@@ -43,7 +43,7 @@ const About = () => {
       id: 4,
       title: "Events & News",
       description: "Upcoming events and announcements",
-      icon: "calendar-star",
+      icon: "event",
       iconLibrary: "MaterialIcons",
       color: Colors.yellowAccent,
       route: "/events",
@@ -138,8 +138,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 20,
+    paddingBottom: 0,
   },
+
   header: {
     paddingHorizontal: 20,
     paddingBottom: 16,
@@ -166,10 +167,11 @@ const styles = StyleSheet.create({
   gridContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 16,
+    justifyContent: "space-between",
   },
+
   card: {
-    width: "47%",
+    width: "48%",
     backgroundColor: Colors.uiBackground,
     borderRadius: 12,
     padding: 20,
@@ -178,7 +180,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    marginBottom: 16,
   },
+
   iconContainer: {
     width: 64,
     height: 64,

@@ -58,6 +58,13 @@ const LayoutContent = () => {
             gestureEnabled: false,
           }}
         />
+        <Stack.Screen
+          name="finances"
+          options={{
+            headerTitle: "Finances",
+            gestureEnabled: false,
+          }}
+        />
       </Stack>
     </>
   );
