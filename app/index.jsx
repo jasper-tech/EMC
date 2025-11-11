@@ -8,7 +8,7 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Colors } from "../constants/Colors";
 import ThemedView from "../components/ThemedView";
@@ -23,6 +23,15 @@ const Login = () => {
     password: "",
   });
   const [loading, setLoading] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleLogin = async () => {
     // Validate input
@@ -71,6 +80,22 @@ const Login = () => {
       setLoading(false);
     }
   };
+
+  // Splash Screen
+  if (showSplash) {
+    return (
+      <ThemedView style={styles.splashContainer}>
+        <View style={styles.splashContent}>
+          <ThemedText style={styles.splashTitle}>EMC</ThemedText>
+        </View>
+        <View style={styles.splashFooter}>
+          <ThemedText style={styles.splashFooterText}>
+            by jasper-tech
+          </ThemedText>
+        </View>
+      </ThemedView>
+    );
+  }
 
   return (
     <ThemedView style={styles.container}>
@@ -241,5 +266,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "bold",
     color: Colors.blueAccent,
+  },
+  // Splash Screen Styles
+  splashContainer: {
+    flex: 1,
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 60,
+  },
+  splashContent: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  splashTitle: {
+    fontSize: 72,
+    fontWeight: "bold",
+    letterSpacing: 4,
+    color: Colors.blueAccent,
+  },
+  splashFooter: {
+    paddingBottom: 20,
+  },
+  splashFooterText: {
+    fontSize: 14,
+    opacity: 0.6,
+    letterSpacing: 1,
   },
 });

@@ -4,6 +4,7 @@ import { Stack } from "expo-router";
 import { Colors } from "../constants/Colors";
 import { StatusBar } from "expo-status-bar";
 import { ThemeProvider, ThemeContext } from "../context/ThemeContext";
+import { AuthProvider } from "../context/AuthContext";
 
 const LayoutContent = () => {
   const { scheme } = useContext(ThemeContext);
@@ -25,6 +26,7 @@ const LayoutContent = () => {
           options={{
             headerTitle: "Login",
             headerBackVisible: false,
+            gestureEnabled: false,
           }}
         />
         <Stack.Screen
@@ -63,7 +65,9 @@ const LayoutContent = () => {
 const RootLayout = () => {
   return (
     <ThemeProvider>
-      <LayoutContent />
+      <AuthProvider>
+        <LayoutContent />
+      </AuthProvider>
     </ThemeProvider>
   );
 };

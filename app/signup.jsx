@@ -8,9 +8,12 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  Modal,
 } from "react-native";
+import { Picker } from "@react-native-picker/picker";
 import React, { useState } from "react";
 import { MaterialIcons } from "@expo/vector-icons";
+import RNPickerSelect from "react-native-picker-select";
 import { Colors } from "../constants/Colors";
 import ThemedView from "../components/ThemedView";
 import ThemedText from "../components/ThemedText";
@@ -24,16 +27,20 @@ const Signup = () => {
     fullName: "",
     email: "",
     phone: "",
+    role: "",
     password: "",
     confirmPassword: "",
   });
   const [loading, setLoading] = useState(false);
+  const [showRolePicker, setShowRolePicker] = useState(false);
+  const [tempRole, setTempRole] = useState("");
 
   const validateForm = () => {
     if (
       !formData.fullName ||
       !formData.email ||
       !formData.phone ||
+      !formData.role ||
       !formData.password ||
       !formData.confirmPassword
     ) {
@@ -59,7 +66,6 @@ const Signup = () => {
 
     setLoading(true);
     try {
-      // Create user with email and password
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         formData.email,
@@ -68,7 +74,6 @@ const Signup = () => {
 
       const user = userCredential.user;
 
-      // Ensure the user's ID token is available to Firestore rules (avoid timing issues)
       try {
         await user.getIdToken();
       } catch (tokenErr) {
@@ -78,16 +83,15 @@ const Signup = () => {
         );
       }
 
-      // Update user profile with display name
       await updateProfile(user, {
         displayName: formData.fullName,
       });
 
-      // Save user details to Firestore
       await setDoc(doc(db, "users", user.uid), {
         fullName: formData.fullName,
         email: formData.email,
         phone: formData.phone,
+        role: formData.role,
         createdAt: new Date().toISOString(),
         uid: user.uid,
       });
@@ -125,6 +129,40 @@ const Signup = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const roleOptions = [
+    { label: "Union President", value: "Union President" },
+    { label: "Union Vice President", value: "Union Vice President" },
+    { label: "Union General Secretary", value: "Union General Secretary" },
+    { label: "Union Assistant Secretary", value: "Union Assistant Secretary" },
+    { label: "Union Financial Secretary", value: "Union Financial Secretary" },
+    { label: "Union Treasurer", value: "Union Treasurer" },
+    {
+      label: "Union Organizing Secretary",
+      value: "Union Organizing Secretary",
+    },
+    {
+      label: "Union Assistant Organizing Secretary",
+      value: "Union Assistant Organizing Secretary",
+    },
+    { label: "Union Mother", value: "Union Mother" },
+    { label: "Union Prayer Secretary", value: "Union Prayer Secretary" },
+    { label: "Union Bible Facilitator", value: "Union Bible Facilitator" },
+  ];
+
+  const openRolePicker = () => {
+    setTempRole(formData.role || roleOptions[0].value);
+    setShowRolePicker(true);
+  };
+
+  const handleRoleConfirm = () => {
+    setFormData({ ...formData, role: tempRole });
+    setShowRolePicker(false);
+  };
+
+  const handleRoleCancel = () => {
+    setShowRolePicker(false);
   };
 
   return (
@@ -195,6 +233,54 @@ const Signup = () => {
             </View>
 
             <View style={styles.inputContainer}>
+              <ThemedText style={styles.label}>Role</ThemedText>
+              {Platform.OS === "ios" ? (
+                <TouchableOpacity
+                  style={styles.pickerTouchable}
+                  onPress={openRolePicker}
+                  disabled={loading}
+                >
+                  <ThemedText
+                    style={[
+                      styles.pickerText,
+                      !formData.role && styles.pickerPlaceholder,
+                    ]}
+                  >
+                    {formData.role || "Select your role"}
+                  </ThemedText>
+                  <MaterialIcons
+                    name="arrow-drop-down"
+                    size={24}
+                    color="#666"
+                  />
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.pickerContainer}>
+                  <RNPickerSelect
+                    placeholder={{
+                      label: "Select your role",
+                      value: null,
+                      color: "#9EA0A4",
+                    }}
+                    items={roleOptions}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, role: value })
+                    }
+                    value={formData.role}
+                    disabled={loading}
+                    style={{
+                      inputAndroid: styles.pickerInputAndroid,
+                      placeholder: {
+                        color: "#9EA0A4",
+                      },
+                    }}
+                    useNativeAndroidPickerStyle={false}
+                  />
+                </View>
+              )}
+            </View>
+
+            <View style={styles.inputContainer}>
               <ThemedText style={styles.label}>Password</ThemedText>
               <TextInput
                 style={styles.input}
@@ -248,6 +334,50 @@ const Signup = () => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* iOS Modal Picker */}
+      <Modal
+        visible={showRolePicker}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={handleRoleCancel}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={handleRoleCancel}
+          />
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={handleRoleCancel}>
+                <ThemedText style={styles.modalButton}>Cancel</ThemedText>
+              </TouchableOpacity>
+              <ThemedText style={styles.modalTitle}>Select Role</ThemedText>
+              <TouchableOpacity onPress={handleRoleConfirm}>
+                <ThemedText
+                  style={[styles.modalButton, styles.modalButtonDone]}
+                >
+                  Done
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+            <Picker
+              selectedValue={tempRole}
+              onValueChange={(itemValue) => setTempRole(itemValue)}
+              style={styles.picker}
+            >
+              {roleOptions.map((option) => (
+                <Picker.Item
+                  key={option.value}
+                  label={option.label}
+                  value={option.value}
+                />
+              ))}
+            </Picker>
+          </View>
+        </View>
+      </Modal>
     </ThemedView>
   );
 };
@@ -301,6 +431,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e0e0e0",
   },
+  pickerTouchable: {
+    backgroundColor: "#f5f5f5",
+    borderRadius: 8,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  pickerText: {
+    fontSize: 16,
+    color: "#000",
+  },
+  pickerPlaceholder: {
+    color: "#9EA0A4",
+  },
   signupButton: {
     backgroundColor: Colors.blueAccent,
     borderRadius: 8,
@@ -329,5 +476,56 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "bold",
     color: Colors.blueAccent,
+  },
+  pickerContainer: {
+    backgroundColor: "#f5f5f5",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+  },
+  pickerInputAndroid: {
+    fontSize: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    color: "#000",
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  modalContent: {
+    backgroundColor: "#000",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 34,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: "600",
+  },
+  modalButton: {
+    fontSize: 17,
+    color: Colors.blueAccent,
+  },
+  modalButtonDone: {
+    fontWeight: "600",
+  },
+  picker: {
+    width: "100%",
+    height: 216,
   },
 });

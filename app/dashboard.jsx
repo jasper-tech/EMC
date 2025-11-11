@@ -1,4 +1,4 @@
-import { StyleSheet, ScrollView, View } from "react-native";
+import { StyleSheet, ScrollView, View, ActivityIndicator } from "react-native";
 import React from "react";
 import { MaterialIcons, FontAwesome, Ionicons } from "@expo/vector-icons";
 import { Colors } from "../constants/Colors";
@@ -7,8 +7,17 @@ import DashboardHeader from "../components/DashboardHeader";
 import StatCard from "../components/StatCard";
 import ThemedText from "../components/ThemedText";
 import FooterNav from "../components/FooterNav";
+import { useAuth } from "../context/AuthContext";
 
 const Dashboard = () => {
+  const { user, userProfile, loading } = useAuth();
+
+  const handleProfilePress = () => {
+    // Navigate to profile screen or show profile modal
+    console.log("Profile pressed");
+    // router.push("/profile");
+  };
+
   const statsData = [
     {
       icon: <MaterialIcons name="group" size={28} color={Colors.blueAccent} />,
@@ -54,9 +63,22 @@ const Dashboard = () => {
     },
   ];
 
+  if (loading) {
+    return (
+      <ThemedView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={Colors.blueAccent} />
+      </ThemedView>
+    );
+  }
+
   return (
     <ThemedView style={styles.container}>
-      <DashboardHeader unionName="Students Union" userRole="Admin" />
+      <DashboardHeader
+        userName={userProfile?.fullName || user?.email?.split("@")[0] || "User"}
+        userRole={userProfile?.role || "Member"}
+        userAvatar={userProfile?.photoURL}
+        onProfilePress={handleProfilePress}
+      />
 
       <View style={styles.content}>
         <ThemedText type="title" style={styles.sectionTitle}>
@@ -91,6 +113,11 @@ export default Dashboard;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   content: {
     flex: 1,
