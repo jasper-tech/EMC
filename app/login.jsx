@@ -8,15 +8,23 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import * as WebBrowser from "expo-web-browser";
+// import * as Google from "expo-auth-session/providers/google";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Colors } from "../constants/Colors";
 import ThemedView from "../components/ThemedView";
 import ThemedText from "../components/ThemedText";
 import { router } from "expo-router";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import {
+  signInWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithCredential,
+} from "firebase/auth";
 import { auth } from "../firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
+WebBrowser.maybeCompleteAuthSession();
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -25,6 +33,21 @@ const Login = () => {
   });
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
+
+  // Google Sign-In configuration
+  // const [request, response, promptAsync] = Google.useAuthRequest({
+  //   androidClientId: "YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com",
+  //   iosClientId: "YOUR_IOS_CLIENT_ID.apps.googleusercontent.com",
+  //   webClientId: "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com",
+  // });
+
+  // Handle Google Sign-In response
+  // useEffect(() => {
+  //   if (response?.type === "success") {
+  //     const { id_token } = response.params;
+  //     handleGoogleSignIn(id_token);
+  //   }
+  // }, [response]);
 
   const handleLogin = async () => {
     // Validate input
@@ -48,7 +71,7 @@ const Login = () => {
         await AsyncStorage.setItem("savedEmail", formData.email);
         await AsyncStorage.setItem("savedPassword", formData.password);
 
-        // Get user's display name (you can fetch this from Firestore if needed)
+        // Get user's display name
         const displayName =
           userCredential.user.displayName || formData.email.split("@")[0];
         await AsyncStorage.setItem("savedName", displayName);
@@ -92,6 +115,22 @@ const Login = () => {
       setLoading(false);
     }
   };
+
+  // const handleGoogleSignIn = async (idToken) => {
+  //   setLoading(true);
+  //   try {
+  //     const credential = GoogleAuthProvider.credential(idToken);
+  //     const userCredential = await signInWithCredential(auth, credential);
+
+  //     console.log("User logged in with Google:", userCredential.user.uid);
+  //     router.replace("/dashboard");
+  //   } catch (error) {
+  //     console.error("Google sign-in error:", error);
+  //     Alert.alert("Google Sign-In Failed", error.message);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   return (
     <ThemedView style={styles.container}>
@@ -177,6 +216,25 @@ const Login = () => {
               )}
             </TouchableOpacity>
 
+            {/* Divider */}
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <ThemedText style={styles.dividerText}>OR</ThemedText>
+              <View style={styles.dividerLine} />
+            </View>
+
+            {/* Google Sign-In Button */}
+            {/* <TouchableOpacity
+              style={styles.googleButton}
+              onPress={() => promptAsync()}
+              disabled={loading || !request}
+            >
+              <MaterialIcons name="g-translate" size={24} color="#fff" />
+              <ThemedText style={styles.googleButtonText}>
+                Continue with Google
+              </ThemedText>
+            </TouchableOpacity> */}
+
             <View style={styles.signupContainer}>
               <ThemedText style={styles.signupText}>
                 Don't have an account?{" "}
@@ -256,9 +314,7 @@ const styles = StyleSheet.create({
   rememberMeText: {
     fontSize: 14,
   },
-  forgotPassword: {
-    // Removed alignSelf
-  },
+  forgotPassword: {},
   forgotPasswordText: {
     fontSize: 14,
     color: Colors.blueAccent,
@@ -291,5 +347,34 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "bold",
     color: Colors.blueAccent,
+  },
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#e0e0e0",
+  },
+  dividerText: {
+    marginHorizontal: 10,
+    fontSize: 14,
+    opacity: 0.5,
+  },
+  googleButton: {
+    backgroundColor: "#DB4437",
+    borderRadius: 8,
+    padding: 16,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 10,
+  },
+  googleButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });

@@ -16,13 +16,18 @@ import {
   orderBy,
   limit,
   onSnapshot,
+  doc,
+  updateDoc,
+  arrayUnion,
 } from "firebase/firestore";
-import { db } from "../firebase";
+import { db, auth } from "../firebase";
 
 const NotificationsCard = ({ maxItems = 5 }) => {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAll, setShowAll] = useState(false);
+  const [updatingIds, setUpdatingIds] = useState(new Set());
+  const currentUserId = auth.currentUser?.uid;
 
   useEffect(() => {
     // Subscribe to notifications collection
@@ -44,13 +49,63 @@ const NotificationsCard = ({ maxItems = 5 }) => {
         setLoading(false);
       },
       (error) => {
-        console.error("Error fetching notifications:", error);
+        // Only log if it's not a permissions error (which happens on sign out)
+        if (error.code !== "permission-denied") {
+          console.error("Error fetching notifications:", error);
+        }
         setLoading(false);
       }
     );
 
     return () => unsubscribe();
   }, []);
+
+  const isReadByCurrentUser = (notification) => {
+    if (!currentUserId || !notification.readBy) return false;
+    return notification.readBy.includes(currentUserId);
+  };
+
+  const markAsRead = async (notificationId) => {
+    if (!currentUserId) return;
+
+    try {
+      setUpdatingIds((prev) => new Set(prev).add(notificationId));
+      const notificationRef = doc(db, "notifications", notificationId);
+      await updateDoc(notificationRef, {
+        readBy: arrayUnion(currentUserId),
+      });
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+    } finally {
+      setUpdatingIds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(notificationId);
+        return newSet;
+      });
+    }
+  };
+
+  const markAllAsRead = async () => {
+    if (!currentUserId) return;
+
+    try {
+      const unreadNotifications = notifications.filter(
+        (n) => !isReadByCurrentUser(n)
+      );
+
+      // Update notifications one by one (batch doesn't work well with arrayUnion)
+      const updatePromises = unreadNotifications.map((notification) => {
+        const notificationRef = doc(db, "notifications", notification.id);
+        return updateDoc(notificationRef, {
+          readBy: arrayUnion(currentUserId),
+        });
+      });
+
+      await Promise.all(updatePromises);
+    } catch (error) {
+      console.error("Error marking all as read:", error);
+    }
+  };
 
   const getNotificationIcon = (type) => {
     switch (type) {
@@ -90,9 +145,12 @@ const NotificationsCard = ({ maxItems = 5 }) => {
 
   const renderNotification = ({ item }) => {
     const iconInfo = getNotificationIcon(item.type);
+    const isUpdating = updatingIds.has(item.id);
+    const isRead = isReadByCurrentUser(item);
+    const readCount = item.readBy ? item.readBy.length : 0;
 
     return (
-      <TouchableOpacity style={styles.notificationItem}>
+      <View style={styles.notificationItem}>
         <View
           style={[
             styles.iconContainer,
@@ -111,19 +169,54 @@ const NotificationsCard = ({ maxItems = 5 }) => {
           <ThemedText style={styles.notificationMessage}>
             {item.message}
           </ThemedText>
-          <ThemedText style={styles.notificationTime}>
-            {formatTimestamp(item.timestamp)}
-          </ThemedText>
+          <View style={styles.notificationFooter}>
+            <View style={styles.footerLeft}>
+              <ThemedText style={styles.notificationTime}>
+                {formatTimestamp(item.timestamp)}
+              </ThemedText>
+              {/* {readCount > 0 && (
+                <View style={styles.readCountContainer}>
+                  <MaterialIcons
+                    name="visibility"
+                    size={12}
+                    color={Colors.blueAccent}
+                  />
+                  <ThemedText style={styles.readCountText}>
+                    {readCount}
+                  </ThemedText>
+                </View>
+              )} */}
+            </View>
+            {!isRead && (
+              <TouchableOpacity
+                style={styles.markReadButton}
+                onPress={() => markAsRead(item.id)}
+                disabled={isUpdating}
+              >
+                {isUpdating ? (
+                  <ActivityIndicator size="small" color={Colors.blueAccent} />
+                ) : (
+                  <ThemedText style={styles.markReadText}>
+                    Mark as read
+                  </ThemedText>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
-        {!item.read && <View style={styles.unreadBadge} />}
-      </TouchableOpacity>
+        {!isRead && <View style={styles.unreadBadge} />}
+      </View>
     );
   };
 
   const displayedNotifications = showAll
     ? notifications
     : notifications.slice(0, maxItems);
+
+  const unreadCount = notifications.filter(
+    (n) => !isReadByCurrentUser(n)
+  ).length;
 
   if (loading) {
     return (
@@ -154,13 +247,25 @@ const NotificationsCard = ({ maxItems = 5 }) => {
           />
           <ThemedText style={styles.headerTitle}>Notifications</ThemedText>
         </View>
-        {notifications.length > 0 && (
-          <View style={styles.badge}>
-            <ThemedText style={styles.badgeText}>
-              {notifications.filter((n) => !n.read).length}
-            </ThemedText>
-          </View>
-        )}
+        <View style={styles.headerRight}>
+          {unreadCount > 0 && (
+            <>
+              <View style={styles.badge}>
+                <ThemedText style={styles.badgeText}>{unreadCount}</ThemedText>
+              </View>
+              <TouchableOpacity
+                style={styles.markAllButton}
+                onPress={markAllAsRead}
+              >
+                <MaterialIcons
+                  name="done-all"
+                  size={20}
+                  color={Colors.blueAccent}
+                />
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
       </View>
 
       {notifications.length === 0 ? (
@@ -223,6 +328,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   headerTitle: {
     fontSize: 18,
     fontWeight: "bold",
@@ -240,6 +350,9 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 12,
     fontWeight: "bold",
+  },
+  markAllButton: {
+    padding: 4,
   },
   loadingContainer: {
     paddingVertical: 32,
@@ -284,9 +397,43 @@ const styles = StyleSheet.create({
     opacity: 0.7,
     marginBottom: 4,
   },
+  notificationFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 4,
+  },
+  footerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   notificationTime: {
     fontSize: 11,
     opacity: 0.5,
+  },
+  readCountContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: Colors.blueAccent + "15",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  readCountText: {
+    fontSize: 10,
+    color: Colors.blueAccent,
+    fontWeight: "600",
+  },
+  markReadButton: {
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+  },
+  markReadText: {
+    fontSize: 11,
+    color: Colors.blueAccent,
+    fontWeight: "600",
   },
   unreadBadge: {
     width: 8,
