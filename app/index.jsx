@@ -1,12 +1,9 @@
 import {
   StyleSheet,
   View,
-  TextInput,
   TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import React, { useState, useEffect } from "react";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -14,18 +11,19 @@ import { Colors } from "../constants/Colors";
 import ThemedView from "../components/ThemedView";
 import ThemedText from "../components/ThemedText";
 import { router } from "expo-router";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, onAuthStateChanged } from "firebase/auth";
 import { auth } from "../firebase";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const Login = () => {
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-  });
-  const [loading, setLoading] = useState(false);
+const Index = () => {
   const [showSplash, setShowSplash] = useState(true);
+  const [savedUser, setSavedUser] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
   useEffect(() => {
+    checkSavedUser();
+
     const timer = setTimeout(() => {
       setShowSplash(false);
     }, 3000);
@@ -33,56 +31,77 @@ const Login = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  const handleLogin = async () => {
-    // Validate input
-    if (!formData.email || !formData.password) {
-      Alert.alert("Error", "Please fill in all fields");
-      return;
+  const checkSavedUser = async () => {
+    try {
+      // Check if user is already logged in
+      const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        if (user) {
+          // User is logged in, navigate to dashboard
+          router.replace("/dashboard");
+        } else {
+          // Check for saved credentials
+          const savedEmail = await AsyncStorage.getItem("savedEmail");
+          const savedPassword = await AsyncStorage.getItem("savedPassword");
+          const savedName = await AsyncStorage.getItem("savedName");
+
+          if (savedEmail && savedPassword) {
+            setSavedUser({
+              email: savedEmail,
+              password: savedPassword,
+              name: savedName || "User",
+            });
+          }
+        }
+        setCheckingAuth(false);
+      });
+
+      return () => unsubscribe();
+    } catch (error) {
+      console.error("Error checking saved user:", error);
+      setCheckingAuth(false);
     }
+  };
+
+  const handleContinueAs = async () => {
+    if (!savedUser) return;
 
     setLoading(true);
     try {
       const userCredential = await signInWithEmailAndPassword(
         auth,
-        formData.email,
-        formData.password
+        savedUser.email,
+        savedUser.password
       );
 
       console.log("User logged in:", userCredential.user.uid);
-      // Navigate to dashboard after successful login
       router.replace("/dashboard");
     } catch (error) {
-      console.error("Login error:", error);
-      let errorMessage = "An error occurred during login";
+      console.error("Auto-login error:", error);
 
-      switch (error.code) {
-        case "auth/invalid-email":
-          errorMessage = "Invalid email address";
-          break;
-        case "auth/user-disabled":
-          errorMessage = "This account has been disabled";
-          break;
-        case "auth/user-not-found":
-          errorMessage = "No account found with this email";
-          break;
-        case "auth/wrong-password":
-          errorMessage = "Incorrect password";
-          break;
-        case "auth/invalid-credential":
-          errorMessage = "Invalid email or password";
-          break;
-        default:
-          errorMessage = error.message;
-      }
+      // Clear saved credentials if login fails
+      await AsyncStorage.multiRemove([
+        "savedEmail",
+        "savedPassword",
+        "savedName",
+      ]);
+      setSavedUser(null);
 
-      Alert.alert("Login Failed", errorMessage);
+      Alert.alert(
+        "Login Failed",
+        "Unable to log in automatically. Please log in manually.",
+        [{ text: "OK" }]
+      );
     } finally {
       setLoading(false);
     }
   };
 
+  const handleDifferentAccount = () => {
+    router.push("/login");
+  };
+
   // Splash Screen
-  if (showSplash) {
+  if (showSplash || checkingAuth) {
     return (
       <ThemedView style={styles.splashContainer}>
         <View style={styles.splashContent}>
@@ -97,96 +116,83 @@ const Login = () => {
     );
   }
 
+  // Welcome Screen with saved user
   return (
     <ThemedView style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.keyboardView}
-      >
-        <View style={styles.content}>
-          <View style={styles.header}>
-            <MaterialIcons name="lock" size={60} color={Colors.blueAccent} />
-            <ThemedText type="title" style={styles.title}>
-              Welcome Back
-            </ThemedText>
-            <ThemedText style={styles.subtitle}>
-              Login to your account
-            </ThemedText>
-          </View>
+      <View style={styles.content}>
+        <View style={styles.header}>
+          {/* <MaterialIcons
+            name="account-circle"
+            size={80}
+            color={Colors.blueAccent}
+          /> */}
+          <ThemedText type="title" style={styles.title}>
+            Welcome Back
+          </ThemedText>
+        </View>
 
-          <View style={styles.form}>
-            <View style={styles.inputContainer}>
-              <ThemedText style={styles.label}>Email</ThemedText>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your email"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                value={formData.email}
-                onChangeText={(text) =>
-                  setFormData({ ...formData, email: text })
-                }
-                editable={!loading}
+        {savedUser ? (
+          <View style={styles.userSection}>
+            <View style={styles.userCard}>
+              <MaterialIcons
+                name="person"
+                size={40}
+                color={Colors.blueAccent}
               />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <ThemedText style={styles.label}>Password</ThemedText>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your password"
-                secureTextEntry
-                value={formData.password}
-                onChangeText={(text) =>
-                  setFormData({ ...formData, password: text })
-                }
-                editable={!loading}
-              />
-            </View>
-
-            <TouchableOpacity style={styles.forgotPassword}>
-              <ThemedText style={styles.forgotPasswordText}>
-                Forgot Password?
+              <ThemedText style={styles.userName}>{savedUser.name}</ThemedText>
+              <ThemedText style={styles.userEmail}>
+                {savedUser.email}
               </ThemedText>
-            </TouchableOpacity>
+            </View>
 
             <TouchableOpacity
-              style={[
-                styles.loginButton,
-                loading && styles.loginButtonDisabled,
-              ]}
-              onPress={handleLogin}
+              style={[styles.continueButton, loading && styles.buttonDisabled]}
+              onPress={handleContinueAs}
               disabled={loading}
             >
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <ThemedText style={styles.loginButtonText}>Login</ThemedText>
+                <ThemedText style={styles.continueButtonText}>
+                  Continue as {savedUser.name}
+                </ThemedText>
               )}
             </TouchableOpacity>
 
-            <View style={styles.signupContainer}>
-              <ThemedText style={styles.signupText}>
-                Don't have an account?{" "}
+            <TouchableOpacity
+              style={styles.differentAccountButton}
+              onPress={handleDifferentAccount}
+              disabled={loading}
+            >
+              <ThemedText style={styles.differentAccountText}>
+                Use a different account
               </ThemedText>
-              <TouchableOpacity onPress={() => router.push("/signup")}>
-                <ThemedText style={styles.signupLink}>Sign Up</ThemedText>
-              </TouchableOpacity>
-            </View>
+            </TouchableOpacity>
           </View>
-        </View>
-      </KeyboardAvoidingView>
+        ) : (
+          <View style={styles.noUserSection}>
+            <ThemedText style={styles.noUserText}>
+              No saved account found
+            </ThemedText>
+            <TouchableOpacity
+              style={styles.loginButton}
+              onPress={() => router.push("/login")}
+            >
+              <ThemedText style={styles.loginButtonText}>
+                Go to Login
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
     </ThemedView>
   );
 };
 
-export default Login;
+export default Index;
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-  },
-  keyboardView: {
     flex: 1,
   },
   content: {
@@ -204,68 +210,72 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "bold",
     marginTop: 16,
-    marginBottom: 8,
   },
-  subtitle: {
-    fontSize: 16,
-    opacity: 0.7,
-    textAlign: "center",
-  },
-  form: {
+  userSection: {
     width: "100%",
   },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: "#f5f5f5",
-    borderRadius: 8,
-    padding: 14,
-    fontSize: 16,
+  userCard: {
+    backgroundColor: Colors.uiBackground,
+    borderRadius: 12,
+    padding: 24,
+    alignItems: "center",
+    marginBottom: 24,
     borderWidth: 1,
     borderColor: "#e0e0e0",
   },
-  forgotPassword: {
-    alignSelf: "flex-end",
-    marginBottom: 20,
+  userName: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginTop: 12,
   },
-  forgotPasswordText: {
+  userEmail: {
+    fontSize: 14,
+    opacity: 0.7,
+    marginTop: 4,
+  },
+  continueButton: {
+    backgroundColor: Colors.blueAccent,
+    borderRadius: 8,
+    padding: 16,
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+  continueButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  differentAccountButton: {
+    padding: 16,
+    alignItems: "center",
+  },
+  differentAccountText: {
     fontSize: 14,
     color: Colors.blueAccent,
+  },
+  noUserSection: {
+    width: "100%",
+    alignItems: "center",
+  },
+  noUserText: {
+    fontSize: 16,
+    opacity: 0.7,
+    marginBottom: 24,
   },
   loginButton: {
     backgroundColor: Colors.blueAccent,
     borderRadius: 8,
     padding: 16,
     alignItems: "center",
-    marginTop: 10,
-  },
-  loginButtonDisabled: {
-    opacity: 0.7,
+    width: "100%",
   },
   loginButtonText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
-  },
-  signupContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 24,
-  },
-  signupText: {
-    fontSize: 14,
-  },
-  signupLink: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: Colors.blueAccent,
   },
   // Splash Screen Styles
   splashContainer: {

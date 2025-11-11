@@ -15,11 +15,13 @@ import React, { useState } from "react";
 import { MaterialIcons } from "@expo/vector-icons";
 import RNPickerSelect from "react-native-picker-select";
 import { Colors } from "../constants/Colors";
+import { ThemeContext } from "../context/ThemeContext";
+import { useContext } from "react";
 import ThemedView from "../components/ThemedView";
 import ThemedText from "../components/ThemedText";
 import { router } from "expo-router";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, addDoc, collection } from "firebase/firestore";
 import { auth, db } from "../firebase";
 
 const Signup = () => {
@@ -34,6 +36,9 @@ const Signup = () => {
   const [loading, setLoading] = useState(false);
   const [showRolePicker, setShowRolePicker] = useState(false);
   const [tempRole, setTempRole] = useState("");
+
+  const { scheme } = useContext(ThemeContext);
+  const theme = Colors[scheme] ?? Colors.light;
 
   const validateForm = () => {
     if (
@@ -95,6 +100,16 @@ const Signup = () => {
         createdAt: new Date().toISOString(),
         uid: user.uid,
       });
+
+      await addDoc(collection(db, "notifications"), {
+        type: "user_created",
+        title: "New Member Joined",
+        message: `${formData.fullName} (${formData.role}) has joined the union`,
+        timestamp: new Date(),
+        read: false,
+      });
+
+      console.log("User created and saved to Firestore:", user.uid);
 
       console.log("User created and saved to Firestore:", user.uid);
 
@@ -348,7 +363,12 @@ const Signup = () => {
             activeOpacity={1}
             onPress={handleRoleCancel}
           />
-          <View style={styles.modalContent}>
+          <View
+            style={[
+              styles.modalContent,
+              { backgroundColor: theme.uiBackground },
+            ]}
+          >
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={handleRoleCancel}>
                 <ThemedText style={styles.modalButton}>Cancel</ThemedText>
@@ -499,7 +519,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   modalContent: {
-    backgroundColor: "#000",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingBottom: 34,

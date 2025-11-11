@@ -24,7 +24,7 @@ const LayoutContent = () => {
         <Stack.Screen
           name="index"
           options={{
-            headerTitle: "Login",
+            headerTitle: "",
             headerBackVisible: false,
             gestureEnabled: false,
           }}

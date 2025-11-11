@@ -10,6 +10,9 @@ import { Ionicons } from "@expo/vector-icons";
 import ThemedText from "./ThemedText";
 import { Colors } from "../constants/Colors";
 import { ThemeContext } from "../context/ThemeContext";
+import { signOut } from "firebase/auth";
+import { auth } from "../firebase";
+import { router } from "expo-router";
 
 const DashboardHeader = ({
   userName = "John Doe",
@@ -21,6 +24,15 @@ const DashboardHeader = ({
 }) => {
   const { scheme, toggleScheme } = useContext(ThemeContext);
   const theme = Colors[scheme] ?? Colors.light;
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      router.replace("/");
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
 
   const getCurrentGreeting = () => {
     const hour = new Date().getHours();
@@ -76,7 +88,10 @@ const DashboardHeader = ({
               <Ionicons name="person" size={28} color={Colors.primary} />
             )}
             <View
-              style={[styles.roleBadge, { backgroundColor: Colors.primary }]}
+              style={[
+                styles.roleBadge,
+                { backgroundColor: Colors.uiBackground },
+              ]}
             >
               <ThemedText style={styles.roleText}>
                 {userRole.substring(0, 1)}
@@ -132,6 +147,16 @@ const DashboardHeader = ({
             />
           </TouchableOpacity>
         </View>
+
+        {/* Sign Out Button */}
+        <TouchableOpacity
+          style={[styles.iconButton, { backgroundColor: theme.uiBackground }]}
+          onPress={handleSignOut}
+          activeOpacity={0.7}
+          accessibilityLabel="Sign out"
+        >
+          <Ionicons name="log-out-outline" size={20} color={theme.text} />
+        </TouchableOpacity>
       </View>
 
       {/* Date Row */}
@@ -159,8 +184,8 @@ const styles = StyleSheet.create({
       ios: {
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+        // shadowOpacity: 0.1,
+        // shadowRadius: 2,
       },
       android: {
         elevation: 4,
@@ -280,7 +305,7 @@ const styles = StyleSheet.create({
   roleText: {
     fontSize: 9,
     fontWeight: "bold",
-    color: "#fff",
+    color: Colors.text,
   },
   dateRow: {
     flexDirection: "row",

@@ -7,6 +7,7 @@ import DashboardHeader from "../components/DashboardHeader";
 import StatCard from "../components/StatCard";
 import ThemedText from "../components/ThemedText";
 import FooterNav from "../components/FooterNav";
+import NotificationsCard from "../components/NotificationsCard";
 import { useAuth } from "../context/AuthContext";
 
 const Dashboard = () => {
@@ -103,6 +104,7 @@ const Dashboard = () => {
           ))}
         </ScrollView>
       </View>
+      <NotificationsCard />
       <FooterNav />
     </ThemedView>
   );
