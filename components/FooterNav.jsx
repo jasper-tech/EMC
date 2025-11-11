@@ -19,7 +19,7 @@ const FooterNav = () => {
       name: "Home",
       icon: "home",
       iconFilled: "home",
-      route: "/",
+      route: "/dashboard",
     },
     {
       name: "About",
@@ -69,7 +69,11 @@ const FooterNav = () => {
           <TouchableOpacity
             key={index}
             style={styles.tab}
-            onPress={() => router.push(tab.route)}
+            onPress={() => {
+              if (!active) {
+                router.push(tab.route);
+              }
+            }}
             activeOpacity={0.7}
           >
             <View style={styles.iconContainer}>

@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet } from "react-native";
 import React, { useContext } from "react";
 import { Stack } from "expo-router";
 import { Colors } from "../constants/Colors";
@@ -16,26 +16,43 @@ const LayoutContent = () => {
         screenOptions={{
           headerStyle: { backgroundColor: theme.navBackground },
           headerShown: false,
-          headerTintColor: theme.title,
+          animation: "fade",
+          animationDuration: 200,
         }}
       >
         <Stack.Screen
           name="index"
           options={{
-            headerTitle: "",
+            headerTitle: "Login",
             headerBackVisible: false,
+          }}
+        />
+        <Stack.Screen
+          name="signup"
+          options={{
+            headerTitle: "Sign Up",
+          }}
+        />
+        <Stack.Screen
+          name="dashboard"
+          options={{
+            headerTitle: "Dashboard",
+            headerBackVisible: false,
+            gestureEnabled: false,
           }}
         />
         <Stack.Screen
           name="about"
           options={{
-            headerTitle: "",
+            headerTitle: "About",
+            gestureEnabled: false,
           }}
         />
         <Stack.Screen
           name="reports"
           options={{
-            headerTitle: "",
+            headerTitle: "Reports",
+            gestureEnabled: false,
           }}
         />
       </Stack>

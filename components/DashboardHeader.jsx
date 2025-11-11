@@ -1,19 +1,25 @@
-import { StyleSheet, View, TouchableOpacity, Platform } from "react-native";
+import {
+  StyleSheet,
+  View,
+  TouchableOpacity,
+  Platform,
+  Image,
+} from "react-native";
 import React, { useContext } from "react";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import ThemedText from "./ThemedText";
-import ThemeToggle from "./ThemeToggle";
 import { Colors } from "../constants/Colors";
 import { ThemeContext } from "../context/ThemeContext";
 
 const DashboardHeader = ({
-  unionName = "Students Union",
+  userName = "John Doe",
   userRole = "Admin",
+  userAvatar = null, // URL or local image source
   onProfilePress,
   //   onNotificationPress,
-  //   hasStackHeader = false,
+  hasStackHeader = false,
 }) => {
-  const { scheme } = useContext(ThemeContext);
+  const { scheme, toggleScheme } = useContext(ThemeContext);
   const theme = Colors[scheme] ?? Colors.light;
 
   const getCurrentGreeting = () => {
@@ -34,24 +40,52 @@ const DashboardHeader = ({
   };
 
   return (
-    <View style={[styles.header, { backgroundColor: theme.navBackground }]}>
+    <View
+      style={[
+        styles.header,
+        { backgroundColor: theme.navBackground },
+        hasStackHeader && styles.headerWithStack,
+      ]}
+    >
       <View style={styles.topRow}>
-        <View style={styles.unionInfo}>
+        <TouchableOpacity
+          style={styles.unionInfo}
+          onPress={onProfilePress}
+          activeOpacity={0.7}
+        >
           <View
             style={[
-              styles.logoContainer,
-              { backgroundColor: `${Colors.primary}15` },
+              styles.avatarContainer,
+              {
+                backgroundColor: userAvatar
+                  ? "transparent"
+                  : `${Colors.primary}15`,
+              },
             ]}
           >
-            <MaterialCommunityIcons
-              name="school"
-              size={28}
-              color={Colors.primary}
-            />
+            {userAvatar ? (
+              <Image
+                source={
+                  typeof userAvatar === "string"
+                    ? { uri: userAvatar }
+                    : userAvatar
+                }
+                style={styles.avatarImage}
+              />
+            ) : (
+              <Ionicons name="person" size={28} color={Colors.primary} />
+            )}
+            <View
+              style={[styles.roleBadge, { backgroundColor: Colors.primary }]}
+            >
+              <ThemedText style={styles.roleText}>
+                {userRole.substring(0, 1)}
+              </ThemedText>
+            </View>
           </View>
           <View style={styles.textContainer}>
-            <ThemedText type="title" style={styles.unionName}>
-              {unionName}
+            <ThemedText type="title" style={styles.userName}>
+              {userName}
             </ThemedText>
             <View style={styles.greetingRow}>
               <Ionicons
@@ -65,7 +99,7 @@ const DashboardHeader = ({
               </ThemedText>
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
 
         <View style={styles.rightSection}>
           {/* Notification Button */}
@@ -85,25 +119,17 @@ const DashboardHeader = ({
           </TouchableOpacity> */}
 
           {/* Theme Toggle */}
-          <ThemeToggle />
-
-          {/* Profile Button */}
           <TouchableOpacity
-            style={[
-              styles.profileButton,
-              { backgroundColor: theme.uiBackground },
-            ]}
-            onPress={onProfilePress}
+            style={[styles.iconButton, { backgroundColor: theme.uiBackground }]}
+            onPress={toggleScheme}
             activeOpacity={0.7}
+            accessibilityLabel="Toggle theme"
           >
-            <Ionicons name="person" size={20} color={theme.text} />
-            <View
-              style={[styles.roleBadge, { backgroundColor: Colors.primary }]}
-            >
-              <ThemedText style={styles.roleText}>
-                {userRole.substring(0, 1)}
-              </ThemedText>
-            </View>
+            <Ionicons
+              name={scheme === "dark" ? "moon" : "sunny"}
+              size={20}
+              color={theme.text}
+            />
           </TouchableOpacity>
         </View>
       </View>
@@ -160,10 +186,30 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginRight: 12,
   },
+  avatarContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+    position: "relative",
+    overflow: "hidden",
+  },
+  avatarImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
   textContainer: {
     flex: 1,
   },
   unionName: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+  userName: {
     fontSize: 18,
     fontWeight: "700",
     marginBottom: 2,
@@ -225,6 +271,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
+  headerWithStack: {
+    paddingTop: 16,
   },
   roleText: {
     fontSize: 9,

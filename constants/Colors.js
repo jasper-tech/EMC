@@ -2,6 +2,15 @@ export const Colors = {
   primary: "#6849a7",
   warning: "#cc475a",
 
+  // Accent colors
+  blueAccent: "#2196F3",
+  greenAccent: "#28A745",
+  yellowAccent: "#FFC107",
+  redAccent: "#EF5350",
+  tealAccent: "#17A2B8",
+  orangeAccent: "#FF7F50",
+  purpleAccent: "#9B59B6",
+
   dark: {
     text: "#d4d4d4",
     title: "#fff",
