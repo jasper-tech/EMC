@@ -39,7 +39,7 @@ const LayoutContent = () => {
         <Stack.Screen
           name="dashboard"
           options={{
-            headerTitle: "Dashboard",
+            headerTitle: "",
             headerBackVisible: false,
             gestureEnabled: false,
           }}
