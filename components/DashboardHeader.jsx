@@ -178,14 +178,12 @@ export default DashboardHeader;
 const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === "ios" ? 60 : 20,
+    paddingTop: Platform.OS === "ios" ? 16 : 16,
     paddingBottom: 16,
     ...Platform.select({
       ios: {
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
-        // shadowOpacity: 0.1,
-        // shadowRadius: 2,
       },
       android: {
         elevation: 4,

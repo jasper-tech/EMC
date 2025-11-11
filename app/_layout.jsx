@@ -16,7 +16,8 @@ const LayoutContent = () => {
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: theme.navBackground },
-          headerShown: false,
+          headerTintColor: Colors.blueAccent,
+          headerTitleStyle: { color: theme.text },
           animation: "fade",
           animationDuration: 200,
         }}
