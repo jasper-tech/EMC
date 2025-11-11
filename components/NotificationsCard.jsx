@@ -49,7 +49,6 @@ const NotificationsCard = ({ maxItems = 5 }) => {
         setLoading(false);
       },
       (error) => {
-        // Only log if it's not a permissions error (which happens on sign out)
         if (error.code !== "permission-denied") {
           console.error("Error fetching notifications:", error);
         }
@@ -210,6 +209,9 @@ const NotificationsCard = ({ maxItems = 5 }) => {
     );
   };
 
+  const MAX_VISIBLE_ITEMS = 4;
+  const ITEM_HEIGHT = 72;
+
   const displayedNotifications = showAll
     ? notifications
     : notifications.slice(0, maxItems);
@@ -275,13 +277,21 @@ const NotificationsCard = ({ maxItems = 5 }) => {
         </View>
       ) : (
         <>
-          <FlatList
-            data={displayedNotifications}
-            renderItem={renderNotification}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
-            contentContainerStyle={styles.listContent}
-          />
+          <View
+            style={{
+              maxHeight: MAX_VISIBLE_ITEMS * ITEM_HEIGHT,
+              marginBottom: 8,
+            }}
+          >
+            <FlatList
+              data={displayedNotifications}
+              renderItem={renderNotification}
+              keyExtractor={(item) => item.id}
+              scrollEnabled={true} // now scrolls if too tall
+              showsVerticalScrollIndicator={true}
+              contentContainerStyle={styles.listContent}
+            />
+          </View>
 
           {notifications.length > maxItems && (
             <TouchableOpacity
