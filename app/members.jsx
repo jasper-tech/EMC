@@ -154,6 +154,8 @@ const Members = () => {
 
       await addDoc(membersRef, {
         ...formData,
+        uid: "",
+        isExecutive: false,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });

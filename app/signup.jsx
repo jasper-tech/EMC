@@ -154,15 +154,15 @@ const Signup = () => {
         uid: user.uid,
       });
 
-      // Also save to members collection
       await addDoc(collection(db, "members"), {
         fullname: formData.fullName,
         email: formData.email,
         phone: formData.phone,
         role: formData.role,
-        address: formData.address, // Added address
+        address: formData.address,
         dateJoined: new Date().toISOString().split("T")[0],
-        isExecutive: true, // Mark as executive
+        isExecutive: true,
+        uid: user.uid,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
