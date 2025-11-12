@@ -1,23 +1,19 @@
 import { StyleSheet, ScrollView, View, ActivityIndicator } from "react-native";
-import React from "react";
+import React, { useState } from "react";
 import { MaterialIcons, FontAwesome, Ionicons } from "@expo/vector-icons";
+import { GestureDetector, Gesture } from "react-native-gesture-handler";
 import { Colors } from "../constants/Colors";
 import ThemedView from "../components/ThemedView";
-import DashboardHeader from "../components/DashboardHeader";
 import StatCard from "../components/StatCard";
 import ThemedText from "../components/ThemedText";
 import FooterNav from "../components/FooterNav";
 import NotificationsCard from "../components/NotificationsCard";
+import SidePanel from "../components/SidePanel";
 import { useAuth } from "../context/AuthContext";
 
 const Dashboard = () => {
   const { user, userProfile, loading } = useAuth();
-
-  const handleProfilePress = () => {
-    // Navigate to profile screen or show profile modal
-    console.log("Profile pressed");
-    // router.push("/profile");
-  };
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
 
   const statsData = [
     {
@@ -64,6 +60,16 @@ const Dashboard = () => {
     },
   ];
 
+  // Swipe gesture to open panel
+  const swipeGesture = Gesture.Pan()
+    .onEnd((event) => {
+      // Swipe from left edge to right
+      if (event.translationX > 100 && event.velocityX > 0) {
+        setIsPanelOpen(true);
+      }
+    })
+    .runOnJS(true);
+
   if (loading) {
     return (
       <ThemedView style={styles.loadingContainer}>
@@ -73,40 +79,47 @@ const Dashboard = () => {
   }
 
   return (
-    <ThemedView style={styles.container}>
-      <DashboardHeader
-        userName={userProfile?.fullName || user?.email?.split("@")[0] || "User"}
-        userRole={userProfile?.role || "Member"}
-        userAvatar={userProfile?.photoURL}
-        onProfilePress={handleProfilePress}
-      />
+    <GestureDetector gesture={swipeGesture}>
+      <ThemedView style={styles.container}>
+        <View style={styles.content}>
+          <ThemedText type="title" style={styles.sectionTitle}>
+            Quick Stats
+          </ThemedText>
 
-      <View style={styles.content}>
-        <ThemedText type="title" style={styles.sectionTitle}>
-          Quick Stats
-        </ThemedText>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.statsContainer}
+            contentContainerStyle={styles.statsContent}
+          >
+            {statsData.map((stat, index) => (
+              <StatCard
+                key={index}
+                icon={stat.icon}
+                title={stat.title}
+                value={stat.value}
+                subtitle={stat.subtitle}
+                trend={stat.trend}
+              />
+            ))}
+          </ScrollView>
+        </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.statsContainer}
-          contentContainerStyle={styles.statsContent}
-        >
-          {statsData.map((stat, index) => (
-            <StatCard
-              key={index}
-              icon={stat.icon}
-              title={stat.title}
-              value={stat.value}
-              subtitle={stat.subtitle}
-              trend={stat.trend}
-            />
-          ))}
-        </ScrollView>
-      </View>
-      <NotificationsCard />
-      <FooterNav />
-    </ThemedView>
+        <NotificationsCard />
+        <FooterNav />
+
+        {/* Side Panel */}
+        <SidePanel
+          userName={
+            userProfile?.fullName || user?.email?.split("@")[0] || "User"
+          }
+          userRole={userProfile?.role || "Member"}
+          userAvatar={userProfile?.photoURL}
+          isOpen={isPanelOpen}
+          onClose={() => setIsPanelOpen(false)}
+        />
+      </ThemedView>
+    </GestureDetector>
   );
 };
 
