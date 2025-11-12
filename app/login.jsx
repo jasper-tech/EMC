@@ -108,15 +108,23 @@ const Login = () => {
         formData.password
       );
 
-      // ADD THIS CHECK FOR EMAIL VERIFICATION
       if (!userCredential.user.emailVerified) {
+        await signOut(auth);
+
         Alert.alert(
           "Email Not Verified",
           "Please verify your email before signing in. Check your inbox for the verification link.",
           [
             {
               text: "Resend Verification",
-              onPress: () => sendEmailVerification(userCredential.user),
+              onPress: async () => {
+                try {
+                  await sendEmailVerification(userCredential.user);
+                  Alert.alert("Success", "Verification email sent!");
+                } catch (error) {
+                  Alert.alert("Error", "Failed to send verification email");
+                }
+              },
             },
             {
               text: "OK",
@@ -124,8 +132,8 @@ const Login = () => {
             },
           ]
         );
-        await signOut(auth); // Sign them out until verified
-        return;
+        setLoading(false); // Stop loading
+        return; // Stop execution here
       }
       console.log("User logged in:", userCredential.user.uid);
 
