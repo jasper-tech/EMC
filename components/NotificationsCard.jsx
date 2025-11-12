@@ -287,7 +287,7 @@ const NotificationsCard = ({ maxItems = 5 }) => {
               data={displayedNotifications}
               renderItem={renderNotification}
               keyExtractor={(item) => item.id}
-              scrollEnabled={true} // now scrolls if too tall
+              scrollEnabled={true}
               showsVerticalScrollIndicator={true}
               contentContainerStyle={styles.listContent}
             />

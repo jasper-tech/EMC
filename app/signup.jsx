@@ -156,7 +156,7 @@ const Signup = () => {
         phone: formData.phone,
         role: formData.role,
         address: formData.address,
-        emailVerified: false, // Add this field
+        emailVerified: false,
         createdAt: new Date().toISOString(),
         uid: user.uid,
       });

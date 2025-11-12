@@ -13,6 +13,15 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        // ✅ ADD EMAIL VERIFICATION CHECK HERE
+        if (!firebaseUser.emailVerified) {
+          console.log("User email not verified, signing out");
+          setUser(null);
+          setUserProfile(null);
+          setLoading(false);
+          return;
+        }
+
         setUser(firebaseUser);
 
         // Fetch user profile from Firestore
