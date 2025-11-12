@@ -8,12 +8,10 @@ import StatCard from "../components/StatCard";
 import ThemedText from "../components/ThemedText";
 import FooterNav from "../components/FooterNav";
 import NotificationsCard from "../components/NotificationsCard";
-import SidePanel from "../components/SidePanel";
 import { useAuth } from "../context/AuthContext";
 
 const Dashboard = () => {
-  const { user, userProfile, loading } = useAuth();
-  const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const { loading } = useAuth();
 
   const statsData = [
     {
@@ -63,9 +61,10 @@ const Dashboard = () => {
   // Swipe gesture to open panel
   const swipeGesture = Gesture.Pan()
     .onEnd((event) => {
-      // Swipe from left edge to right
+      // Only trigger if swiping from left edge (first 50px)
+      // and swipe distance is > 100px
       if (event.translationX > 100 && event.velocityX > 0) {
-        setIsPanelOpen(true);
+        // This will be handled by AppWrapper's gesture detector
       }
     })
     .runOnJS(true);
@@ -107,17 +106,6 @@ const Dashboard = () => {
 
         <NotificationsCard />
         <FooterNav />
-
-        {/* Side Panel */}
-        <SidePanel
-          userName={
-            userProfile?.fullName || user?.email?.split("@")[0] || "User"
-          }
-          userRole={userProfile?.role || "Member"}
-          userAvatar={userProfile?.photoURL}
-          isOpen={isPanelOpen}
-          onClose={() => setIsPanelOpen(false)}
-        />
       </ThemedView>
     </GestureDetector>
   );

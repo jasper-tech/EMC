@@ -3,6 +3,7 @@
 import { initializeApp } from "firebase/app";
 import { initializeAuth, getReactNativePersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 
@@ -28,7 +29,10 @@ const auth = initializeAuth(app, {
 // Initialize Firestore
 const db = getFirestore(app);
 
+// Initialize Firebase Storage
+const storage = getStorage(app);
+
 // Note: Firebase Analytics is not supported in React Native/Expo
 // If you need analytics, use Expo's built-in analytics or Firebase Analytics for mobile
 
-export { app, auth, db };
+export { app, auth, db, storage };

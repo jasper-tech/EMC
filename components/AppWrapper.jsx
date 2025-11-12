@@ -7,7 +7,7 @@ import { useAuth } from "../context/AuthContext";
 
 const AppWrapper = ({ children }) => {
   const { isPanelOpen, openPanel, closePanel } = useSidePanel();
-  const { user, userProfile } = useAuth();
+  const { user, userProfile, updateUserProfile } = useAuth();
 
   // Swipe gesture to open panel from left edge
   const swipeGesture = Gesture.Pan()
@@ -20,6 +20,12 @@ const AppWrapper = ({ children }) => {
     })
     .runOnJS(true);
 
+  const handleAvatarUpdate = (newAvatarUrl) => {
+    if (updateUserProfile) {
+      updateUserProfile({ profileImg: newAvatarUrl });
+    }
+  };
+
   return (
     <GestureDetector gesture={swipeGesture}>
       <View style={styles.container}>
@@ -31,9 +37,11 @@ const AppWrapper = ({ children }) => {
             userProfile?.fullName || user?.email?.split("@")[0] || "User"
           }
           userRole={userProfile?.role || "Member"}
-          userAvatar={userProfile?.photoURL}
+          userAvatar={userProfile?.profileImg}
+          userId={user?.uid}
           isOpen={isPanelOpen}
           onClose={closePanel}
+          onAvatarUpdate={handleAvatarUpdate}
         />
       </View>
     </GestureDetector>
