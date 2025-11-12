@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
-  Dimensions,
 } from "react-native";
 import React, { useState, useEffect, useRef, useContext } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -28,8 +27,10 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import { auth } from "../firebase";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+// const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const Members = () => {
   const [members, setMembers] = useState([]);
@@ -216,6 +217,21 @@ const Members = () => {
           address: formData.address,
           updatedAt: serverTimestamp(),
         });
+
+        // UPDATE ASYNCSTORAGE FOR INSTANT SIDEPANEL UPDATE
+        const currentUser = auth.currentUser;
+        if (currentUser && currentUser.uid === selectedMember.uid) {
+          // If editing current user's own profile, update AsyncStorage
+          const userData = {
+            fullName: formData.fullname,
+            phone: formData.phone,
+            address: formData.address,
+          };
+          await AsyncStorage.setItem(
+            "currentUserData",
+            JSON.stringify(userData)
+          );
+        }
       }
 
       setShowEditModal(false);

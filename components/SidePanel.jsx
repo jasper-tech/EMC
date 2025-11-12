@@ -24,7 +24,14 @@ import { ThemeContext } from "../context/ThemeContext";
 import { signOut } from "firebase/auth";
 import { auth } from "../firebase";
 import { router } from "expo-router";
-import { doc, updateDoc } from "firebase/firestore";
+import {
+  doc,
+  updateDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+} from "firebase/firestore";
 import { db } from "../firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useProfile } from "../context/ProfileContext";
@@ -178,10 +185,26 @@ const SidePanel = ({
         updatedAt: new Date().toISOString(),
       });
 
-      //  UPDATE ASYNCSTORAGE FOR PERSISTENCE
+      // ALSO UPDATE MEMBERS COLLECTION FOR EXECUTIVES
+      const membersQuery = query(
+        collection(db, "members"),
+        where("uid", "==", auth.currentUser.uid)
+      );
+      const membersSnapshot = await getDocs(membersQuery);
+
+      if (!membersSnapshot.empty) {
+        const memberDoc = membersSnapshot.docs[0];
+        const memberRef = doc(db, "members", memberDoc.id);
+        await updateDoc(memberRef, {
+          profileImg: base64Image,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      // UPDATE ASYNCSTORAGE FOR PERSISTENCE
       await AsyncStorage.setItem("savedProfileImg", base64Image);
 
-      //  UPDATE CONTEXT FOR IMMEDIATE UI UPDATE
+      // UPDATE CONTEXT FOR IMMEDIATE UI UPDATE
       updateProfileImage(base64Image);
 
       // Still call the callback for parent component if needed

@@ -8,27 +8,34 @@ import {
   Alert,
   ActivityIndicator,
   Animated,
-  Dimensions,
+  // Dimensions,
   ScrollView,
 } from "react-native";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useContext } from "react";
 import * as WebBrowser from "expo-web-browser";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../constants/Colors";
 import ThemedView from "../components/ThemedView";
 import ThemedText from "../components/ThemedText";
 import { router } from "expo-router";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import {
+  signInWithEmailAndPassword,
+  sendEmailVerification,
+  signOut,
+} from "firebase/auth";
 import { auth } from "../firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
+import { ThemeContext } from "../context/ThemeContext";
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+// const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 WebBrowser.maybeCompleteAuthSession();
 
 const Login = () => {
+  const { scheme } = useContext(ThemeContext);
+  const theme = Colors[scheme] ?? Colors.light;
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -101,6 +108,25 @@ const Login = () => {
         formData.password
       );
 
+      // ADD THIS CHECK FOR EMAIL VERIFICATION
+      if (!userCredential.user.emailVerified) {
+        Alert.alert(
+          "Email Not Verified",
+          "Please verify your email before signing in. Check your inbox for the verification link.",
+          [
+            {
+              text: "Resend Verification",
+              onPress: () => sendEmailVerification(userCredential.user),
+            },
+            {
+              text: "OK",
+              style: "cancel",
+            },
+          ]
+        );
+        await signOut(auth); // Sign them out until verified
+        return;
+      }
       console.log("User logged in:", userCredential.user.uid);
 
       if (rememberMe) {
@@ -263,6 +289,7 @@ const Login = () => {
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
                     editable={!loading}
+                    color={theme.text}
                   />
                 </Animated.View>
               </View>
@@ -303,6 +330,7 @@ const Login = () => {
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
                     editable={!loading}
+                    color={theme.text}
                   />
                   <TouchableOpacity
                     style={styles.visibilityToggle}

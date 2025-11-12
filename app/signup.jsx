@@ -10,8 +10,8 @@ import {
   ActivityIndicator,
   Modal,
   Animated,
-  Dimensions,
 } from "react-native";
+
 import { Picker } from "@react-native-picker/picker";
 import React, { useState, useRef, useContext } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,12 +21,15 @@ import { ThemeContext } from "../context/ThemeContext";
 import ThemedView from "../components/ThemedView";
 import ThemedText from "../components/ThemedText";
 import { router } from "expo-router";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import {
+  createUserWithEmailAndPassword,
+  updateProfile,
+  sendEmailVerification,
+} from "firebase/auth";
 import { doc, setDoc, addDoc, collection } from "firebase/firestore";
 import { auth, db } from "../firebase";
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-
+//
 const Signup = () => {
   const [formData, setFormData] = useState({
     fullName: "",
@@ -35,7 +38,7 @@ const Signup = () => {
     role: "",
     password: "",
     confirmPassword: "",
-    address: "", // Added address field
+    address: "",
   });
   const [loading, setLoading] = useState(false);
   const [showRolePicker, setShowRolePicker] = useState(false);
@@ -130,6 +133,9 @@ const Signup = () => {
 
       const user = userCredential.user;
 
+      // Send email verification
+      await sendEmailVerification(user);
+
       try {
         await user.getIdToken();
       } catch (tokenErr) {
@@ -149,7 +155,8 @@ const Signup = () => {
         email: formData.email,
         phone: formData.phone,
         role: formData.role,
-        address: formData.address, // Added address
+        address: formData.address,
+        emailVerified: false, // Add this field
         createdAt: new Date().toISOString(),
         uid: user.uid,
       });
@@ -177,12 +184,16 @@ const Signup = () => {
 
       console.log("Executive created and saved to both collections:", user.uid);
 
-      Alert.alert("Success", "Account created successfully!", [
-        {
-          text: "OK",
-          onPress: () => router.push("/dashboard"),
-        },
-      ]);
+      Alert.alert(
+        "Verification Email Sent",
+        "Please check your email and verify your account before signing in.",
+        [
+          {
+            text: "OK",
+            onPress: () => router.push("/"),
+          },
+        ]
+      );
     } catch (error) {
       console.error("Signup error:", error);
       let errorMessage = "An error occurred during signup";
