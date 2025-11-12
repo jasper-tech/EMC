@@ -76,6 +76,13 @@ const LayoutContent = () => {
               gestureEnabled: false,
             }}
           />
+          <Stack.Screen
+            name="members"
+            options={{
+              headerTitle: "EPSU Members",
+              gestureEnabled: false,
+            }}
+          />
         </Stack>
       </AppWrapper>
     </>
