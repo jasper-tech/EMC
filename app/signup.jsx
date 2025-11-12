@@ -9,20 +9,23 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
+  Animated,
+  Dimensions,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
-import React, { useState } from "react";
-import { MaterialIcons } from "@expo/vector-icons";
+import React, { useState, useRef, useContext } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import RNPickerSelect from "react-native-picker-select";
 import { Colors } from "../constants/Colors";
 import { ThemeContext } from "../context/ThemeContext";
-import { useContext } from "react";
 import ThemedView from "../components/ThemedView";
 import ThemedText from "../components/ThemedText";
 import { router } from "expo-router";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { doc, setDoc, addDoc, collection } from "firebase/firestore";
 import { auth, db } from "../firebase";
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -36,9 +39,55 @@ const Signup = () => {
   const [loading, setLoading] = useState(false);
   const [showRolePicker, setShowRolePicker] = useState(false);
   const [tempRole, setTempRole] = useState("");
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] =
+    useState(false);
 
   const { scheme } = useContext(ThemeContext);
   const theme = Colors[scheme] ?? Colors.light;
+
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+  const inputFocusAnim = useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    // Start entrance animations
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const handleInputFocus = () => {
+    Animated.timing(inputFocusAnim, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleInputBlur = () => {
+    Animated.timing(inputFocusAnim, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  };
 
   const validateForm = () => {
     if (
@@ -111,8 +160,6 @@ const Signup = () => {
 
       console.log("User created and saved to Firestore:", user.uid);
 
-      console.log("User created and saved to Firestore:", user.uid);
-
       Alert.alert("Success", "Account created successfully!", [
         {
           text: "OK",
@@ -182,6 +229,12 @@ const Signup = () => {
 
   return (
     <ThemedView style={styles.container}>
+      <View style={styles.backgroundGraphics}>
+        <View style={[styles.circle, styles.circle1]} />
+        <View style={[styles.circle, styles.circle2]} />
+        <View style={[styles.circle, styles.circle3]} />
+      </View>
+
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardView}
@@ -190,163 +243,383 @@ const Signup = () => {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.header}>
-            <MaterialIcons
-              name="group-add"
-              size={60}
-              color={Colors.blueAccent}
-            />
-            <ThemedText type="title" style={styles.title}>
-              Create Account
-            </ThemedText>
-            <ThemedText style={styles.subtitle}>
-              Join your union community today
-            </ThemedText>
-          </View>
+          <Animated.View
+            style={[
+              styles.content,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
+              },
+            ]}
+          >
+            {/* Header Section */}
+            <View style={styles.header}>
+              <View style={styles.logoContainer}>
+                <View style={styles.logoCircle}>
+                  <Ionicons name="people" size={32} color={Colors.blueAccent} />
+                </View>
+                <View style={styles.welcomeBadge}>
+                  <Ionicons name="flash" size={14} color={Colors.blueAccent} />
+                  <ThemedText style={styles.welcomeBadgeText}>
+                    Join Our Union
+                  </ThemedText>
+                </View>
+              </View>
 
-          <View style={styles.form}>
-            <View style={styles.inputContainer}>
-              <ThemedText style={styles.label}>Full Name</ThemedText>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your full name"
-                value={formData.fullName}
-                onChangeText={(text) =>
-                  setFormData({ ...formData, fullName: text })
-                }
-                editable={!loading}
-              />
+              <ThemedText type="title" style={styles.title}>
+                Create Your Account
+              </ThemedText>
+              <ThemedText style={styles.subtitle}>
+                Create an account to start managing the union
+              </ThemedText>
             </View>
 
-            <View style={styles.inputContainer}>
-              <ThemedText style={styles.label}>Email</ThemedText>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your email"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                value={formData.email}
-                onChangeText={(text) =>
-                  setFormData({ ...formData, email: text })
-                }
-                editable={!loading}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <ThemedText style={styles.label}>Phone Number</ThemedText>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your phone number"
-                keyboardType="phone-pad"
-                value={formData.phone}
-                onChangeText={(text) =>
-                  setFormData({ ...formData, phone: text })
-                }
-                editable={!loading}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <ThemedText style={styles.label}>Role</ThemedText>
-              {Platform.OS === "ios" ? (
-                <TouchableOpacity
-                  style={styles.pickerTouchable}
-                  onPress={openRolePicker}
-                  disabled={loading}
+            {/* Form Section */}
+            <View style={styles.form}>
+              {/* Full Name Input */}
+              <View style={styles.inputContainer}>
+                <ThemedText style={styles.label}>Full Name</ThemedText>
+                <Animated.View
+                  style={[
+                    styles.inputWrapper,
+                    {
+                      transform: [
+                        {
+                          scale: inputFocusAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [1, 1.02],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
                 >
-                  <ThemedText
+                  <Ionicons
+                    name="person-outline"
+                    size={20}
+                    color={Colors.blueAccent}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter your full name"
+                    placeholderTextColor="#999"
+                    value={formData.fullName}
+                    onChangeText={(text) =>
+                      setFormData({ ...formData, fullName: text })
+                    }
+                    onFocus={handleInputFocus}
+                    onBlur={handleInputBlur}
+                    editable={!loading}
+                  />
+                </Animated.View>
+              </View>
+
+              {/* Email Input */}
+              <View style={styles.inputContainer}>
+                <ThemedText style={styles.label}>Email Address</ThemedText>
+                <Animated.View
+                  style={[
+                    styles.inputWrapper,
+                    {
+                      transform: [
+                        {
+                          scale: inputFocusAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [1, 1.02],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="mail-outline"
+                    size={20}
+                    color={Colors.blueAccent}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter your email"
+                    placeholderTextColor="#999"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    value={formData.email}
+                    onChangeText={(text) =>
+                      setFormData({ ...formData, email: text })
+                    }
+                    onFocus={handleInputFocus}
+                    onBlur={handleInputBlur}
+                    editable={!loading}
+                  />
+                </Animated.View>
+              </View>
+
+              {/* Phone Input */}
+              <View style={styles.inputContainer}>
+                <ThemedText style={styles.label}>Phone Number</ThemedText>
+                <Animated.View
+                  style={[
+                    styles.inputWrapper,
+                    {
+                      transform: [
+                        {
+                          scale: inputFocusAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [1, 1.02],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="call-outline"
+                    size={20}
+                    color={Colors.blueAccent}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter your phone number"
+                    placeholderTextColor="#999"
+                    keyboardType="phone-pad"
+                    value={formData.phone}
+                    onChangeText={(text) =>
+                      setFormData({ ...formData, phone: text })
+                    }
+                    onFocus={handleInputFocus}
+                    onBlur={handleInputBlur}
+                    editable={!loading}
+                  />
+                </Animated.View>
+              </View>
+
+              {/* Role Selection */}
+              <View style={styles.inputContainer}>
+                <ThemedText style={styles.label}>Union Role</ThemedText>
+                {Platform.OS === "ios" ? (
+                  <TouchableOpacity
                     style={[
-                      styles.pickerText,
-                      !formData.role && styles.pickerPlaceholder,
+                      styles.pickerTouchable,
+                      { backgroundColor: theme.uiBackground },
+                    ]}
+                    onPress={openRolePicker}
+                    disabled={loading}
+                  >
+                    <Ionicons
+                      name="person-circle-outline"
+                      size={20}
+                      color={Colors.blueAccent}
+                      style={styles.inputIcon}
+                    />
+                    <ThemedText
+                      style={[
+                        styles.pickerText,
+                        !formData.role && styles.pickerPlaceholder,
+                      ]}
+                    >
+                      {formData.role || "Select your union role"}
+                    </ThemedText>
+                    <Ionicons
+                      name="chevron-down"
+                      size={20}
+                      color={Colors.blueAccent}
+                    />
+                  </TouchableOpacity>
+                ) : (
+                  <View
+                    style={[
+                      styles.pickerContainer,
+                      { backgroundColor: theme.uiBackground },
                     ]}
                   >
-                    {formData.role || "Select your role"}
-                  </ThemedText>
-                  <MaterialIcons
-                    name="arrow-drop-down"
-                    size={24}
-                    color="#666"
-                  />
-                </TouchableOpacity>
-              ) : (
-                <View style={styles.pickerContainer}>
-                  <RNPickerSelect
-                    placeholder={{
-                      label: "Select your role",
-                      value: null,
-                      color: "#9EA0A4",
-                    }}
-                    items={roleOptions}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, role: value })
-                    }
-                    value={formData.role}
-                    disabled={loading}
-                    style={{
-                      inputAndroid: styles.pickerInputAndroid,
-                      placeholder: {
+                    <RNPickerSelect
+                      placeholder={{
+                        label: "Select your union role",
+                        value: null,
                         color: "#9EA0A4",
-                      },
-                    }}
-                    useNativeAndroidPickerStyle={false}
+                      }}
+                      items={roleOptions}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, role: value })
+                      }
+                      value={formData.role}
+                      disabled={loading}
+                      style={{
+                        inputAndroid: styles.pickerInputAndroid,
+                        placeholder: {
+                          color: "#9EA0A4",
+                        },
+                      }}
+                      useNativeAndroidPickerStyle={false}
+                      Icon={() => (
+                        <Ionicons
+                          name="chevron-down"
+                          size={20}
+                          color={Colors.blueAccent}
+                        />
+                      )}
+                    />
+                  </View>
+                )}
+              </View>
+
+              {/* Password Input */}
+              <View style={styles.inputContainer}>
+                <ThemedText style={styles.label}>Password</ThemedText>
+                <Animated.View
+                  style={[
+                    styles.inputWrapper,
+                    {
+                      transform: [
+                        {
+                          scale: inputFocusAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [1, 1.02],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="lock-closed-outline"
+                    size={20}
+                    color={Colors.blueAccent}
+                    style={styles.inputIcon}
                   />
-                </View>
-              )}
-            </View>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Create a password (min 6 characters)"
+                    placeholderTextColor="#999"
+                    secureTextEntry={!isPasswordVisible}
+                    value={formData.password}
+                    onChangeText={(text) =>
+                      setFormData({ ...formData, password: text })
+                    }
+                    onFocus={handleInputFocus}
+                    onBlur={handleInputBlur}
+                    editable={!loading}
+                  />
+                  <TouchableOpacity
+                    style={styles.visibilityToggle}
+                    onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+                  >
+                    <Ionicons
+                      name={
+                        isPasswordVisible ? "eye-off-outline" : "eye-outline"
+                      }
+                      size={20}
+                      color={Colors.blueAccent}
+                    />
+                  </TouchableOpacity>
+                </Animated.View>
+              </View>
 
-            <View style={styles.inputContainer}>
-              <ThemedText style={styles.label}>Password</ThemedText>
-              <TextInput
-                style={styles.input}
-                placeholder="Create a password (min 6 characters)"
-                secureTextEntry
-                value={formData.password}
-                onChangeText={(text) =>
-                  setFormData({ ...formData, password: text })
-                }
-                editable={!loading}
-              />
-            </View>
+              {/* Confirm Password Input */}
+              <View style={styles.inputContainer}>
+                <ThemedText style={styles.label}>Confirm Password</ThemedText>
+                <Animated.View
+                  style={[
+                    styles.inputWrapper,
+                    {
+                      transform: [
+                        {
+                          scale: inputFocusAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [1, 1.02],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="lock-closed-outline"
+                    size={20}
+                    color={Colors.blueAccent}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Confirm your password"
+                    placeholderTextColor="#999"
+                    secureTextEntry={!isConfirmPasswordVisible}
+                    value={formData.confirmPassword}
+                    onChangeText={(text) =>
+                      setFormData({ ...formData, confirmPassword: text })
+                    }
+                    onFocus={handleInputFocus}
+                    onBlur={handleInputBlur}
+                    editable={!loading}
+                  />
+                  <TouchableOpacity
+                    style={styles.visibilityToggle}
+                    onPress={() =>
+                      setIsConfirmPasswordVisible(!isConfirmPasswordVisible)
+                    }
+                  >
+                    <Ionicons
+                      name={
+                        isConfirmPasswordVisible
+                          ? "eye-off-outline"
+                          : "eye-outline"
+                      }
+                      size={20}
+                      color={Colors.blueAccent}
+                    />
+                  </TouchableOpacity>
+                </Animated.View>
+              </View>
 
-            <View style={styles.inputContainer}>
-              <ThemedText style={styles.label}>Confirm Password</ThemedText>
-              <TextInput
-                style={styles.input}
-                placeholder="Confirm your password"
-                secureTextEntry
-                value={formData.confirmPassword}
-                onChangeText={(text) =>
-                  setFormData({ ...formData, confirmPassword: text })
-                }
-                editable={!loading}
-              />
-            </View>
-
-            <TouchableOpacity
-              style={[
-                styles.signupButton,
-                loading && styles.signupButtonDisabled,
-              ]}
-              onPress={handleSignup}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <ThemedText style={styles.signupButtonText}>Sign Up</ThemedText>
-              )}
-            </TouchableOpacity>
-
-            <View style={styles.loginContainer}>
-              <ThemedText style={styles.loginText}>
-                Already have an account?{" "}
-              </ThemedText>
-              <TouchableOpacity onPress={() => router.push("/")}>
-                <ThemedText style={styles.loginLink}>Login</ThemedText>
+              {/* Sign Up Button */}
+              <TouchableOpacity
+                style={[
+                  styles.signupButton,
+                  loading && styles.signupButtonDisabled,
+                ]}
+                onPress={handleSignup}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <Ionicons
+                      name="person-add-outline"
+                      size={20}
+                      color="#fff"
+                    />
+                    <ThemedText style={styles.signupButtonText}>
+                      Create Account
+                    </ThemedText>
+                  </>
+                )}
               </TouchableOpacity>
+
+              {/* Login Link */}
+              <View style={styles.loginContainer}>
+                <ThemedText style={styles.loginText}>
+                  Already have an account?{" "}
+                </ThemedText>
+                <TouchableOpacity
+                  onPress={() => router.push("/")}
+                  disabled={loading}
+                >
+                  <ThemedText style={styles.loginLink}>Sign In</ThemedText>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+
+            {/* Footer */}
+            <View style={styles.footer}>
+              <ThemedText style={styles.footerText}>
+                Secure • Community • Trusted
+              </ThemedText>
+            </View>
+          </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -373,7 +646,9 @@ const Signup = () => {
               <TouchableOpacity onPress={handleRoleCancel}>
                 <ThemedText style={styles.modalButton}>Cancel</ThemedText>
               </TouchableOpacity>
-              <ThemedText style={styles.modalTitle}>Select Role</ThemedText>
+              <ThemedText style={styles.modalTitle}>
+                Select Union Role
+              </ThemedText>
               <TouchableOpacity onPress={handleRoleConfirm}>
                 <ThemedText
                   style={[styles.modalButton, styles.modalButtonDone]}
@@ -408,72 +683,184 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  backgroundGraphics: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  circle: {
+    position: "absolute",
+    borderRadius: 500,
+    backgroundColor: `${Colors.blueAccent}08`,
+  },
+  circle1: {
+    width: 250,
+    height: 250,
+    top: -100,
+    right: -80,
+  },
+  circle2: {
+    width: 180,
+    height: 180,
+    bottom: 80,
+    left: -40,
+    backgroundColor: `${Colors.blueAccent}05`,
+  },
+  circle3: {
+    width: 120,
+    height: 120,
+    bottom: -30,
+    right: 40,
+    backgroundColor: `${Colors.blueAccent}03`,
+  },
   keyboardView: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
+  },
+  content: {
+    flex: 1,
     paddingHorizontal: 24,
     paddingTop: 60,
     paddingBottom: 40,
+    justifyContent: "space-between",
   },
   header: {
     alignItems: "center",
     marginBottom: 40,
   },
+  logoContainer: {
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  logoCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: `${Colors.blueAccent}15`,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: `${Colors.blueAccent}20`,
+  },
+  welcomeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: `${Colors.blueAccent}15`,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 6,
+  },
+  welcomeBadgeText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: Colors.blueAccent,
+  },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: "bold",
-    marginTop: 16,
-    marginBottom: 8,
+    textAlign: "center",
+    marginBottom: 12,
+    lineHeight: 38,
   },
   subtitle: {
     fontSize: 16,
     opacity: 0.7,
     textAlign: "center",
+    lineHeight: 22,
+    maxWidth: 300,
   },
   form: {
     width: "100%",
   },
   inputContainer: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   label: {
     fontSize: 14,
     fontWeight: "600",
     marginBottom: 8,
+    color: Colors.blueAccent,
+  },
+  inputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.uiBackground,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    borderWidth: 2,
+    borderColor: `${Colors.blueAccent}20`,
+    shadowColor: Colors.blueAccent,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  inputIcon: {
+    marginRight: 12,
   },
   input: {
-    backgroundColor: "#f5f5f5",
-    borderRadius: 8,
-    padding: 14,
+    flex: 1,
+    paddingVertical: 16,
     fontSize: 16,
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
+    color: Colors.text,
+  },
+  visibilityToggle: {
+    padding: 4,
   },
   pickerTouchable: {
-    backgroundColor: "#f5f5f5",
-    borderRadius: 8,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderWidth: 2,
+    borderColor: `${Colors.blueAccent}20`,
+    shadowColor: Colors.blueAccent,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   pickerText: {
+    flex: 1,
     fontSize: 16,
-    color: "#000",
+    color: Colors.text,
   },
   pickerPlaceholder: {
     color: "#9EA0A4",
   },
+  pickerContainer: {
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: `${Colors.blueAccent}20`,
+    shadowColor: Colors.blueAccent,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  pickerInputAndroid: {
+    fontSize: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    color: Colors.text,
+  },
   signupButton: {
     backgroundColor: Colors.blueAccent,
-    borderRadius: 8,
-    padding: 16,
+    borderRadius: 16,
+    padding: 18,
     alignItems: "center",
-    marginTop: 10,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+    shadowColor: Colors.blueAccent,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+    marginBottom: 24,
   },
   signupButtonDisabled: {
     opacity: 0.7,
@@ -487,27 +874,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 24,
   },
   loginText: {
     fontSize: 14,
+    opacity: 0.7,
   },
   loginLink: {
     fontSize: 14,
     fontWeight: "bold",
     color: Colors.blueAccent,
   },
-  pickerContainer: {
-    backgroundColor: "#f5f5f5",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
+  footer: {
+    alignItems: "center",
+    marginTop: 40,
   },
-  pickerInputAndroid: {
-    fontSize: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    color: "#000",
+  footerText: {
+    fontSize: 12,
+    opacity: 0.5,
+    letterSpacing: 1,
   },
   // Modal styles
   modalOverlay: {
@@ -522,22 +906,27 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingBottom: 34,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
   },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
+    borderBottomColor: `${Colors.blueAccent}20`,
   },
   modalTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: "600",
   },
   modalButton: {
-    fontSize: 17,
+    fontSize: 16,
     color: Colors.blueAccent,
   },
   modalButtonDone: {

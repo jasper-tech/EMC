@@ -7,24 +7,24 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  Animated,
+  Dimensions,
+  ScrollView,
 } from "react-native";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import * as WebBrowser from "expo-web-browser";
-// import * as Google from "expo-auth-session/providers/google";
-import { MaterialIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../constants/Colors";
 import ThemedView from "../components/ThemedView";
 import ThemedText from "../components/ThemedText";
 import { router } from "expo-router";
-import {
-  signInWithEmailAndPassword,
-  // GoogleAuthProvider,
-  // signInWithCredential,
-} from "firebase/auth";
+import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -35,24 +35,52 @@ const Login = () => {
   });
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
-  // Google Sign-In configuration
-  // const [request, response, promptAsync] = Google.useAuthRequest({
-  //   androidClientId: "YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com",
-  //   iosClientId: "YOUR_IOS_CLIENT_ID.apps.googleusercontent.com",
-  //   webClientId: "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com",
-  // });
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+  const inputFocusAnim = useRef(new Animated.Value(0)).current;
 
-  // Handle Google Sign-In response
-  // useEffect(() => {
-  //   if (response?.type === "success") {
-  //     const { id_token } = response.params;
-  //     handleGoogleSignIn(id_token);
-  //   }
-  // }, [response]);
+  useEffect(() => {
+    // Start entrance animations
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const handleInputFocus = () => {
+    Animated.timing(inputFocusAnim, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleInputBlur = () => {
+    Animated.timing(inputFocusAnim, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  };
 
   const handleLogin = async () => {
-    // Validate input
     if (!formData.email || !formData.password) {
       Alert.alert("Error", "Please fill in all fields");
       return;
@@ -60,7 +88,6 @@ const Login = () => {
 
     setLoading(true);
     try {
-      // CLEAR PREVIOUS CREDENTIALS BEFORE SAVING NEW ONES
       await AsyncStorage.multiRemove([
         "savedEmail",
         "savedPassword",
@@ -76,17 +103,14 @@ const Login = () => {
 
       console.log("User logged in:", userCredential.user.uid);
 
-      // Save credentials if remember me is checked
       if (rememberMe) {
         await AsyncStorage.setItem("savedEmail", formData.email);
         await AsyncStorage.setItem("savedPassword", formData.password);
 
-        // Get user's display name
         const displayName =
           userCredential.user.displayName || formData.email.split("@")[0];
         await AsyncStorage.setItem("savedName", displayName);
 
-        // Try to get the base64 profile image from Firestore
         try {
           const userDoc = await getDoc(
             doc(db, "users", userCredential.user.uid)
@@ -94,20 +118,17 @@ const Login = () => {
           if (userDoc.exists()) {
             const userData = userDoc.data();
             if (userData.profileImg) {
-              // Save the base64 image from Firestore
               await AsyncStorage.setItem(
                 "savedProfileImg",
                 userData.profileImg
               );
             } else if (userCredential.user.photoURL) {
-              // Fallback to Firebase photoURL
               await AsyncStorage.setItem(
                 "savedProfileImg",
                 userCredential.user.photoURL
               );
             }
           } else if (userCredential.user.photoURL) {
-            // Fallback if no Firestore document
             await AsyncStorage.setItem(
               "savedProfileImg",
               userCredential.user.photoURL
@@ -115,7 +136,6 @@ const Login = () => {
           }
         } catch (firestoreError) {
           console.error("Error fetching user data:", firestoreError);
-          // Fallback to Firebase photoURL
           if (userCredential.user.photoURL) {
             await AsyncStorage.setItem(
               "savedProfileImg",
@@ -125,7 +145,6 @@ const Login = () => {
         }
       }
 
-      // Navigate to dashboard after successful login
       router.replace("/dashboard");
     } catch (error) {
       console.error("Login error:", error);
@@ -157,135 +176,256 @@ const Login = () => {
     }
   };
 
-  // const handleGoogleSignIn = async (idToken) => {
-  //   setLoading(true);
-  //   try {
-  //     const credential = GoogleAuthProvider.credential(idToken);
-  //     const userCredential = await signInWithCredential(auth, credential);
-
-  //     console.log("User logged in with Google:", userCredential.user.uid);
-  //     router.replace("/dashboard");
-  //   } catch (error) {
-  //     console.error("Google sign-in error:", error);
-  //     Alert.alert("Google Sign-In Failed", error.message);
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
-
   return (
     <ThemedView style={styles.container}>
+      <View style={styles.backgroundGraphics}>
+        <View style={[styles.circle, styles.circle1]} />
+        <View style={[styles.circle, styles.circle2]} />
+        <View style={[styles.circle, styles.circle3]} />
+      </View>
+
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardView}
       >
-        <View style={styles.content}>
-          <View style={styles.header}>
-            <MaterialIcons name="lock" size={60} color={Colors.blueAccent} />
-            <ThemedText type="title" style={styles.title}>
-              Welcome Back
-            </ThemedText>
-            <ThemedText style={styles.subtitle}>
-              Login to your account
-            </ThemedText>
-          </View>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <Animated.View
+            style={[
+              styles.content,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
+              },
+            ]}
+          >
+            {/* Header Section */}
+            <View style={styles.header}>
+              <View style={styles.logoContainer}>
+                <View style={styles.logoCircle}>
+                  <Ionicons
+                    name="lock-closed"
+                    size={32}
+                    color={Colors.blueAccent}
+                  />
+                </View>
+                <View style={styles.welcomeBadge}>
+                  <Ionicons name="flash" size={14} color={Colors.blueAccent} />
+                  <ThemedText style={styles.welcomeBadgeText}>
+                    Welcome Back
+                  </ThemedText>
+                </View>
+              </View>
 
-          <View style={styles.form}>
-            <View style={styles.inputContainer}>
-              <ThemedText style={styles.label}>Email</ThemedText>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your email"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                value={formData.email}
-                onChangeText={(text) =>
-                  setFormData({ ...formData, email: text })
-                }
-                editable={!loading}
-              />
+              <ThemedText type="title" style={styles.title}>
+                Sign In to Your Account
+              </ThemedText>
             </View>
 
-            <View style={styles.inputContainer}>
-              <ThemedText style={styles.label}>Password</ThemedText>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your password"
-                secureTextEntry
-                value={formData.password}
-                onChangeText={(text) =>
-                  setFormData({ ...formData, password: text })
-                }
-                editable={!loading}
-              />
-            </View>
+            {/* Form Section */}
+            <View style={styles.form}>
+              {/* Email Input */}
+              <View style={styles.inputContainer}>
+                <ThemedText style={styles.label}>Email Address</ThemedText>
+                <Animated.View
+                  style={[
+                    styles.inputWrapper,
+                    {
+                      transform: [
+                        {
+                          scale: inputFocusAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [1, 1.02],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="mail-outline"
+                    size={20}
+                    color={Colors.blueAccent}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter your email"
+                    placeholderTextColor="#999"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    value={formData.email}
+                    onChangeText={(text) =>
+                      setFormData({ ...formData, email: text })
+                    }
+                    onFocus={handleInputFocus}
+                    onBlur={handleInputBlur}
+                    editable={!loading}
+                  />
+                </Animated.View>
+              </View>
 
-            <View style={styles.optionsRow}>
+              {/* Password Input */}
+              <View style={styles.inputContainer}>
+                <ThemedText style={styles.label}>Password</ThemedText>
+                <Animated.View
+                  style={[
+                    styles.inputWrapper,
+                    {
+                      transform: [
+                        {
+                          scale: inputFocusAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [1, 1.02],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="lock-closed-outline"
+                    size={20}
+                    color={Colors.blueAccent}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter your password"
+                    placeholderTextColor="#999"
+                    secureTextEntry={!isPasswordVisible}
+                    value={formData.password}
+                    onChangeText={(text) =>
+                      setFormData({ ...formData, password: text })
+                    }
+                    onFocus={handleInputFocus}
+                    onBlur={handleInputBlur}
+                    editable={!loading}
+                  />
+                  <TouchableOpacity
+                    style={styles.visibilityToggle}
+                    onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+                  >
+                    <Ionicons
+                      name={
+                        isPasswordVisible ? "eye-off-outline" : "eye-outline"
+                      }
+                      size={20}
+                      color={Colors.blueAccent}
+                    />
+                  </TouchableOpacity>
+                </Animated.View>
+              </View>
+
+              {/* Options Row */}
+              <View style={styles.optionsRow}>
+                <TouchableOpacity
+                  style={styles.rememberMeContainer}
+                  onPress={() => setRememberMe(!rememberMe)}
+                  disabled={loading}
+                >
+                  <View
+                    style={[
+                      styles.checkbox,
+                      rememberMe && styles.checkboxChecked,
+                    ]}
+                  >
+                    {rememberMe && (
+                      <Ionicons name="checkmark" size={16} color="#fff" />
+                    )}
+                  </View>
+                  <ThemedText style={styles.rememberMeText}>
+                    Remember me
+                  </ThemedText>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.forgotPassword}
+                  disabled={loading}
+                >
+                  <ThemedText style={styles.forgotPasswordText}>
+                    Forgot Password?
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+
+              {/* Login Button */}
               <TouchableOpacity
-                style={styles.rememberMeContainer}
-                onPress={() => setRememberMe(!rememberMe)}
+                style={[
+                  styles.loginButton,
+                  loading && styles.loginButtonDisabled,
+                ]}
+                onPress={handleLogin}
+                disabled={loading}
               >
-                <MaterialIcons
-                  name={rememberMe ? "check-box" : "check-box-outline-blank"}
-                  size={24}
-                  color={Colors.blueAccent}
-                />
-                <ThemedText style={styles.rememberMeText}>
-                  Remember me
+                {loading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="log-in-outline" size={20} color="#fff" />
+                    <ThemedText style={styles.loginButtonText}>
+                      Sign In
+                    </ThemedText>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              {/* Divider */}
+              {/* <View style={styles.divider}>
+                <View style={styles.dividerLine} />
+                <ThemedText style={styles.dividerText}>or</ThemedText>
+                <View style={styles.dividerLine} />
+              </View> */}
+
+              {/* Alternative Sign In Options */}
+              {/* <View style={styles.alternativeAuthContainer}>
+                <TouchableOpacity
+                  style={styles.alternativeButton}
+                  disabled={loading}
+                >
+                  <Ionicons name="logo-google" size={20} color="#DB4437" />
+                  <ThemedText style={styles.alternativeButtonText}>
+                    Continue with Google
+                  </ThemedText>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.alternativeButton}
+                  disabled={loading}
+                >
+                  <Ionicons name="logo-apple" size={20} color="#000" />
+                  <ThemedText style={styles.alternativeButtonText}>
+                    Continue with Apple
+                  </ThemedText>
+                </TouchableOpacity>
+              </View> */}
+
+              {/* Sign Up Link */}
+              <View style={styles.signupContainer}>
+                <ThemedText style={styles.signupText}>
+                  Don't have an account?{" "}
                 </ThemedText>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.forgotPassword}>
-                <ThemedText style={styles.forgotPasswordText}>
-                  Forgot Password?
-                </ThemedText>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => router.push("/signup")}
+                  disabled={loading}
+                >
+                  <ThemedText style={styles.signupLink}>
+                    Create Account
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
             </View>
 
-            <TouchableOpacity
-              style={[
-                styles.loginButton,
-                loading && styles.loginButtonDisabled,
-              ]}
-              onPress={handleLogin}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <ThemedText style={styles.loginButtonText}>Login</ThemedText>
-              )}
-            </TouchableOpacity>
-
-            {/* Divider */}
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <ThemedText style={styles.dividerText}>OR</ThemedText>
-              <View style={styles.dividerLine} />
-            </View>
-
-            {/* Google Sign-In Button */}
-            {/* <TouchableOpacity
-              style={styles.googleButton}
-              onPress={() => promptAsync()}
-              disabled={loading || !request}
-            >
-              <MaterialIcons name="g-translate" size={24} color="#fff" />
-              <ThemedText style={styles.googleButtonText}>
-                Continue with Google
+            {/* Footer */}
+            <View style={styles.footer}>
+              <ThemedText style={styles.footerText}>
+                Secure • Encrypted • Trusted
               </ThemedText>
-            </TouchableOpacity> */}
-
-            <View style={styles.signupContainer}>
-              <ThemedText style={styles.signupText}>
-                Don't have an account?{" "}
-              </ThemedText>
-              <TouchableOpacity onPress={() => router.push("/signup")}>
-                <ThemedText style={styles.signupLink}>Sign Up</ThemedText>
-              </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </Animated.View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </ThemedView>
   );
@@ -297,75 +437,179 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  backgroundGraphics: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  circle: {
+    position: "absolute",
+    borderRadius: 500,
+    backgroundColor: `${Colors.blueAccent}08`,
+  },
+  circle1: {
+    width: 250,
+    height: 250,
+    top: -100,
+    right: -80,
+  },
+  circle2: {
+    width: 180,
+    height: 180,
+    bottom: 80,
+    left: -40,
+    backgroundColor: `${Colors.blueAccent}05`,
+  },
+  circle3: {
+    width: 120,
+    height: 120,
+    bottom: -30,
+    right: 40,
+    backgroundColor: `${Colors.blueAccent}03`,
+  },
   keyboardView: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   content: {
     flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 80,
+    paddingTop: 60,
     paddingBottom: 40,
-    justifyContent: "center",
+    justifyContent: "space-between",
   },
   header: {
     alignItems: "center",
     marginBottom: 40,
   },
+  logoContainer: {
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  logoCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: `${Colors.blueAccent}15`,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: `${Colors.blueAccent}20`,
+  },
+  welcomeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: `${Colors.blueAccent}15`,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 6,
+  },
+  welcomeBadgeText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: Colors.blueAccent,
+  },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: "bold",
-    marginTop: 16,
-    marginBottom: 8,
+    textAlign: "center",
+    marginBottom: 12,
+    lineHeight: 38,
   },
   subtitle: {
     fontSize: 16,
     opacity: 0.7,
     textAlign: "center",
+    lineHeight: 22,
+    maxWidth: 300,
   },
   form: {
     width: "100%",
   },
   inputContainer: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   label: {
     fontSize: 14,
     fontWeight: "600",
     marginBottom: 8,
+    color: Colors.blueAccent,
+  },
+  inputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.uiBackground,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    borderWidth: 2,
+    borderColor: `${Colors.blueAccent}20`,
+    shadowColor: Colors.blueAccent,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  inputIcon: {
+    marginRight: 12,
   },
   input: {
-    backgroundColor: "#f5f5f5",
-    borderRadius: 8,
-    padding: 14,
+    flex: 1,
+    paddingVertical: 16,
     fontSize: 16,
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
+    color: Colors.text,
+  },
+  visibilityToggle: {
+    padding: 4,
   },
   optionsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 32,
   },
   rememberMeContainer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 12,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: Colors.blueAccent,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkboxChecked: {
+    backgroundColor: Colors.blueAccent,
   },
   rememberMeText: {
     fontSize: 14,
+    fontWeight: "500",
   },
   forgotPassword: {},
   forgotPasswordText: {
     fontSize: 14,
+    fontWeight: "600",
     color: Colors.blueAccent,
   },
   loginButton: {
     backgroundColor: Colors.blueAccent,
-    borderRadius: 8,
-    padding: 16,
+    borderRadius: 16,
+    padding: 18,
     alignItems: "center",
-    marginTop: 10,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+    shadowColor: Colors.blueAccent,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+    marginBottom: 24,
   },
   loginButtonDisabled: {
     opacity: 0.7,
@@ -375,47 +619,62 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: `${Colors.blueAccent}20`,
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    fontSize: 14,
+    opacity: 0.5,
+    fontWeight: "500",
+  },
+  alternativeAuthContainer: {
+    gap: 12,
+    marginBottom: 32,
+  },
+  alternativeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: `${Colors.blueAccent}20`,
+    backgroundColor: Colors.uiBackground,
+  },
+  alternativeButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
   signupContainer: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 24,
   },
   signupText: {
     fontSize: 14,
+    opacity: 0.7,
   },
   signupLink: {
     fontSize: 14,
     fontWeight: "bold",
     color: Colors.blueAccent,
   },
-  divider: {
-    flexDirection: "row",
+  footer: {
     alignItems: "center",
-    marginVertical: 20,
+    marginTop: 40,
   },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "#e0e0e0",
-  },
-  dividerText: {
-    marginHorizontal: 10,
-    fontSize: 14,
+  footerText: {
+    fontSize: 12,
     opacity: 0.5,
-  },
-  googleButton: {
-    backgroundColor: "#DB4437",
-    borderRadius: 8,
-    padding: 16,
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 10,
-  },
-  googleButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
+    letterSpacing: 1,
   },
 });
