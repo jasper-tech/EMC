@@ -203,7 +203,7 @@ const Login = () => {
           >
             {/* Header Section */}
             <View style={styles.header}>
-              <View style={styles.logoContainer}>
+              {/* <View style={styles.logoContainer}>
                 <View style={styles.logoCircle}>
                   <Ionicons
                     name="lock-closed"
@@ -217,7 +217,7 @@ const Login = () => {
                     Welcome Back
                   </ThemedText>
                 </View>
-              </View>
+              </View> */}
 
               <ThemedText type="title" style={styles.title}>
                 Sign In to Your Account

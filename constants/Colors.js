@@ -6,6 +6,7 @@ export const Colors = {
   blueAccent: "#2196F3",
   greenAccent: "#28A745",
   yellowAccent: "#FFC107",
+  goldAccent: "#D3AF37",
   redAccent: "#EF5350",
   tealAccent: "#17A2B8",
   orangeAccent: "#FF7F50",

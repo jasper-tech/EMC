@@ -35,6 +35,7 @@ const Signup = () => {
     role: "",
     password: "",
     confirmPassword: "",
+    address: "", // Added address field
   });
   const [loading, setLoading] = useState(false);
   const [showRolePicker, setShowRolePicker] = useState(false);
@@ -96,7 +97,8 @@ const Signup = () => {
       !formData.phone ||
       !formData.role ||
       !formData.password ||
-      !formData.confirmPassword
+      !formData.confirmPassword ||
+      !formData.address // Added address validation
     ) {
       Alert.alert("Error", "Please fill in all fields");
       return false;
@@ -141,24 +143,39 @@ const Signup = () => {
         displayName: formData.fullName,
       });
 
+      // Save to users collection
       await setDoc(doc(db, "users", user.uid), {
         fullName: formData.fullName,
         email: formData.email,
         phone: formData.phone,
         role: formData.role,
+        address: formData.address, // Added address
         createdAt: new Date().toISOString(),
         uid: user.uid,
       });
 
+      // Also save to members collection
+      await addDoc(collection(db, "members"), {
+        fullname: formData.fullName,
+        email: formData.email,
+        phone: formData.phone,
+        role: formData.role,
+        address: formData.address, // Added address
+        dateJoined: new Date().toISOString().split("T")[0],
+        isExecutive: true, // Mark as executive
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
       await addDoc(collection(db, "notifications"), {
         type: "user_created",
-        title: "New Member Joined",
-        message: `${formData.fullName} (${formData.role}) has joined the union`,
+        title: "New Executive Joined",
+        message: `${formData.fullName} (${formData.role}) has joined the union as an executive`,
         timestamp: new Date(),
         read: false,
       });
 
-      console.log("User created and saved to Firestore:", user.uid);
+      console.log("Executive created and saved to both collections:", user.uid);
 
       Alert.alert("Success", "Account created successfully!", [
         {
@@ -254,7 +271,7 @@ const Signup = () => {
           >
             {/* Header Section */}
             <View style={styles.header}>
-              <View style={styles.logoContainer}>
+              {/* <View style={styles.logoContainer}>
                 <View style={styles.logoCircle}>
                   <Ionicons name="people" size={32} color={Colors.blueAccent} />
                 </View>
@@ -264,14 +281,14 @@ const Signup = () => {
                     Join Our Union
                   </ThemedText>
                 </View>
-              </View>
+              </View> */}
 
               <ThemedText type="title" style={styles.title}>
                 Create Your Account
               </ThemedText>
-              <ThemedText style={styles.subtitle}>
+              {/* <ThemedText style={styles.subtitle}>
                 Create an account to start managing the union
-              </ThemedText>
+              </ThemedText> */}
             </View>
 
             {/* Form Section */}
@@ -311,6 +328,7 @@ const Signup = () => {
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
                     editable={!loading}
+                    color={theme.text}
                   />
                 </Animated.View>
               </View>
@@ -352,6 +370,7 @@ const Signup = () => {
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
                     editable={!loading}
+                    color={theme.text}
                   />
                 </Animated.View>
               </View>
@@ -392,6 +411,50 @@ const Signup = () => {
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
                     editable={!loading}
+                    color={theme.text}
+                  />
+                </Animated.View>
+              </View>
+
+              {/* Address Input */}
+              <View style={styles.inputContainer}>
+                <ThemedText style={styles.label}>Address</ThemedText>
+                <Animated.View
+                  style={[
+                    styles.inputWrapper,
+                    styles.textAreaWrapper,
+                    {
+                      transform: [
+                        {
+                          scale: inputFocusAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [1, 1.02],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="home-outline"
+                    size={20}
+                    color={Colors.blueAccent}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={[styles.input, styles.textArea]}
+                    placeholder="Enter your address"
+                    placeholderTextColor="#999"
+                    value={formData.address}
+                    onChangeText={(text) =>
+                      setFormData({ ...formData, address: text })
+                    }
+                    onFocus={handleInputFocus}
+                    onBlur={handleInputBlur}
+                    multiline
+                    numberOfLines={3}
+                    editable={!loading}
+                    color={theme.text}
                   />
                 </Animated.View>
               </View>
@@ -502,6 +565,7 @@ const Signup = () => {
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
                     editable={!loading}
+                    color={theme.text}
                   />
                   <TouchableOpacity
                     style={styles.visibilityToggle}
@@ -554,6 +618,7 @@ const Signup = () => {
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
                     editable={!loading}
+                    color={theme.text}
                   />
                   <TouchableOpacity
                     style={styles.visibilityToggle}
@@ -797,6 +862,10 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
+  textAreaWrapper: {
+    alignItems: "flex-start",
+    paddingVertical: 12,
+  },
   inputIcon: {
     marginRight: 12,
   },
@@ -805,6 +874,10 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     fontSize: 16,
     color: Colors.text,
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: "top",
   },
   visibilityToggle: {
     padding: 4,

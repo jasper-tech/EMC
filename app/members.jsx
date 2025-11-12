@@ -51,7 +51,7 @@ const Members = () => {
   const [formData, setFormData] = useState({
     fullname: "",
     address: "",
-    contact: "",
+    phone: "",
     dateJoined: new Date().toISOString().split("T")[0],
   });
 
@@ -99,7 +99,7 @@ const Members = () => {
       const filtered = members.filter(
         (member) =>
           member.fullname?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          member.contact?.includes(searchQuery) ||
+          member.phone?.includes(searchQuery) ||
           member.address?.toLowerCase().includes(searchQuery.toLowerCase())
       );
       setFilteredMembers(filtered);
@@ -110,7 +110,7 @@ const Members = () => {
     setFormData({
       fullname: "",
       address: "",
-      contact: "",
+      phone: "",
       dateJoined: new Date().toISOString().split("T")[0],
     });
   };
@@ -134,8 +134,9 @@ const Members = () => {
       return;
     }
 
-    if (!formData.contact.trim()) {
-      Alert.alert("Error", "Please enter member's contact");
+    if (!formData.phone.trim()) {
+      // Changed from contact to phone
+      Alert.alert("Error", "Please enter member's phone number");
       return;
     }
 
@@ -183,8 +184,8 @@ const Members = () => {
       return;
     }
 
-    if (!formData.contact.trim()) {
-      Alert.alert("Error", "Please enter member's contact");
+    if (!formData.phone.trim()) {
+      Alert.alert("Error", "Please enter member's phone number");
       return;
     }
 
@@ -204,6 +205,17 @@ const Members = () => {
         updatedAt: serverTimestamp(),
       });
 
+      // Also update users collection if this is an executive
+      if (selectedMember.isExecutive && selectedMember.uid) {
+        const userRef = doc(db, "users", selectedMember.uid);
+        await updateDoc(userRef, {
+          fullName: formData.fullname,
+          phone: formData.phone,
+          address: formData.address,
+          updatedAt: serverTimestamp(),
+        });
+      }
+
       setShowEditModal(false);
       setSelectedMember(null);
       resetForm();
@@ -221,7 +233,7 @@ const Members = () => {
     setFormData({
       fullname: member.fullname || "",
       address: member.address || "",
-      contact: member.contact || "",
+      phone: member.phone || "",
       dateJoined: member.dateJoined || new Date().toISOString().split("T")[0],
     });
     setShowEditModal(true);
@@ -239,6 +251,7 @@ const Members = () => {
 
   const renderMemberCard = ({ item, index }) => {
     const isExpanded = expandedMemberId === item.id;
+    const isExecutive = item.isExecutive;
 
     return (
       <Animated.View
@@ -259,16 +272,48 @@ const Members = () => {
             <View
               style={[
                 styles.avatarContainer,
-                { backgroundColor: Colors.blueAccent + "20" },
+                {
+                  backgroundColor: Colors.blueAccent + "20",
+                  borderWidth: isExecutive ? 2 : 0,
+                  borderColor: isExecutive ? Colors.goldAccent : "transparent",
+                },
               ]}
             >
-              <Ionicons name="person" size={24} color={Colors.blueAccent} />
+              <Ionicons
+                name={isExecutive ? "star" : "person"}
+                size={24}
+                color={isExecutive ? Colors.goldAccent : Colors.blueAccent}
+              />
+              {isExecutive && (
+                <View style={styles.executiveBadge}>
+                  <Ionicons name="star" size={10} color={Colors.goldAccent} />
+                </View>
+              )}
             </View>
             <View style={styles.memberInfo}>
-              <ThemedText style={styles.memberName}>{item.fullname}</ThemedText>
-              <ThemedText style={styles.memberContact}>
-                {item.contact}
-              </ThemedText>
+              <View style={styles.nameRow}>
+                <ThemedText style={styles.memberName}>
+                  {item.fullname}
+                </ThemedText>
+                {isExecutive && (
+                  <View
+                    style={[
+                      styles.roleBadge,
+                      { backgroundColor: Colors.goldAccent + "20" },
+                    ]}
+                  >
+                    <ThemedText
+                      style={[styles.roleText, { color: Colors.goldAccent }]}
+                    >
+                      {item.role}
+                    </ThemedText>
+                  </View>
+                )}
+              </View>
+              <ThemedText style={styles.memberPhone}> {item.phone}</ThemedText>
+              {item.email && (
+                <ThemedText style={styles.memberEmail}>{item.email}</ThemedText>
+              )}
             </View>
             <Ionicons
               name={isExpanded ? "chevron-up" : "chevron-down"}
@@ -308,6 +353,23 @@ const Members = () => {
                   </ThemedText>
                 </View>
               </View>
+
+              {/* Display role for executives */}
+              {isExecutive && (
+                <View style={styles.detailRow}>
+                  <Ionicons
+                    name="shield-outline"
+                    size={20}
+                    color={Colors.goldAccent}
+                  />
+                  <View style={styles.detailTextContainer}>
+                    <ThemedText style={styles.detailLabel}>Role</ThemedText>
+                    <ThemedText style={[styles.detailValue]}>
+                      {item.role}
+                    </ThemedText>
+                  </View>
+                </View>
+              )}
 
               <TouchableOpacity
                 style={[
@@ -420,7 +482,7 @@ const Members = () => {
               </View>
 
               <View style={styles.inputGroup}>
-                <ThemedText style={styles.inputLabel}>Contact *</ThemedText>
+                <ThemedText style={styles.inputLabel}>Phone *</ThemedText>
                 <View
                   style={[
                     styles.inputWrapper,
@@ -435,11 +497,11 @@ const Members = () => {
                   />
                   <TextInput
                     style={styles.input}
-                    value={formData.contact}
+                    value={formData.phone}
                     onChangeText={(text) =>
-                      setFormData({ ...formData, contact: text })
+                      setFormData({ ...formData, phone: text })
                     }
-                    placeholder="Enter contact number"
+                    placeholder="Enter phone number"
                     placeholderTextColor="#999"
                     keyboardType="phone-pad"
                     color={theme.text}
@@ -643,7 +705,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginBottom: 4,
   },
-  memberContact: {
+  memberPhone: {
     fontSize: 14,
     opacity: 0.6,
   },
@@ -755,7 +817,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginBottom: 8,
     opacity: 0.7,
-    // color: Colors.text,
   },
   inputWrapper: {
     flexDirection: "row",
@@ -815,5 +876,37 @@ const styles = StyleSheet.create({
     opacity: 0.5,
     marginTop: 4,
     fontStyle: "italic",
+  },
+  executiveBadge: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    backgroundColor: Colors.goldAccent,
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 4,
+  },
+  roleBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  roleText: {
+    fontSize: 10,
+    fontWeight: "600",
+  },
+  memberEmail: {
+    fontSize: 12,
+    opacity: 0.5,
+    marginTop: 2,
   },
 });
