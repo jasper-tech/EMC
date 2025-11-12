@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ThemeProvider, ThemeContext } from "../context/ThemeContext";
 import { AuthProvider } from "../context/AuthContext";
 import { SidePanelProvider } from "../context/SidepanelContext";
+import { ProfileProvider } from "../context/ProfileContext";
 import AppWrapper from "../components/AppWrapper";
 
 const LayoutContent = () => {
@@ -87,7 +88,9 @@ const RootLayout = () => {
       <ThemeProvider>
         <AuthProvider>
           <SidePanelProvider>
-            <LayoutContent />
+            <ProfileProvider>
+              <LayoutContent />
+            </ProfileProvider>
           </SidePanelProvider>
         </AuthProvider>
       </ThemeProvider>

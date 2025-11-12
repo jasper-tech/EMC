@@ -26,7 +26,8 @@ import { auth } from "../firebase";
 import { router } from "expo-router";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
-import AsyncStorage from "@react-native-async-storage/async-storage"; // ADD THIS IMPORT
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useProfile } from "../context/ProfileContext";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const PANEL_WIDTH = SCREEN_WIDTH * 0.8;
@@ -57,6 +58,9 @@ const SidePanel = ({
   const [uploading, setUploading] = useState(false);
 
   const translateX = useSharedValue(isOpen ? 0 : -PANEL_WIDTH);
+  const { profileImage, updateProfileImage } = useProfile();
+
+  const currentUserAvatar = profileImage || userAvatar;
 
   // Generate consistent avatar variant based on userId or userName
   const avatarVariant = useMemo(() => {
@@ -174,7 +178,13 @@ const SidePanel = ({
         updatedAt: new Date().toISOString(),
       });
 
-      // Call the callback to update parent component
+      //  UPDATE ASYNCSTORAGE FOR PERSISTENCE
+      await AsyncStorage.setItem("savedProfileImg", base64Image);
+
+      //  UPDATE CONTEXT FOR IMMEDIATE UI UPDATE
+      updateProfileImage(base64Image);
+
+      // Still call the callback for parent component if needed
       if (onAvatarUpdate) {
         onAvatarUpdate(base64Image);
       }
@@ -241,18 +251,18 @@ const SidePanel = ({
                   style={[
                     styles.avatarContainer,
                     {
-                      backgroundColor: userAvatar
+                      backgroundColor: currentUserAvatar
                         ? "transparent"
                         : avatarVariant.bg,
                     },
                   ]}
                 >
-                  {userAvatar ? (
+                  {currentUserAvatar ? (
                     <Image
                       source={
-                        typeof userAvatar === "string"
-                          ? { uri: userAvatar }
-                          : userAvatar
+                        typeof currentUserAvatar === "string"
+                          ? { uri: currentUserAvatar }
+                          : currentUserAvatar
                       }
                       style={styles.avatarImage}
                     />

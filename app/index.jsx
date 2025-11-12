@@ -7,7 +7,7 @@ import {
   Animated,
   Dimensions,
 } from "react-native";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useContext } from "react";
 import { MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { Colors } from "../constants/Colors";
 import ThemedView from "../components/ThemedView";
@@ -18,6 +18,7 @@ import { auth } from "../firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
+import { ProfileContext } from "../context/ProfileContext";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -26,6 +27,9 @@ const Index = () => {
   const [savedUser, setSavedUser] = useState(null);
   const [loading, setLoading] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
+
+  // Get profile image from context
+  const { profileImage } = useContext(ProfileContext);
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -60,6 +64,16 @@ const Index = () => {
     return () => clearTimeout(timer);
   }, []);
 
+  // Update savedUser when profileImage changes in context
+  useEffect(() => {
+    if (savedUser && profileImage) {
+      setSavedUser((prev) => ({
+        ...prev,
+        profileImg: profileImage,
+      }));
+    }
+  }, [profileImage]);
+
   const checkSavedUser = async () => {
     try {
       const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -72,12 +86,15 @@ const Index = () => {
           const savedName = await AsyncStorage.getItem("savedName");
           const savedProfileImg = await AsyncStorage.getItem("savedProfileImg");
 
+          // Use profileImage from context if available, otherwise fall back to AsyncStorage
+          const currentProfileImg = profileImage || savedProfileImg;
+
           if (savedEmail && savedPassword) {
             setSavedUser({
               email: savedEmail,
               password: savedPassword,
               name: savedName || "User",
-              profileImg: savedProfileImg,
+              profileImg: currentProfileImg,
             });
           }
         }
