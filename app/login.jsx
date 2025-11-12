@@ -18,11 +18,13 @@ import ThemedText from "../components/ThemedText";
 import { router } from "expo-router";
 import {
   signInWithEmailAndPassword,
-  GoogleAuthProvider,
-  signInWithCredential,
+  // GoogleAuthProvider,
+  // signInWithCredential,
 } from "firebase/auth";
 import { auth } from "../firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../firebase";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -58,6 +60,14 @@ const Login = () => {
 
     setLoading(true);
     try {
+      // CLEAR PREVIOUS CREDENTIALS BEFORE SAVING NEW ONES
+      await AsyncStorage.multiRemove([
+        "savedEmail",
+        "savedPassword",
+        "savedName",
+        "savedProfileImg",
+      ]);
+
       const userCredential = await signInWithEmailAndPassword(
         auth,
         formData.email,
@@ -75,13 +85,44 @@ const Login = () => {
         const displayName =
           userCredential.user.displayName || formData.email.split("@")[0];
         await AsyncStorage.setItem("savedName", displayName);
-      } else {
-        // Clear saved credentials if remember me is not checked
-        await AsyncStorage.multiRemove([
-          "savedEmail",
-          "savedPassword",
-          "savedName",
-        ]);
+
+        // Try to get the base64 profile image from Firestore
+        try {
+          const userDoc = await getDoc(
+            doc(db, "users", userCredential.user.uid)
+          );
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            if (userData.profileImg) {
+              // Save the base64 image from Firestore
+              await AsyncStorage.setItem(
+                "savedProfileImg",
+                userData.profileImg
+              );
+            } else if (userCredential.user.photoURL) {
+              // Fallback to Firebase photoURL
+              await AsyncStorage.setItem(
+                "savedProfileImg",
+                userCredential.user.photoURL
+              );
+            }
+          } else if (userCredential.user.photoURL) {
+            // Fallback if no Firestore document
+            await AsyncStorage.setItem(
+              "savedProfileImg",
+              userCredential.user.photoURL
+            );
+          }
+        } catch (firestoreError) {
+          console.error("Error fetching user data:", firestoreError);
+          // Fallback to Firebase photoURL
+          if (userCredential.user.photoURL) {
+            await AsyncStorage.setItem(
+              "savedProfileImg",
+              userCredential.user.photoURL
+            );
+          }
+        }
       }
 
       // Navigate to dashboard after successful login

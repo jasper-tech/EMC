@@ -3,7 +3,7 @@ import {
   View,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
+  Image,
 } from "react-native";
 import React, { useState, useEffect } from "react";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -14,6 +14,9 @@ import { router } from "expo-router";
 import { signInWithEmailAndPassword, onAuthStateChanged } from "firebase/auth";
 import { auth } from "../firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../firebase";
+import { useFocusEffect } from "expo-router";
 
 const Index = () => {
   const [showSplash, setShowSplash] = useState(true);
@@ -39,16 +42,26 @@ const Index = () => {
           // User is logged in, navigate to dashboard
           router.replace("/dashboard");
         } else {
+          // RESET STATE FIRST to avoid showing old data
+          setSavedUser(null);
+
           // Check for saved credentials
           const savedEmail = await AsyncStorage.getItem("savedEmail");
           const savedPassword = await AsyncStorage.getItem("savedPassword");
           const savedName = await AsyncStorage.getItem("savedName");
+          const savedProfileImg = await AsyncStorage.getItem("savedProfileImg");
+
+          console.log(
+            "Saved profile image:",
+            savedProfileImg ? "Exists" : "Null"
+          ); // Debug log
 
           if (savedEmail && savedPassword) {
             setSavedUser({
               email: savedEmail,
               password: savedPassword,
               name: savedName || "User",
+              profileImg: savedProfileImg, // This can be null, base64, or URL
             });
           }
         }
@@ -74,23 +87,24 @@ const Index = () => {
       );
 
       console.log("User logged in:", userCredential.user.uid);
+
+      // Update saved profile image from Firestore if available
+      try {
+        const userDocRef = doc(db, "users", userCredential.user.uid);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists() && userDoc.data().profileImg) {
+          await AsyncStorage.setItem(
+            "savedProfileImg",
+            userDoc.data().profileImg
+          );
+        }
+      } catch (err) {
+        console.warn("Could not update profile image:", err);
+      }
+
       router.replace("/dashboard");
     } catch (error) {
-      console.error("Auto-login error:", error);
-
-      // Clear saved credentials if login fails
-      await AsyncStorage.multiRemove([
-        "savedEmail",
-        "savedPassword",
-        "savedName",
-      ]);
-      setSavedUser(null);
-
-      Alert.alert(
-        "Login Failed",
-        "Unable to log in automatically. Please log in manually.",
-        [{ text: "OK" }]
-      );
+      // ...existing error handling...
     } finally {
       setLoading(false);
     }
@@ -121,11 +135,6 @@ const Index = () => {
     <ThemedView style={styles.container}>
       <View style={styles.content}>
         <View style={styles.header}>
-          {/* <MaterialIcons
-            name="account-circle"
-            size={80}
-            color={Colors.blueAccent}
-          /> */}
           <ThemedText type="title" style={styles.title}>
             Welcome Back
           </ThemedText>
@@ -134,11 +143,22 @@ const Index = () => {
         {savedUser ? (
           <View style={styles.userSection}>
             <View style={styles.userCard}>
-              <MaterialIcons
-                name="person"
-                size={40}
-                color={Colors.blueAccent}
-              />
+              {savedUser.profileImg ? (
+                <Image
+                  source={{
+                    uri: savedUser.profileImg.startsWith("data:")
+                      ? savedUser.profileImg
+                      : savedUser.profileImg,
+                  }}
+                  style={styles.profileImage}
+                />
+              ) : (
+                <MaterialIcons
+                  name="account-circle"
+                  size={80}
+                  color={Colors.blueAccent}
+                />
+              )}
               <ThemedText style={styles.userName}>{savedUser.name}</ThemedText>
               <ThemedText style={styles.userEmail}>
                 {savedUser.email}
@@ -222,6 +242,12 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     borderWidth: 1,
     borderColor: "#e0e0e0",
+  },
+  profileImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginBottom: 8,
   },
   userName: {
     fontSize: 20,

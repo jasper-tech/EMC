@@ -26,6 +26,7 @@ import { auth } from "../firebase";
 import { router } from "expo-router";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
+import AsyncStorage from "@react-native-async-storage/async-storage"; // ADD THIS IMPORT
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const PANEL_WIDTH = SCREEN_WIDTH * 0.8;
@@ -90,6 +91,7 @@ const SidePanel = ({
       router.replace("/");
     } catch (error) {
       console.error("Error signing out:", error);
+      Alert.alert("Sign Out Error", "Failed to sign out properly.");
     }
   };
 
@@ -288,17 +290,15 @@ const SidePanel = ({
                 <View
                   style={[
                     styles.roleBadge,
-                    { backgroundColor: `${Colors.primary}15` },
+                    { backgroundColor: `${Colors.uiBackground}15` },
                   ]}
                 >
                   <Ionicons
                     name="shield-checkmark"
                     size={12}
-                    color={Colors.primary}
+                    color={theme.text}
                   />
-                  <ThemedText
-                    style={[styles.roleText, { color: Colors.primary }]}
-                  >
+                  <ThemedText style={[styles.roleText, { color: theme.text }]}>
                     {userRole}
                   </ThemedText>
                 </View>
