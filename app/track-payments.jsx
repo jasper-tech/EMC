@@ -4,6 +4,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import React, { useState, useEffect, useContext } from "react";
 import { MaterialIcons, Ionicons } from "@expo/vector-icons";
@@ -245,13 +246,21 @@ const TrackPayments = () => {
                 member.isExecutive && styles.executiveAvatar,
               ]}
             >
-              <Ionicons
-                name={member.isExecutive ? "star" : "person"}
-                size={20}
-                color={
-                  member.isExecutive ? Colors.goldAccent : Colors.blueAccent
-                }
-              />
+              {member.profileImg ? (
+                <Image
+                  source={{ uri: member.profileImg }}
+                  style={styles.profileImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Ionicons
+                  name={member.isExecutive ? "star" : "person"}
+                  size={20}
+                  color={
+                    member.isExecutive ? Colors.goldAccent : Colors.blueAccent
+                  }
+                />
+              )}
             </View>
             <View style={styles.memberDetails}>
               <View style={styles.memberNameRow}>
@@ -299,11 +308,21 @@ const TrackPayments = () => {
               member.isExecutive && styles.executiveAvatar,
             ]}
           >
-            <Ionicons
-              name={member.isExecutive ? "star" : "person"}
-              size={20}
-              color={member.isExecutive ? Colors.goldAccent : Colors.blueAccent}
-            />
+            {member.profileImg ? (
+              <Image
+                source={{ uri: member.profileImg }}
+                style={styles.profileImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <Ionicons
+                name={member.isExecutive ? "star" : "person"}
+                size={20}
+                color={
+                  member.isExecutive ? Colors.goldAccent : Colors.blueAccent
+                }
+              />
+            )}
           </View>
           <View style={styles.memberDetails}>
             <View style={styles.memberNameRow}>
@@ -944,5 +963,10 @@ const styles = StyleSheet.create({
   membersScrollContent: {
     gap: 12,
     paddingBottom: 8,
+  },
+  profileImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 20,
   },
 });
