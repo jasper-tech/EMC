@@ -110,6 +110,13 @@ const LayoutContent = () => {
                 gestureEnabled: false,
               }}
             />
+            <Stack.Screen
+              name="track-payments"
+              options={{
+                headerTitle: "Track Payments",
+                gestureEnabled: false,
+              }}
+            />
           </Stack>
         </AppWrapper>
       )}
