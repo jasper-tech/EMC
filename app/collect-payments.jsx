@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   ScrollView,
   TextInput,
+  Image,
 } from "react-native";
 import React, { useState, useEffect, useContext } from "react";
 import { MaterialIcons, Ionicons } from "@expo/vector-icons";
@@ -17,13 +18,11 @@ import { ThemeContext } from "../context/ThemeContext";
 import {
   collection,
   query,
-  where,
   onSnapshot,
   addDoc,
   updateDoc,
   doc,
   serverTimestamp,
-  getDocs,
   orderBy,
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
@@ -616,15 +615,23 @@ const CollectPayments = () => {
                         item.isExecutive && styles.executiveAvatar,
                       ]}
                     >
-                      <Ionicons
-                        name={item.isExecutive ? "star" : "person"}
-                        size={20}
-                        color={
-                          item.isExecutive
-                            ? Colors.goldAccent
-                            : Colors.blueAccent
-                        }
-                      />
+                      {item.profileImg ? (
+                        <Image
+                          source={{ uri: item.profileImg }}
+                          style={styles.profileImage}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <Ionicons
+                          name={item.isExecutive ? "star" : "person"}
+                          size={20}
+                          color={
+                            item.isExecutive
+                              ? Colors.goldAccent
+                              : Colors.blueAccent
+                          }
+                        />
+                      )}
                     </View>
                     <View style={styles.memberDetails}>
                       <View style={styles.memberNameRow}>
@@ -1299,5 +1306,10 @@ const styles = StyleSheet.create({
 
   membersScrollContent: {
     paddingBottom: 8,
+  },
+  profileImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 20,
   },
 });

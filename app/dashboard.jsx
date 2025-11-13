@@ -1,6 +1,5 @@
 import { StyleSheet, ScrollView, View, ActivityIndicator } from "react-native";
-import React, { useState } from "react";
-import { MaterialIcons, FontAwesome, Ionicons } from "@expo/vector-icons";
+import React from "react";
 import { GestureDetector, Gesture } from "react-native-gesture-handler";
 import { Colors } from "../constants/Colors";
 import ThemedView from "../components/ThemedView";
@@ -9,7 +8,7 @@ import ThemedText from "../components/ThemedText";
 import FooterNav from "../components/FooterNav";
 import NotificationsCard from "../components/NotificationsCard";
 import { useAuth } from "../context/AuthContext";
-import RealTimeStats from "../components/RealTimeStats"; // Import the new component
+import RealTimeStats from "../components/RealTimeStats";
 
 const Dashboard = () => {
   const { loading: authLoading } = useAuth();
