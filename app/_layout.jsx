@@ -103,6 +103,13 @@ const LayoutContent = () => {
                 gestureEnabled: false,
               }}
             />
+            <Stack.Screen
+              name="collect-payments"
+              options={{
+                headerTitle: "Collect Payments",
+                gestureEnabled: false,
+              }}
+            />
           </Stack>
         </AppWrapper>
       )}

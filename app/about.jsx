@@ -60,7 +60,7 @@ const About = () => {
     {
       id: 2,
       title: "Finances",
-      description: "Track payments and financial reports",
+      description: "View Money Available",
       route: "/finances",
       badge: "Track",
     },
