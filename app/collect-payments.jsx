@@ -244,7 +244,7 @@ const CollectPayments = () => {
         title: "Dues Payment Received",
         message: `${selectedMember.fullname} paid GH₵${amount.toFixed(2)} for ${
           selectedMonth.name
-        } ${selectedYear} dues`,
+        } ${selectedYear} `,
         timestamp: serverTimestamp(),
         readBy: [],
       });
@@ -547,6 +547,7 @@ const CollectPayments = () => {
 
     return (
       <View style={styles.section}>
+        {/* Back button header */}
         <View style={styles.sectionHeader}>
           <TouchableOpacity
             style={styles.backButton}
@@ -563,7 +564,8 @@ const CollectPayments = () => {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.sectionHeader}>
+        {/* Title and count in separate row for better layout */}
+        <View style={styles.titleRow}>
           <ThemedText style={styles.sectionTitle}>
             Unpaid Members - {selectedMonth.name} {selectedYear}
           </ThemedText>
@@ -592,7 +594,11 @@ const CollectPayments = () => {
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={styles.membersListContainer}>
+          <ScrollView
+            style={styles.membersScrollView}
+            showsVerticalScrollIndicator={true}
+            contentContainerStyle={styles.membersScrollContent}
+          >
             {unpaidMembers.map((item) => {
               const duesAmount = getMemberDuesAmount(item);
               return (
@@ -651,7 +657,7 @@ const CollectPayments = () => {
                 </View>
               );
             })}
-          </View>
+          </ScrollView>
         )}
       </View>
     );
@@ -917,8 +923,11 @@ const styles = StyleSheet.create({
   },
   unpaidCount: {
     fontSize: 14,
-    opacity: 0.7,
     fontWeight: "600",
+
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   yearScrollView: {
     marginHorizontal: -16,
@@ -1274,5 +1283,21 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
+  },
+  titleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+    flexWrap: "wrap",
+  },
+
+  membersScrollView: {
+    maxHeight: 400,
+    flexGrow: 0,
+  },
+
+  membersScrollContent: {
+    paddingBottom: 8,
   },
 });
