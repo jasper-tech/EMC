@@ -11,15 +11,9 @@ import { Colors } from "../constants/Colors";
 import ThemedView from "../components/ThemedView";
 import ThemedText from "../components/ThemedText";
 import { ThemeContext } from "../context/ThemeContext";
-import {
-  collection,
-  query,
-  where,
-  onSnapshot,
-  orderBy,
-} from "firebase/firestore";
+import { collection, query, onSnapshot, orderBy } from "firebase/firestore";
 import { db, auth } from "../firebase";
-
+import { TextInput } from "react-native";
 const TrackPayments = () => {
   const { scheme } = useContext(ThemeContext);
   const theme = Colors[scheme] ?? Colors.light;
@@ -30,6 +24,9 @@ const TrackPayments = () => {
   const [transactions, setTransactions] = useState([]);
   const [duesAllocations, setDuesAllocations] = useState([]);
   const [selectedMember, setSelectedMember] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredMembers, setFilteredMembers] = useState([]);
+  const [showSummaryTiles, setShowSummaryTiles] = useState(true);
 
   // Generate years from 2022 to current year
   const years = Array.from(
@@ -57,6 +54,19 @@ const TrackPayments = () => {
     loadTransactions();
     loadDuesAllocations();
   }, []);
+
+  useEffect(() => {
+    if (searchQuery.trim() === "") {
+      setFilteredMembers(members);
+    } else {
+      const filtered = members.filter(
+        (member) =>
+          member.fullname?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          member.phone?.includes(searchQuery)
+      );
+      setFilteredMembers(filtered);
+    }
+  }, [searchQuery, members]);
 
   const loadMembers = async () => {
     try {
@@ -435,51 +445,107 @@ const TrackPayments = () => {
     const overallRate =
       totalExpected > 0 ? (totalPaid / totalExpected) * 100 : 0;
 
+    // Calculate members owing (members who haven't paid all 12 months)
+    const membersOwing = members.filter((member) => {
+      const memberPayments = transactions.filter(
+        (t) =>
+          t.type === "dues" &&
+          t.memberId === member.id &&
+          t.year === selectedYear
+      );
+      return memberPayments.length < 12;
+    }).length;
+
     return (
       <View style={styles.summarySection}>
-        <ThemedText style={styles.summaryTitle}>
-          Year {selectedYear} Summary
-        </ThemedText>
-        <View style={styles.summaryGrid}>
-          <View style={styles.summaryCard}>
-            <MaterialIcons name="people" size={24} color={Colors.blueAccent} />
-            <ThemedText style={styles.summaryValue}>{totalMembers}</ThemedText>
-            <ThemedText style={styles.summaryLabel}>Total Members</ThemedText>
-          </View>
-          <View style={styles.summaryCard}>
-            <MaterialIcons
-              name="payments"
-              size={24}
-              color={Colors.greenAccent}
-            />
-            <ThemedText style={styles.summaryValue}>
-              GH₵{totalPaid.toFixed(0)}
+        {/* Collapsible Header */}
+        <TouchableOpacity
+          style={styles.summaryHeader}
+          onPress={() => setShowSummaryTiles(!showSummaryTiles)}
+          activeOpacity={0.7}
+        >
+          <ThemedText style={styles.summaryTitle}>
+            Year {selectedYear} Summary
+          </ThemedText>
+          <MaterialIcons
+            name={showSummaryTiles ? "expand-less" : "expand-more"}
+            size={24}
+            color={theme.text}
+          />
+        </TouchableOpacity>
+
+        {/* Expected Amount Banner (always visible) */}
+        <View style={styles.expectedAmountBanner}>
+          <MaterialIcons name="account-balance" size={20} color={theme.text} />
+          <View style={styles.expectedAmountInfo}>
+            <ThemedText style={styles.expectedAmountLabel}>
+              Expected Amount for {selectedYear}
             </ThemedText>
-            <ThemedText style={styles.summaryLabel}>Total Collected</ThemedText>
-          </View>
-          <View style={styles.summaryCard}>
-            <MaterialIcons
-              name="money-off"
-              size={24}
-              color={Colors.orangeAccent}
-            />
-            <ThemedText style={styles.summaryValue}>
-              GH₵{totalOwing.toFixed(0)}
+            <ThemedText style={styles.expectedAmountValue}>
+              GH₵{totalExpected.toFixed(2)}
             </ThemedText>
-            <ThemedText style={styles.summaryLabel}>Total Owing</ThemedText>
-          </View>
-          <View style={styles.summaryCard}>
-            <MaterialIcons
-              name="trending-up"
-              size={24}
-              color={Colors.blueAccent}
-            />
-            <ThemedText style={styles.summaryValue}>
-              {overallRate.toFixed(0)}%
+            <ThemedText style={styles.amountLeftText}>
+              Amount left to reach:{" "}
+              <ThemedText style={styles.amountLeftValue}>
+                GH₵{totalOwing.toFixed(2)}
+              </ThemedText>
             </ThemedText>
-            <ThemedText style={styles.summaryLabel}>Collection Rate</ThemedText>
           </View>
         </View>
+
+        {/* Collapsible Tiles */}
+        {showSummaryTiles && (
+          <View style={styles.summaryGrid}>
+            <View style={styles.summaryCard}>
+              <MaterialIcons
+                name="people"
+                size={24}
+                color={Colors.blueAccent}
+              />
+              <ThemedText style={styles.summaryValue}>
+                {totalMembers}
+              </ThemedText>
+              <ThemedText style={styles.summaryLabel}>Total Members</ThemedText>
+            </View>
+            <View style={styles.summaryCard}>
+              <MaterialIcons
+                name="payments"
+                size={24}
+                color={Colors.greenAccent}
+              />
+              <ThemedText style={styles.summaryValue}>
+                GH₵{totalPaid.toFixed(0)}
+              </ThemedText>
+              <ThemedText style={styles.summaryLabel}>
+                Total Collected
+              </ThemedText>
+            </View>
+            <View style={styles.summaryCard}>
+              <MaterialIcons
+                name="person-remove"
+                size={24}
+                color={Colors.orangeAccent}
+              />
+              <ThemedText style={styles.summaryValue}>
+                {membersOwing}
+              </ThemedText>
+              <ThemedText style={styles.summaryLabel}>Members Owing</ThemedText>
+            </View>
+            <View style={styles.summaryCard}>
+              <MaterialIcons
+                name="trending-up"
+                size={24}
+                color={Colors.tealAccent}
+              />
+              <ThemedText style={styles.summaryValue}>
+                {overallRate.toFixed(0)}%
+              </ThemedText>
+              <ThemedText style={styles.summaryLabel}>
+                Collection Rate
+              </ThemedText>
+            </View>
+          </View>
+        )}
       </View>
     );
   };
@@ -505,15 +571,41 @@ const TrackPayments = () => {
         contentContainerStyle={styles.scrollViewContent}
       >
         {renderYearSelector()}
+
         {renderSummaryStats()}
+        {/* Search Bar */}
+        <View
+          style={[
+            styles.searchContainer,
+            { backgroundColor: theme.uiBackground },
+          ]}
+        >
+          <Ionicons name="search" size={20} color={Colors.blueAccent} />
+          <TextInput
+            style={[styles.searchInput, { color: theme.text }]}
+            placeholder="Search members..."
+            placeholderTextColor="#999"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery !== "" && (
+            <TouchableOpacity onPress={() => setSearchQuery("")}>
+              <Ionicons name="close" size={18} color={Colors.blueAccent} />
+            </TouchableOpacity>
+          )}
+        </View>
 
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>
             Member Payment Details - {selectedYear}
           </ThemedText>
-          <View style={styles.membersList}>
-            {members.map(renderMemberCard)}
-          </View>
+          <ScrollView
+            style={styles.membersScrollView}
+            showsVerticalScrollIndicator={true}
+            contentContainerStyle={styles.membersScrollContent}
+          >
+            {filteredMembers.map(renderMemberCard)}
+          </ScrollView>
         </View>
       </ScrollView>
     </ThemedView>
@@ -788,5 +880,69 @@ const styles = StyleSheet.create({
   },
   unpaidMonthText: {
     color: Colors.text + "80",
+  },
+  expectedAmountBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.blueAccent + "15",
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.blueAccent + "30",
+    marginBottom: 16,
+    gap: 12,
+  },
+  expectedAmountInfo: {
+    flex: 1,
+  },
+  expectedAmountLabel: {
+    fontSize: 14,
+    opacity: 0.7,
+    marginBottom: 4,
+  },
+  expectedAmountValue: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: Colors.blueAccent,
+  },
+  amountLeftText: {
+    fontSize: 12,
+    opacity: 0.6,
+  },
+  amountLeftValue: {
+    fontSize: 12,
+    color: Colors.redAccent,
+    fontWeight: "600",
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+  },
+  summaryHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+    paddingVertical: 8,
+  },
+
+  membersScrollView: {
+    maxHeight: 400, // Adjust this height as needed
+  },
+
+  membersScrollContent: {
+    gap: 12,
+    paddingBottom: 8,
   },
 });

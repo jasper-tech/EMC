@@ -9,54 +9,11 @@ import ThemedText from "../components/ThemedText";
 import FooterNav from "../components/FooterNav";
 import NotificationsCard from "../components/NotificationsCard";
 import { useAuth } from "../context/AuthContext";
+import RealTimeStats from "../components/RealTimeStats"; // Import the new component
 
 const Dashboard = () => {
-  const { loading } = useAuth();
-
-  const statsData = [
-    {
-      icon: <MaterialIcons name="group" size={28} color={Colors.blueAccent} />,
-      title: "Total Members",
-      value: "1,247",
-      trend: "+12% vs last month",
-    },
-    {
-      icon: <FontAwesome name="money" size={28} color={Colors.greenAccent} />,
-      title: "Dues Collected",
-      value: "$45,890",
-      subtitle: "MTD: $12,340 | YTD: $145,670",
-      trend: "+8.5%",
-    },
-    {
-      icon: (
-        <MaterialIcons
-          name="report-problem"
-          size={28}
-          color={Colors.redAccent}
-        />
-      ),
-      title: "Outstanding Dues",
-      value: "$8,450",
-      subtitle: "67 members pending",
-      trend: "-15%",
-    },
-    {
-      icon: <Ionicons name="receipt" size={28} color={Colors.yellowAccent} />,
-      title: "Transactions",
-      value: "234",
-      subtitle: "This month",
-      trend: "+22%",
-    },
-    {
-      icon: (
-        <MaterialIcons name="trending-up" size={28} color={Colors.tealAccent} />
-      ),
-      title: "Growth Rate",
-      value: "18.5%",
-      subtitle: "vs last period",
-      trend: "+5.2%",
-    },
-  ];
+  const { loading: authLoading } = useAuth();
+  const { statsData, loading: statsLoading } = RealTimeStats();
 
   // Swipe gesture to open panel
   const swipeGesture = Gesture.Pan()
@@ -69,10 +26,11 @@ const Dashboard = () => {
     })
     .runOnJS(true);
 
-  if (loading) {
+  if (authLoading || statsLoading) {
     return (
       <ThemedView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.blueAccent} />
+        <ThemedText style={styles.loadingText}>Loading dashboard...</ThemedText>
       </ThemedView>
     );
   }
@@ -121,6 +79,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    opacity: 0.7,
   },
   content: {
     flex: 1,
