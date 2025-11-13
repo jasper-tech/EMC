@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Image,
 } from "react-native";
 import React, { useState, useEffect, useRef, useContext } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -29,8 +30,7 @@ import {
 import { db } from "../firebase";
 import { auth } from "../firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-// const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+import * as ImagePicker from "expo-image-picker";
 
 const Members = () => {
   const [members, setMembers] = useState([]);
@@ -42,6 +42,8 @@ const Members = () => {
   const [expandedMemberId, setExpandedMemberId] = useState(null);
   const [selectedMember, setSelectedMember] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [imageModalVisible, setImageModalVisible] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
 
   const { scheme } = useContext(ThemeContext);
   const theme = Colors[scheme] ?? Colors.light;
@@ -54,6 +56,7 @@ const Members = () => {
     address: "",
     phone: "",
     dateJoined: new Date().toISOString().split("T")[0],
+    profileImg: "",
   });
 
   useEffect(() => {
@@ -113,6 +116,7 @@ const Members = () => {
       address: "",
       phone: "",
       dateJoined: new Date().toISOString().split("T")[0],
+      profileImg: "",
     });
   };
 
@@ -129,6 +133,42 @@ const Members = () => {
     return date instanceof Date && !isNaN(date) && date <= today;
   };
 
+  const pickImage = async () => {
+    try {
+      // Request permissions
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission required",
+          "Sorry, we need camera roll permissions to select an image."
+        );
+        return;
+      }
+
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0].base64) {
+        const base64String = `data:image/jpeg;base64,${result.assets[0].base64}`;
+        setFormData({ ...formData, profileImg: base64String });
+      }
+    } catch (error) {
+      console.error("Error picking image:", error);
+      Alert.alert("Error", "Failed to pick image");
+    }
+  };
+
+  const removeImage = () => {
+    setFormData({ ...formData, profileImg: "" });
+  };
+
   const handleAddMember = async () => {
     if (!formData.fullname.trim()) {
       Alert.alert("Error", "Please enter member's full name");
@@ -136,7 +176,6 @@ const Members = () => {
     }
 
     if (!formData.phone.trim()) {
-      // Changed from contact to phone
       Alert.alert("Error", "Please enter member's phone number");
       return;
     }
@@ -215,6 +254,7 @@ const Members = () => {
           fullName: formData.fullname,
           phone: formData.phone,
           address: formData.address,
+          profileImg: formData.profileImg,
           updatedAt: serverTimestamp(),
         });
 
@@ -226,6 +266,7 @@ const Members = () => {
             fullName: formData.fullname,
             phone: formData.phone,
             address: formData.address,
+            profileImg: formData.profileImg,
           };
           await AsyncStorage.setItem(
             "currentUserData",
@@ -253,8 +294,14 @@ const Members = () => {
       address: member.address || "",
       phone: member.phone || "",
       dateJoined: member.dateJoined || new Date().toISOString().split("T")[0],
+      profileImg: member.profileImg || "",
     });
     setShowEditModal(true);
+  };
+
+  const openImageModal = (imageUri) => {
+    setSelectedImage(imageUri);
+    setImageModalVisible(true);
   };
 
   const formatDate = (dateString) => {
@@ -287,27 +334,48 @@ const Members = () => {
           activeOpacity={0.7}
         >
           <View style={styles.memberHeader}>
-            <View
-              style={[
-                styles.avatarContainer,
-                {
-                  backgroundColor: Colors.blueAccent + "20",
-                  borderWidth: isExecutive ? 2 : 0,
-                  borderColor: isExecutive ? Colors.goldAccent : "transparent",
-                },
-              ]}
+            <TouchableOpacity
+              onPress={(e) => {
+                e.stopPropagation();
+                if (item.profileImg) {
+                  openImageModal(item.profileImg);
+                }
+              }}
+              activeOpacity={item.profileImg ? 0.7 : 1}
             >
-              <Ionicons
-                name={isExecutive ? "star" : "person"}
-                size={24}
-                color={isExecutive ? Colors.goldAccent : Colors.blueAccent}
-              />
-              {isExecutive && (
-                <View style={styles.executiveBadge}>
-                  <Ionicons name="star" size={10} color={Colors.goldAccent} />
-                </View>
-              )}
-            </View>
+              <View
+                style={[
+                  styles.avatarContainer,
+                  {
+                    backgroundColor: Colors.blueAccent + "20",
+                    borderWidth: isExecutive ? 2 : 0,
+                    borderColor: isExecutive
+                      ? Colors.goldAccent
+                      : "transparent",
+                    overflow: "hidden",
+                  },
+                ]}
+              >
+                {item.profileImg ? (
+                  <Image
+                    source={{ uri: item.profileImg }}
+                    style={styles.profileImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Ionicons
+                    name={isExecutive ? "star" : "person"}
+                    size={24}
+                    color={isExecutive ? Colors.goldAccent : Colors.blueAccent}
+                  />
+                )}
+                {isExecutive && (
+                  <View style={styles.executiveBadge}>
+                    <Ionicons name="star" size={10} color={Colors.goldAccent} />
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
             <View style={styles.memberInfo}>
               <View style={styles.nameRow}>
                 <ThemedText style={styles.memberName}>
@@ -342,6 +410,25 @@ const Members = () => {
 
           {isExpanded && (
             <View style={styles.expandedContent}>
+              {item.profileImg && (
+                <TouchableOpacity
+                  style={styles.imagePreviewContainer}
+                  onPress={() => openImageModal(item.profileImg)}
+                >
+                  <ThemedText style={styles.detailLabel}>
+                    Profile Image
+                  </ThemedText>
+                  <Image
+                    source={{ uri: item.profileImg }}
+                    style={styles.expandedProfileImage}
+                    resizeMode="cover"
+                  />
+                  <ThemedText style={styles.viewImageText}>
+                    Tap to view full image
+                  </ThemedText>
+                </TouchableOpacity>
+              )}
+
               <View style={styles.detailRow}>
                 <Ionicons
                   name="home-outline"
@@ -406,6 +493,35 @@ const Members = () => {
     );
   };
 
+  const renderImageModal = () => (
+    <Modal
+      visible={imageModalVisible}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => setImageModalVisible(false)}
+    >
+      <View style={styles.imageModalOverlay}>
+        <TouchableOpacity
+          style={styles.imageModalBackground}
+          onPress={() => setImageModalVisible(false)}
+          activeOpacity={1}
+        >
+          <Image
+            source={{ uri: selectedImage }}
+            style={styles.fullSizeImage}
+            resizeMode="contain"
+          />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.closeImageButton}
+          onPress={() => setImageModalVisible(false)}
+        >
+          <Ionicons name="close" size={28} color="#fff" />
+        </TouchableOpacity>
+      </View>
+    </Modal>
+  );
+
   const renderModal = (isEditMode = false) => {
     const isVisible = isEditMode ? showEditModal : showAddModal;
     const onClose = () => {
@@ -442,6 +558,48 @@ const Members = () => {
             </View>
 
             <ScrollView style={styles.formContainer}>
+              {/* Profile Image Section */}
+              <View style={styles.inputGroup}>
+                <ThemedText style={styles.inputLabel}>Profile Image</ThemedText>
+                <View style={styles.imageSection}>
+                  {formData.profileImg ? (
+                    <View style={styles.imagePreviewWrapper}>
+                      <Image
+                        source={{ uri: formData.profileImg }}
+                        style={styles.formProfileImage}
+                        resizeMode="cover"
+                      />
+                      <TouchableOpacity
+                        style={styles.removeImageButton}
+                        onPress={removeImage}
+                      >
+                        <Ionicons name="close" size={16} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={[
+                        styles.imageUploadButton,
+                        {
+                          backgroundColor: theme.uiBackground,
+                          borderColor: `${Colors.blueAccent}20`,
+                        },
+                      ]}
+                      onPress={pickImage}
+                    >
+                      <Ionicons
+                        name="camera-outline"
+                        size={32}
+                        color={Colors.blueAccent}
+                      />
+                      <ThemedText style={styles.uploadButtonText}>
+                        Tap to add profile image
+                      </ThemedText>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
               <View style={styles.inputGroup}>
                 <ThemedText style={styles.inputLabel}>Full Name *</ThemedText>
                 <View
@@ -654,6 +812,7 @@ const Members = () => {
 
       {renderModal(false)}
       {renderModal(true)}
+      {renderImageModal()}
     </ThemedView>
   );
 };
@@ -715,6 +874,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  profileImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 22,
+  },
   memberInfo: {
     flex: 1,
   },
@@ -733,6 +897,21 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: Colors.border + "20",
     gap: 12,
+  },
+  imagePreviewContainer: {
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  expandedProfileImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginVertical: 8,
+  },
+  viewImageText: {
+    fontSize: 12,
+    opacity: 0.5,
+    marginTop: 4,
   },
   detailRow: {
     flexDirection: "row",
@@ -926,5 +1105,77 @@ const styles = StyleSheet.create({
     fontSize: 12,
     opacity: 0.5,
     marginTop: 2,
+  },
+  // Image related styles
+  imageSection: {
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  imageUploadButton: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 2,
+    borderStyle: "dashed",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  uploadButtonText: {
+    fontSize: 12,
+    textAlign: "center",
+    marginTop: 8,
+    opacity: 0.7,
+  },
+  imagePreviewWrapper: {
+    position: "relative",
+  },
+  formProfileImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+  },
+  removeImageButton: {
+    position: "absolute",
+    top: -8,
+    right: -8,
+    backgroundColor: Colors.blueAccent,
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  imageModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  imageModalBackground: {
+    flex: 1,
+    width: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  fullSizeImage: {
+    width: "90%",
+    height: "80%",
+  },
+  closeImageButton: {
+    position: "absolute",
+    top: 50,
+    right: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

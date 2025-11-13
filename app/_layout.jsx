@@ -99,7 +99,7 @@ const LayoutContent = () => {
             <Stack.Screen
               name="members"
               options={{
-                headerTitle: "EPSU Members",
+                headerTitle: "Union Members",
                 gestureEnabled: false,
               }}
             />
