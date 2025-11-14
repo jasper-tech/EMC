@@ -8,7 +8,7 @@ import {
   Dimensions,
 } from "react-native";
 import React, { useState, useEffect, useRef, useContext } from "react";
-import { MaterialIcons, Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../constants/Colors";
 import ThemedView from "../components/ThemedView";
 import ThemedText from "../components/ThemedText";
@@ -19,8 +19,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { ProfileContext } from "../context/ProfileContext";
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const Index = () => {
   const [showSplash, setShowSplash] = useState(true);

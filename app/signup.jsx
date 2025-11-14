@@ -26,10 +26,10 @@ import {
   updateProfile,
   sendEmailVerification,
 } from "firebase/auth";
-import { doc, setDoc, addDoc, collection } from "firebase/firestore";
-import { auth, db } from "../firebase";
+import { auth } from "../firebase";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAuth } from "../context/AuthContext";
 
-//
 const Signup = () => {
   const [formData, setFormData] = useState({
     fullName: "",
@@ -48,6 +48,7 @@ const Signup = () => {
     useState(false);
 
   const { scheme } = useContext(ThemeContext);
+  const { generateVerificationCode, storeVerificationCode } = useAuth();
   const theme = Colors[scheme] ?? Colors.light;
 
   // Animation values
@@ -133,64 +134,50 @@ const Signup = () => {
 
       const user = userCredential.user;
 
-      // Send email verification
-      await sendEmailVerification(user);
-
-      try {
-        await user.getIdToken();
-      } catch (tokenErr) {
-        console.warn(
-          "Could not refresh user token before writing user document:",
-          tokenErr
-        );
-      }
-
+      // Update profile with display name
       await updateProfile(user, {
         displayName: formData.fullName,
       });
 
-      // Save to users collection
-      await setDoc(doc(db, "users", user.uid), {
+      // ✅ SEND EMAIL VERIFICATION LINK (instead of OTP)
+      await sendEmailVerification(user);
+
+      // Store user data temporarily for later Firestore save
+      const userData = {
         fullName: formData.fullName,
         email: formData.email,
         phone: formData.phone,
         role: formData.role,
         address: formData.address,
-        emailVerified: false,
         createdAt: new Date().toISOString(),
-        uid: user.uid,
+      };
+
+      // Save to AsyncStorage for use in verification screen
+      await AsyncStorage.setItem("pendingUserData", JSON.stringify(userData));
+
+      // Also save credentials for auto-login after verification
+      await AsyncStorage.setItem("savedEmail", formData.email);
+      await AsyncStorage.setItem("savedPassword", formData.password);
+
+      // Clear form
+      setFormData({
+        fullName: "",
+        email: "",
+        phone: "",
+        role: "",
+        password: "",
+        confirmPassword: "",
+        address: "",
       });
 
-      await addDoc(collection(db, "members"), {
-        fullname: formData.fullName,
-        email: formData.email,
-        phone: formData.phone,
-        role: formData.role,
-        address: formData.address,
-        dateJoined: new Date().toISOString().split("T")[0],
-        isExecutive: true,
-        uid: user.uid,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-
-      await addDoc(collection(db, "notifications"), {
-        type: "user_created",
-        title: "New Executive Joined",
-        message: `${formData.fullName} (${formData.role}) has joined the union as an executive`,
-        timestamp: new Date(),
-        read: false,
-      });
-
-      console.log("Executive created and saved to both collections:", user.uid);
-
+      // ✅ REDIRECT TO VERIFICATION SCREEN (no code needed)
       Alert.alert(
         "Verification Email Sent",
-        "Please check your email and verify your account before signing in.",
+        `We've sent a verification link to ${formData.email}. Please check your inbox and click the link to verify your account.`,
         [
           {
-            text: "OK",
-            onPress: () => router.push("/"),
+            text: "Continue to Verification",
+            onPress: () => router.replace("/verification-required"),
           },
         ]
       );

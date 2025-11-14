@@ -35,6 +35,7 @@ import {
 import { db } from "../firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useProfile } from "../context/ProfileContext";
+import { useAuth } from "../context/AuthContext"; // ✅ ADD THIS IMPORT
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const PANEL_WIDTH = SCREEN_WIDTH * 0.8;
@@ -51,32 +52,26 @@ const AVATAR_VARIANTS = [
   { bg: "#85C1E2", icon: "woman" },
 ];
 
-const SidePanel = ({
-  userName = "John Doe",
-  userRole = "Admin",
-  userAvatar = null,
-  userId = null,
-  isOpen,
-  onClose,
-  onAvatarUpdate,
-}) => {
+const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
+  // ✅ REMOVE THE DEFAULT PROPS
   const { scheme, toggleScheme } = useContext(ThemeContext);
+  const { user, userProfile } = useAuth(); // ✅ USE THE AUTH CONTEXT
   const theme = Colors[scheme] ?? Colors.light;
   const [uploading, setUploading] = useState(false);
 
   const translateX = useSharedValue(isOpen ? 0 : -PANEL_WIDTH);
   const { profileImage, updateProfileImage } = useProfile();
 
-  const currentUserAvatar = profileImage || userAvatar;
+  const currentUserAvatar = profileImage || userProfile?.profileImg;
 
   // Generate consistent avatar variant based on userId or userName
   const avatarVariant = useMemo(() => {
-    const seed = userId || userName;
+    const seed = user?.uid || userProfile?.fullName || "User";
     const hash = seed
       .split("")
       .reduce((acc, char) => acc + char.charCodeAt(0), 0);
     return AVATAR_VARIANTS[hash % AVATAR_VARIANTS.length];
-  }, [userId, userName]);
+  }, [user?.uid, userProfile?.fullName]);
 
   React.useEffect(() => {
     translateX.value = withSpring(isOpen ? 0 : -PANEL_WIDTH, {
@@ -97,9 +92,6 @@ const SidePanel = ({
 
   const handleSignOut = async () => {
     try {
-      // First, unsubscribe from any active Firestore listeners
-
-      // Then sign out
       await signOut(auth);
       onClose();
       router.replace("/");
@@ -224,6 +216,14 @@ const SidePanel = ({
     }
   };
 
+  // ✅ Get user data from auth context
+  const userName =
+    userProfile?.fullName ||
+    user?.displayName ||
+    user?.email?.split("@")[0] ||
+    "User";
+  const userRole = userProfile?.role || "Member";
+
   return (
     <>
       {/* Overlay */}
@@ -285,11 +285,7 @@ const SidePanel = ({
                 >
                   {currentUserAvatar ? (
                     <Image
-                      source={
-                        typeof currentUserAvatar === "string"
-                          ? { uri: currentUserAvatar }
-                          : currentUserAvatar
-                      }
+                      source={{ uri: currentUserAvatar }}
                       style={styles.avatarImage}
                     />
                   ) : (
@@ -475,7 +471,6 @@ const SidePanel = ({
 };
 
 export default SidePanel;
-
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,

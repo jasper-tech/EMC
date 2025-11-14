@@ -9,46 +9,59 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [pendingVerification, setPendingVerification] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // ✅ ADD EMAIL VERIFICATION CHECK HERE
-        if (!firebaseUser.emailVerified) {
-          console.log("User email not verified, signing out");
-          setUser(null);
-          setUserProfile(null);
-          setLoading(false);
-          return;
-        }
+        // Check email verification status
+        await firebaseUser.reload(); // Refresh to get latest verification status
 
-        setUser(firebaseUser);
+        if (firebaseUser.emailVerified) {
+          // User is verified - proceed normally
+          setUser(firebaseUser);
+          setPendingVerification(false);
 
-        // Fetch user profile from Firestore
-        try {
-          const userDocRef = doc(db, "users", firebaseUser.uid);
-          const userDoc = await getDoc(userDocRef);
+          // Fetch user profile from Firestore
+          try {
+            const userDocRef = doc(db, "users", firebaseUser.uid);
+            const userDoc = await getDoc(userDocRef);
 
-          if (userDoc.exists()) {
-            setUserProfile(userDoc.data());
-          } else {
-            // If no profile exists, create a basic one from auth data
+            if (userDoc.exists()) {
+              setUserProfile(userDoc.data());
+            } else {
+              // If user doesn't exist in Firestore yet, set basic profile
+              setUserProfile({
+                displayName:
+                  firebaseUser.displayName ||
+                  firebaseUser.email?.split("@")[0] ||
+                  "User",
+                email: firebaseUser.email,
+                role: "Member", // Default role
+              });
+            }
+          } catch (error) {
+            console.error("Error fetching user profile:", error);
             setUserProfile({
               displayName:
                 firebaseUser.displayName ||
                 firebaseUser.email?.split("@")[0] ||
                 "User",
               email: firebaseUser.email,
-              photoURL: firebaseUser.photoURL || null,
-              role: "Member", // Default role
+              role: "Member",
             });
           }
-        } catch (error) {
-          console.error("Error fetching user profile:", error);
+        } else {
+          // User is not verified - set pending verification state
+          setUser(null);
+          setUserProfile(null);
+          setPendingVerification(true);
         }
       } else {
+        // No user signed in
         setUser(null);
         setUserProfile(null);
+        setPendingVerification(false);
       }
       setLoading(false);
     });
@@ -60,6 +73,8 @@ export const AuthProvider = ({ children }) => {
     user,
     userProfile,
     loading,
+    pendingVerification,
+    setPendingVerification,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

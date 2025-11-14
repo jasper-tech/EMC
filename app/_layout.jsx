@@ -117,6 +117,14 @@ const LayoutContent = () => {
                 gestureEnabled: false,
               }}
             />
+            <Stack.Screen
+              name="verification-required"
+              options={{
+                headerTitle: "Verification",
+                gestureEnabled: false,
+                headerBackVisible: false,
+              }}
+            />
           </Stack>
         </AppWrapper>
       )}

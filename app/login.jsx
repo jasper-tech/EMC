@@ -8,7 +8,6 @@ import {
   Alert,
   ActivityIndicator,
   Animated,
-  // Dimensions,
   ScrollView,
 } from "react-native";
 import React, { useState, useEffect, useRef, useContext } from "react";
@@ -21,20 +20,18 @@ import { router } from "expo-router";
 import {
   signInWithEmailAndPassword,
   sendEmailVerification,
-  signOut,
 } from "firebase/auth";
-import { auth } from "../firebase";
+import { auth, db } from "../firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "../firebase";
+import { doc, getDoc, setDoc, addDoc, collection } from "firebase/firestore";
 import { ThemeContext } from "../context/ThemeContext";
-
-// const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+import { useAuth } from "../context/AuthContext";
 
 WebBrowser.maybeCompleteAuthSession();
 
 const Login = () => {
   const { scheme } = useContext(ThemeContext);
+  const { pendingVerification, setPendingVerification } = useAuth();
   const theme = Colors[scheme] ?? Colors.light;
   const [formData, setFormData] = useState({
     email: "",
@@ -86,7 +83,6 @@ const Login = () => {
       useNativeDriver: true,
     }).start();
   };
-
   const handleLogin = async () => {
     if (!formData.email || !formData.password) {
       Alert.alert("Error", "Please fill in all fields");
@@ -95,22 +91,16 @@ const Login = () => {
 
     setLoading(true);
     try {
-      await AsyncStorage.multiRemove([
-        "savedEmail",
-        "savedPassword",
-        "savedName",
-        "savedProfileImg",
-      ]);
-
       const userCredential = await signInWithEmailAndPassword(
         auth,
         formData.email,
         formData.password
       );
 
-      if (!userCredential.user.emailVerified) {
-        await signOut(auth);
+      const user = userCredential.user;
 
+      // Check if email is verified
+      if (!user.emailVerified) {
         Alert.alert(
           "Email Not Verified",
           "Please verify your email before signing in. Check your inbox for the verification link.",
@@ -119,64 +109,43 @@ const Login = () => {
               text: "Resend Verification",
               onPress: async () => {
                 try {
-                  await sendEmailVerification(userCredential.user);
+                  await sendEmailVerification(user);
                   Alert.alert("Success", "Verification email sent!");
+                  // Redirect to verification screen
+                  router.push("/verification-required");
                 } catch (error) {
                   Alert.alert("Error", "Failed to send verification email");
                 }
               },
             },
             {
-              text: "OK",
-              style: "cancel",
+              text: "Go to Verification",
+              onPress: () => router.push("/verification-required"),
             },
           ]
         );
-        setLoading(false); // Stop loading
-        return; // Stop execution here
+        setLoading(false);
+        return;
       }
-      console.log("User logged in:", userCredential.user.uid);
+
+      // User is verified - proceed with login
+      console.log("User logged in:", user.uid);
+
+      // Check if user exists in Firestore, if not, create them
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      if (!userDoc.exists()) {
+        // Check if we have pending user data from signup
+        const pendingData = await AsyncStorage.getItem("pendingUserData");
+        if (pendingData) {
+          const userData = JSON.parse(pendingData);
+          await saveUserToFirestore(user, userData);
+          await AsyncStorage.removeItem("pendingUserData");
+        }
+      }
 
       if (rememberMe) {
         await AsyncStorage.setItem("savedEmail", formData.email);
         await AsyncStorage.setItem("savedPassword", formData.password);
-
-        const displayName =
-          userCredential.user.displayName || formData.email.split("@")[0];
-        await AsyncStorage.setItem("savedName", displayName);
-
-        try {
-          const userDoc = await getDoc(
-            doc(db, "users", userCredential.user.uid)
-          );
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            if (userData.profileImg) {
-              await AsyncStorage.setItem(
-                "savedProfileImg",
-                userData.profileImg
-              );
-            } else if (userCredential.user.photoURL) {
-              await AsyncStorage.setItem(
-                "savedProfileImg",
-                userCredential.user.photoURL
-              );
-            }
-          } else if (userCredential.user.photoURL) {
-            await AsyncStorage.setItem(
-              "savedProfileImg",
-              userCredential.user.photoURL
-            );
-          }
-        } catch (firestoreError) {
-          console.error("Error fetching user data:", firestoreError);
-          if (userCredential.user.photoURL) {
-            await AsyncStorage.setItem(
-              "savedProfileImg",
-              userCredential.user.photoURL
-            );
-          }
-        }
       }
 
       router.replace("/dashboard");
@@ -207,6 +176,46 @@ const Login = () => {
       Alert.alert("Login Failed", errorMessage);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveUserToFirestore = async (user, userData) => {
+    try {
+      // Save to users collection
+      await setDoc(doc(db, "users", user.uid), {
+        ...userData,
+        uid: user.uid,
+        emailVerified: true,
+        updatedAt: new Date().toISOString(),
+      });
+
+      // Save to members collection
+      await addDoc(collection(db, "members"), {
+        fullname: userData.fullName,
+        email: userData.email,
+        phone: userData.phone,
+        role: userData.role,
+        address: userData.address,
+        dateJoined: new Date().toISOString().split("T")[0],
+        isExecutive: true,
+        uid: user.uid,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      // Create notification
+      await addDoc(collection(db, "notifications"), {
+        type: "user_created",
+        title: "New Executive Joined",
+        message: `${userData.fullName} (${userData.role}) has joined the union as an executive`,
+        timestamp: new Date(),
+        read: false,
+      });
+
+      console.log("User data saved to Firestore");
+    } catch (error) {
+      console.error("Error saving user to Firestore:", error);
+      throw error;
     }
   };
 
