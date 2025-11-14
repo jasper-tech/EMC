@@ -97,6 +97,9 @@ const SidePanel = ({
 
   const handleSignOut = async () => {
     try {
+      // First, unsubscribe from any active Firestore listeners
+
+      // Then sign out
       await signOut(auth);
       onClose();
       router.replace("/");
