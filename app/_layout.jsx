@@ -58,7 +58,7 @@ const LayoutContent = () => {
           <Stack.Screen
             name="login"
             options={{
-              headerTitle: "",
+              headerTitle: "Login",
             }}
           />
           <Stack.Screen

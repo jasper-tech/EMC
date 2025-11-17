@@ -18,15 +18,18 @@ export const AuthProvider = ({ children }) => {
       if (firebaseUser && firebaseUser.emailVerified) {
         setUser(firebaseUser);
 
-        // Save user identity for quick login (without password)
         await AsyncStorage.setItem("userEmail", firebaseUser.email);
         await AsyncStorage.setItem(
           "userName",
           firebaseUser.displayName || firebaseUser.email.split("@")[0]
         );
+
+        await AsyncStorage.setItem(
+          `userName_${firebaseUser.uid}`,
+          firebaseUser.displayName || firebaseUser.email.split("@")[0]
+        );
       } else {
         setUser(null);
-        // Clear only password on sign out, keep identity
         await AsyncStorage.removeItem("userPassword");
       }
 

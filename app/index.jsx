@@ -105,7 +105,11 @@ const Index = () => {
     try {
       const savedEmail = await AsyncStorage.getItem("userEmail");
       const savedName = await AsyncStorage.getItem("userName");
-      const savedProfileImg = await AsyncStorage.getItem("savedProfileImg");
+
+      const emailKey = savedEmail?.replace(/[@.]/g, "_"); // Sanitize email for key
+      const savedProfileImg = await AsyncStorage.getItem(
+        `savedProfileImg_${emailKey}`
+      );
 
       console.log("Saved user data:", {
         savedEmail,

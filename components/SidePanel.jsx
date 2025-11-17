@@ -72,31 +72,31 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
     });
   }, [isOpen]);
 
-  // Load user profile data from Firestore when panel opens
   useEffect(() => {
     const loadUserProfile = async () => {
       if (isOpen && user) {
         setLoadingProfile(true);
         try {
-          // Load basic user data from AsyncStorage first
-          const savedName = await AsyncStorage.getItem("userName");
-          const savedProfileImg = await AsyncStorage.getItem("savedProfileImg");
+          const savedName = await AsyncStorage.getItem(`userName_${user.uid}`);
+          const savedProfileImg = await AsyncStorage.getItem(
+            `savedProfileImg_${user.uid}`
+          );
 
           setUserName(
             savedName || user.displayName || user.email.split("@")[0]
           );
           setCurrentUserAvatar(savedProfileImg);
 
-          // Then load detailed user data from Firestore
           const userDoc = await getDoc(doc(db, "users", user.uid));
           if (userDoc.exists()) {
             const userData = userDoc.data();
-            // console.log("User profile data:", userData);
 
-            // Update with Firestore data if available
             if (userData.fullName) {
               setUserName(userData.fullName);
-              await AsyncStorage.setItem("userName", userData.fullName);
+              await AsyncStorage.setItem(
+                `userName_${user.uid}`,
+                userData.fullName
+              );
             }
 
             if (userData.role) {
@@ -106,20 +106,17 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
             if (userData.profileImg) {
               setCurrentUserAvatar(userData.profileImg);
               await AsyncStorage.setItem(
-                "savedProfileImg",
+                `savedProfileImg_${user.uid}`,
                 userData.profileImg
               );
             }
           } else {
             console.log("No user data found in Firestore, using basic profile");
-            // User exists in auth but not in Firestore - this shouldn't happen with new flow
-            // But we'll handle it gracefully
             setUserRole("Member");
           }
         } catch (error) {
           console.error("Error loading user profile:", error);
-          // Fallback to basic data
-          const savedName = await AsyncStorage.getItem("userName");
+          const savedName = await AsyncStorage.getItem(`userName_${user.uid}`);
           setUserName(
             savedName || user.displayName || user.email.split("@")[0]
           );
@@ -250,8 +247,20 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
         });
       }
 
-      // Update AsyncStorage and local state
+      // ✅ Save with multiple keys for different use cases
+      // 1. User-specific key (for SidePanel)
+      await AsyncStorage.setItem(
+        `savedProfileImg_${auth.currentUser.uid}`,
+        base64Image
+      );
+
+      // 2. Email-based key (for Index page)
+      const emailKey = auth.currentUser.email.replace(/[@.]/g, "_");
+      await AsyncStorage.setItem(`savedProfileImg_${emailKey}`, base64Image);
+
+      // 3. General key (backwards compatibility)
       await AsyncStorage.setItem("savedProfileImg", base64Image);
+
       setCurrentUserAvatar(base64Image);
 
       if (onAvatarUpdate) {

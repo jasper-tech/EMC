@@ -27,7 +27,8 @@ import {
   sendEmailVerification,
   signOut,
 } from "firebase/auth";
-import { auth } from "../firebase";
+import { auth, db } from "../firebase";
+import { doc, setDoc, collection, addDoc } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const Signup = () => {
@@ -741,8 +742,6 @@ export const saveUserToFirestore = async (user) => {
     }
 
     const userData = JSON.parse(pendingData);
-    const { db } = require("../firebase");
-    const { doc, setDoc, collection, addDoc } = require("firebase/firestore");
 
     // Save to users collection
     await setDoc(doc(db, "users", user.uid), {
@@ -769,16 +768,28 @@ export const saveUserToFirestore = async (user) => {
       updatedAt: new Date().toISOString(),
     });
 
+    // ✅ CREATE NOTIFICATION FOR NEW EXECUTIVE
+    await addDoc(collection(db, "notifications"), {
+      type: "user_created",
+      title: "New Executive Member",
+      message: `${userData.fullName} has joined as ${userData.role}`,
+      timestamp: new Date(),
+      read: false,
+      userId: user.uid,
+      userRole: userData.role,
+    });
+
+    console.log("✅ New executive notification created");
+
     // Clear pending data
     await AsyncStorage.removeItem("pendingUserData");
 
-    console.log("User saved to Firestore after verification");
+    console.log("User saved to Firestore after verification with notification");
   } catch (error) {
     console.error("Error saving to Firestore:", error);
     throw error;
   }
 };
-
 export default Signup;
 
 const styles = StyleSheet.create({

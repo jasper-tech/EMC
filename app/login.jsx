@@ -25,14 +25,14 @@ import { auth, db } from "../firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { ThemeContext } from "../context/ThemeContext";
-import { useAuth } from "../context/AuthContext";
+// import { useAuth } from "../context/AuthContext";
 import { saveUserToFirestore } from "./signup";
 
 WebBrowser.maybeCompleteAuthSession();
 
 const Login = () => {
   const { scheme } = useContext(ThemeContext);
-  const { user } = useAuth();
+  // const { user } = useAuth();
   const theme = Colors[scheme] ?? Colors.light;
   const [formData, setFormData] = useState({
     email: "",
@@ -137,8 +137,6 @@ const Login = () => {
         return;
       }
 
-      // ✅ USER IS VERIFIED - Proceed with login
-
       // Save user identity for quick login
       await AsyncStorage.setItem("userEmail", user.email);
       await AsyncStorage.setItem(
@@ -152,9 +150,36 @@ const Login = () => {
         await saveUserToFirestore(user);
       }
 
-      // Check if user exists in Firestore, if not create basic profile
+      // ✅ Fetch user profile from Firestore and save profile image
       const userDoc = await getDoc(doc(db, "users", user.uid));
-      if (!userDoc.exists()) {
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+
+        // Save profile image with BOTH keys
+        if (userData.profileImg) {
+          // User-specific key (for SidePanel)
+          await AsyncStorage.setItem(
+            `savedProfileImg_${user.uid}`,
+            userData.profileImg
+          );
+
+          // ✅ Email-based key (for Index page quick login)
+          const emailKey = user.email.replace(/[@.]/g, "_");
+          await AsyncStorage.setItem(
+            `savedProfileImg_${emailKey}`,
+            userData.profileImg
+          );
+
+          // Also save to general key for backwards compatibility
+          await AsyncStorage.setItem("savedProfileImg", userData.profileImg);
+        }
+
+        // Save user name with user-specific key
+        if (userData.fullName) {
+          await AsyncStorage.setItem(`userName_${user.uid}`, userData.fullName);
+        }
+      } else {
+        // Create basic profile if doesn't exist
         await setDoc(doc(db, "users", user.uid), {
           uid: user.uid,
           email: user.email,
@@ -222,20 +247,13 @@ const Login = () => {
               },
             ]}
           >
-            {/* Header Section */}
-            {/* <View style={styles.header}>
-              <ThemedText type="title" style={styles.title}>
-                Sign In to Your Account
-              </ThemedText>
-            </View> */}
-
             {/* Security Notice */}
             {securityMessage && (
-              <View style={styles.securityNotice}>
+              <View style={styles.securityNoticeShield}>
                 <Ionicons
                   name="shield-checkmark"
                   size={20}
-                  color={Colors.blueAccent}
+                  color={Colors.greenAccent}
                 />
                 <ThemedText style={styles.securityText}>
                   {securityMessage}
@@ -247,16 +265,17 @@ const Login = () => {
             {!securityMessage && (
               <View style={styles.securityNotice}>
                 <Ionicons
-                  name="lock-closed"
+                  name="warning"
                   size={20}
-                  color={Colors.blueAccent}
+                  color={Colors.yellowAccent}
                 />
                 <View>
                   <ThemedText style={styles.securityTitle}>
-                    Secure Authentication Required
+                    Authentication Required
                   </ThemedText>
                   <ThemedText style={styles.securitySubtitle}>
-                    For security reasons, password entry is required for access
+                    Make sure no one else is around when you enter your
+                    password.
                   </ThemedText>
                 </View>
               </View>
@@ -482,28 +501,39 @@ const styles = StyleSheet.create({
   securityNotice: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#E8F4FD",
+    backgroundColor: Colors.uiBackground,
     padding: 16,
     borderRadius: 12,
     marginBottom: 24,
     borderLeftWidth: 4,
-    borderLeftColor: Colors.blueAccent,
+    borderLeftColor: Colors.yellowAccent,
+    gap: 12,
+  },
+  securityNoticeShield: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.uiBackground,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 24,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.greenAccent,
     gap: 12,
   },
   securityTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#0C4D6B",
+    // color: "#0C4D6B",
     marginBottom: 4,
   },
   securitySubtitle: {
     fontSize: 14,
-    color: "#0C4D6B",
+    // color: "#0C4D6B",
     opacity: 0.8,
   },
   securityText: {
     fontSize: 14,
-    color: "#0C4D6B",
+    // color: "#0C4D6B",
     fontWeight: "500",
     flex: 1,
   },
