@@ -70,8 +70,16 @@ const Members = () => {
           id: doc.id,
           ...doc.data(),
         }));
-        setMembers(membersList);
-        setFilteredMembers(membersList);
+
+        // Sort members: executives first, then regular members
+        const sortedMembers = membersList.sort((a, b) => {
+          if (a.isExecutive && !b.isExecutive) return -1;
+          if (!a.isExecutive && b.isExecutive) return 1;
+          return 0;
+        });
+
+        setMembers(sortedMembers);
+        setFilteredMembers(sortedMembers);
         setLoading(false);
 
         Animated.parallel([
@@ -125,10 +133,8 @@ const Members = () => {
     if (!dateRegex.test(dateString)) {
       return false;
     }
-
     const date = new Date(dateString);
     const today = new Date();
-
     // Check if date is valid and not in the future
     return date instanceof Date && !isNaN(date) && date <= today;
   };
@@ -138,6 +144,7 @@ const Members = () => {
       // Request permissions
       const { status } =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
+
       if (status !== "granted") {
         Alert.alert(
           "Permission required",
@@ -191,7 +198,6 @@ const Members = () => {
     try {
       setSubmitting(true);
       const membersRef = collection(db, "members");
-
       await addDoc(membersRef, {
         ...formData,
         uid: "",
@@ -323,9 +329,10 @@ const Members = () => {
         style={[
           styles.memberCard,
           {
+            backgroundColor: theme.card,
+            shadowColor: theme.shadow,
             opacity: fadeAnim,
             transform: [{ translateY: slideAnim }],
-            backgroundColor: theme.uiBackground,
           },
         ]}
       >
@@ -343,95 +350,64 @@ const Members = () => {
               }}
               activeOpacity={item.profileImg ? 0.7 : 1}
             >
-              <View
-                style={[
-                  styles.avatarContainer,
-                  {
-                    backgroundColor: Colors.blueAccent + "20",
-                    borderWidth: isExecutive ? 2 : 0,
-                    borderColor: isExecutive
-                      ? Colors.goldAccent
-                      : "transparent",
-                    overflow: "hidden",
-                  },
-                ]}
-              >
+              <View style={styles.avatarContainer}>
                 {item.profileImg ? (
                   <Image
                     source={{ uri: item.profileImg }}
                     style={styles.profileImage}
-                    resizeMode="cover"
                   />
                 ) : (
                   <Ionicons
-                    name={isExecutive ? "star" : "person"}
-                    size={24}
-                    color={isExecutive ? Colors.goldAccent : Colors.blueAccent}
+                    name="person-circle-outline"
+                    size={44}
+                    color={theme.text}
+                    style={{ opacity: 0.3 }}
                   />
-                )}
-                {isExecutive && (
-                  <View style={styles.executiveBadge}>
-                    <Ionicons name="star" size={10} color={Colors.goldAccent} />
-                  </View>
                 )}
               </View>
             </TouchableOpacity>
+
             <View style={styles.memberInfo}>
               <View style={styles.nameRow}>
                 <ThemedText style={styles.memberName}>
                   {item.fullname}
                 </ThemedText>
                 {isExecutive && (
-                  <View
-                    style={[
-                      styles.roleBadge,
-                      { backgroundColor: Colors.goldAccent + "20" },
-                    ]}
-                  >
-                    <ThemedText
-                      style={[styles.roleText, { color: Colors.goldAccent }]}
-                    >
-                      {item.role}
-                    </ThemedText>
-                  </View>
+                  <Ionicons
+                    name="shield-checkmark"
+                    size={16}
+                    color={Colors.goldAccent}
+                  />
                 )}
               </View>
-              <ThemedText style={styles.memberPhone}> {item.phone}</ThemedText>
+              <ThemedText style={styles.memberPhone}>{item.phone}</ThemedText>
               {item.email && (
                 <ThemedText style={styles.memberEmail}>{item.email}</ThemedText>
               )}
             </View>
-            <Ionicons
-              name={isExpanded ? "chevron-up" : "chevron-down"}
-              size={20}
-              color={Colors.blueAccent}
-            />
           </View>
 
           {isExpanded && (
             <View style={styles.expandedContent}>
               {item.profileImg && (
-                <TouchableOpacity
-                  style={styles.imagePreviewContainer}
-                  onPress={() => openImageModal(item.profileImg)}
-                >
-                  <ThemedText style={styles.detailLabel}>
-                    Profile Image
-                  </ThemedText>
-                  <Image
-                    source={{ uri: item.profileImg }}
-                    style={styles.expandedProfileImage}
-                    resizeMode="cover"
-                  />
+                <View style={styles.imagePreviewContainer}>
+                  <TouchableOpacity
+                    onPress={() => openImageModal(item.profileImg)}
+                  >
+                    <Image
+                      source={{ uri: item.profileImg }}
+                      style={styles.expandedProfileImage}
+                    />
+                  </TouchableOpacity>
                   <ThemedText style={styles.viewImageText}>
                     Tap to view full image
                   </ThemedText>
-                </TouchableOpacity>
+                </View>
               )}
 
               <View style={styles.detailRow}>
                 <Ionicons
-                  name="home-outline"
+                  name="location-outline"
                   size={20}
                   color={Colors.blueAccent}
                 />
@@ -447,7 +423,7 @@ const Members = () => {
                 <Ionicons
                   name="calendar-outline"
                   size={20}
-                  color={Colors.greenAccent}
+                  color={Colors.blueAccent}
                 />
                 <View style={styles.detailTextContainer}>
                   <ThemedText style={styles.detailLabel}>
@@ -460,16 +436,16 @@ const Members = () => {
               </View>
 
               {/* Display role for executives */}
-              {isExecutive && (
+              {isExecutive && item.role && (
                 <View style={styles.detailRow}>
                   <Ionicons
-                    name="shield-outline"
+                    name="ribbon-outline"
                     size={20}
-                    color={Colors.goldAccent}
+                    color={Colors.blueAccent}
                   />
                   <View style={styles.detailTextContainer}>
                     <ThemedText style={styles.detailLabel}>Role</ThemedText>
-                    <ThemedText style={[styles.detailValue]}>
+                    <ThemedText style={styles.detailValue}>
                       {item.role}
                     </ThemedText>
                   </View>
@@ -496,15 +472,15 @@ const Members = () => {
   const renderImageModal = () => (
     <Modal
       visible={imageModalVisible}
-      transparent={true}
+      transparent
       animationType="fade"
       onRequestClose={() => setImageModalVisible(false)}
     >
       <View style={styles.imageModalOverlay}>
         <TouchableOpacity
           style={styles.imageModalBackground}
-          onPress={() => setImageModalVisible(false)}
           activeOpacity={1}
+          onPress={() => setImageModalVisible(false)}
         >
           <Image
             source={{ uri: selectedImage }}
@@ -516,7 +492,7 @@ const Members = () => {
           style={styles.closeImageButton}
           onPress={() => setImageModalVisible(false)}
         >
-          <Ionicons name="close" size={28} color="#fff" />
+          <Ionicons name="close" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
     </Modal>
@@ -539,74 +515,61 @@ const Members = () => {
     return (
       <Modal
         visible={isVisible}
+        transparent
         animationType="slide"
-        transparent={true}
         onRequestClose={onClose}
       >
         <View style={styles.modalOverlay}>
-          <View
-            style={[
-              styles.modalContent,
-              { backgroundColor: theme.uiBackground },
-            ]}
-          >
+          <ThemedView style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <ThemedText style={styles.modalTitle}>{title}</ThemedText>
               <TouchableOpacity onPress={onClose}>
-                <Ionicons name="close" size={24} color={Colors.blueAccent} />
+                <Ionicons name="close" size={24} color={theme.text} />
               </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.formContainer}>
               {/* Profile Image Section */}
-              <View style={styles.inputGroup}>
+              <View style={styles.imageSection}>
                 <ThemedText style={styles.inputLabel}>Profile Image</ThemedText>
-                <View style={styles.imageSection}>
-                  {formData.profileImg ? (
-                    <View style={styles.imagePreviewWrapper}>
-                      <Image
-                        source={{ uri: formData.profileImg }}
-                        style={styles.formProfileImage}
-                        resizeMode="cover"
-                      />
-                      <TouchableOpacity
-                        style={styles.removeImageButton}
-                        onPress={removeImage}
-                      >
-                        <Ionicons name="close" size={16} color="#fff" />
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
+                {formData.profileImg ? (
+                  <View style={styles.imagePreviewWrapper}>
+                    <Image
+                      source={{ uri: formData.profileImg }}
+                      style={styles.formProfileImage}
+                    />
                     <TouchableOpacity
-                      style={[
-                        styles.imageUploadButton,
-                        {
-                          backgroundColor: theme.uiBackground,
-                          borderColor: `${Colors.blueAccent}20`,
-                        },
-                      ]}
-                      onPress={pickImage}
+                      style={styles.removeImageButton}
+                      onPress={removeImage}
                     >
-                      <Ionicons
-                        name="camera-outline"
-                        size={32}
-                        color={Colors.blueAccent}
-                      />
-                      <ThemedText style={styles.uploadButtonText}>
-                        Tap to add profile image
-                      </ThemedText>
+                      <Ionicons name="close" size={16} color="#fff" />
                     </TouchableOpacity>
-                  )}
-                </View>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={[
+                      styles.imageUploadButton,
+                      { borderColor: Colors.blueAccent },
+                    ]}
+                    onPress={pickImage}
+                  >
+                    <Ionicons
+                      name="image-outline"
+                      size={32}
+                      color={theme.text}
+                      style={{ opacity: 0.5 }}
+                    />
+                    <ThemedText style={styles.uploadButtonText}>
+                      Tap to add profile image
+                    </ThemedText>
+                  </TouchableOpacity>
+                )}
               </View>
 
               <View style={styles.inputGroup}>
                 <ThemedText style={styles.inputLabel}>Full Name *</ThemedText>
                 <View
-                  style={[
-                    styles.inputWrapper,
-                    { backgroundColor: theme.uiBackground },
-                  ]}
+                  style={[styles.inputWrapper, { backgroundColor: theme.card }]}
                 >
                   <Ionicons
                     name="person-outline"
@@ -615,7 +578,7 @@ const Members = () => {
                     style={styles.inputIcon}
                   />
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input]}
                     value={formData.fullname}
                     onChangeText={(text) =>
                       setFormData({ ...formData, fullname: text })
@@ -633,11 +596,11 @@ const Members = () => {
                   style={[
                     styles.inputWrapper,
                     styles.textAreaWrapper,
-                    { backgroundColor: theme.uiBackground },
+                    { backgroundColor: theme.card },
                   ]}
                 >
                   <Ionicons
-                    name="home-outline"
+                    name="location-outline"
                     size={20}
                     color={Colors.blueAccent}
                     style={styles.inputIcon}
@@ -660,10 +623,7 @@ const Members = () => {
               <View style={styles.inputGroup}>
                 <ThemedText style={styles.inputLabel}>Phone *</ThemedText>
                 <View
-                  style={[
-                    styles.inputWrapper,
-                    { backgroundColor: theme.uiBackground },
-                  ]}
+                  style={[styles.inputWrapper, { backgroundColor: theme.card }]}
                 >
                   <Ionicons
                     name="call-outline"
@@ -672,7 +632,7 @@ const Members = () => {
                     style={styles.inputIcon}
                   />
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input]}
                     value={formData.phone}
                     onChangeText={(text) =>
                       setFormData({ ...formData, phone: text })
@@ -688,10 +648,7 @@ const Members = () => {
               <View style={styles.inputGroup}>
                 <ThemedText style={styles.inputLabel}>Date Joined *</ThemedText>
                 <View
-                  style={[
-                    styles.inputWrapper,
-                    { backgroundColor: theme.uiBackground },
-                  ]}
+                  style={[styles.inputWrapper, { backgroundColor: theme.card }]}
                 >
                   <Ionicons
                     name="calendar-outline"
@@ -700,7 +657,7 @@ const Members = () => {
                     style={styles.inputIcon}
                   />
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input]}
                     value={formData.dateJoined}
                     onChangeText={(text) =>
                       setFormData({ ...formData, dateJoined: text })
@@ -730,7 +687,7 @@ const Members = () => {
                 disabled={submitting}
               >
                 {submitting ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator color="#fff" />
                 ) : (
                   <ThemedText style={styles.submitButtonText}>
                     {isEditMode ? "Update" : "Add Member"}
@@ -738,7 +695,7 @@ const Members = () => {
                 )}
               </TouchableOpacity>
             </View>
-          </View>
+          </ThemedView>
         </View>
       </Modal>
     );
@@ -746,48 +703,46 @@ const Members = () => {
 
   if (loading) {
     return (
-      <ThemedView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.blueAccent} />
-          <ThemedText style={styles.loadingText}>Loading members...</ThemedText>
-        </View>
+      <ThemedView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={Colors.blueAccent} />
+        <ThemedText style={styles.loadingText}>Loading members...</ThemedText>
       </ThemedView>
     );
   }
 
   return (
     <ThemedView style={styles.container}>
-      <Animated.View
-        style={[
-          styles.searchContainer,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-            backgroundColor: theme.uiBackground,
-            margin: 16,
-            marginBottom: 8,
-          },
-        ]}
-      >
+      <View style={[styles.searchContainer, { backgroundColor: theme.card }]}>
         <Ionicons name="search" size={20} color={Colors.blueAccent} />
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { color: theme.text }]}
           placeholder="Search members..."
-          placeholderTextColor="#999"
+          placeholderTextColor={theme.text + "80"}
           value={searchQuery}
           onChangeText={setSearchQuery}
-          color={theme.text}
         />
         {searchQuery !== "" && (
           <TouchableOpacity onPress={() => setSearchQuery("")}>
-            <Ionicons name="close" size={18} color={Colors.blueAccent} />
+            <Ionicons name="close-circle" size={20} color={theme.text} />
           </TouchableOpacity>
         )}
-      </Animated.View>
+      </View>
+
+      {/* Total Members Count */}
+      <View style={styles.memberCountContainer}>
+        <ThemedText style={styles.memberCountText}>
+          Total Members: {filteredMembers.length}
+        </ThemedText>
+      </View>
 
       {filteredMembers.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="people-outline" size={64} color="#ccc" />
+          <Ionicons
+            name="people-outline"
+            size={64}
+            color={theme.text}
+            style={{ opacity: 0.3 }}
+          />
           <ThemedText style={styles.emptyText}>
             {searchQuery ? "No members found" : "No members yet"}
           </ThemedText>
@@ -807,7 +762,7 @@ const Members = () => {
         onPress={() => setShowAddModal(true)}
         activeOpacity={0.8}
       >
-        <Ionicons name="add" size={24} color="#fff" />
+        <Ionicons name="add" size={28} color="#fff" />
       </TouchableOpacity>
 
       {renderModal(false)}
@@ -845,13 +800,26 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
+    margin: 16,
+    marginBottom: 8,
   },
   searchInput: {
     flex: 1,
     fontSize: 16,
   },
+  memberCountContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    alignItems: "flex-end",
+  },
+  memberCountText: {
+    fontSize: 14,
+    fontWeight: "600",
+    opacity: 0.7,
+  },
   listContent: {
     padding: 16,
+    paddingTop: 8,
     paddingBottom: 80,
     gap: 12,
   },
@@ -873,6 +841,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     justifyContent: "center",
     alignItems: "center",
+    position: "relative",
   },
   profileImage: {
     width: "100%",
