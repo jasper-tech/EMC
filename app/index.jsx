@@ -106,7 +106,7 @@ const Index = () => {
       const savedEmail = await AsyncStorage.getItem("userEmail");
       const savedName = await AsyncStorage.getItem("userName");
 
-      const emailKey = savedEmail?.replace(/[@.]/g, "_"); // Sanitize email for key
+      const emailKey = savedEmail?.replace(/[@.]/g, "_");
       const savedProfileImg = await AsyncStorage.getItem(
         `savedProfileImg_${emailKey}`
       );
@@ -183,9 +183,9 @@ const Index = () => {
         ]}
       >
         <View style={styles.header}>
-          <ThemedText type="title" style={styles.title}>
+          {/* <ThemedText type="title" style={styles.title}>
             Ready to Continue?
-          </ThemedText>
+          </ThemedText> */}
           <ThemedText style={styles.subtitle}>
             Pick up where you left off
           </ThemedText>

@@ -61,6 +61,7 @@ const LayoutContent = () => {
               headerTitle: "Login",
             }}
           />
+
           <Stack.Screen
             name="signup"
             options={{
@@ -134,6 +135,13 @@ const LayoutContent = () => {
               name="track-payments"
               options={{
                 headerTitle: "Track Payments",
+                gestureEnabled: false,
+              }}
+            />
+            <Stack.Screen
+              name="forgotpassword"
+              options={{
+                headerTitle: "Forgot Password",
                 gestureEnabled: false,
               }}
             />

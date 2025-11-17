@@ -111,7 +111,6 @@ const Login = () => {
 
       const user = userCredential.user;
 
-      // Force reload to get latest verification status
       await user.reload();
 
       if (!user.emailVerified) {
@@ -379,16 +378,20 @@ const Login = () => {
               </View>
 
               {/* Options Row */}
-              <View style={styles.optionsRow}>
-                <TouchableOpacity
-                  style={styles.forgotPassword}
-                  disabled={loading}
-                >
-                  <ThemedText style={styles.forgotPasswordText}>
-                    Forgot Password?
-                  </ThemedText>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={styles.forgotPassword}
+                onPress={() =>
+                  router.push({
+                    pathname: "/forgotpassword",
+                    params: { prefillEmail: formData.email },
+                  })
+                }
+                disabled={loading}
+              >
+                <ThemedText style={styles.forgotPasswordText}>
+                  Forgot Password?
+                </ThemedText>
+              </TouchableOpacity>
 
               {/* Login Button */}
               <TouchableOpacity
@@ -581,7 +584,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 32,
   },
-  forgotPassword: {},
+  forgotPassword: {
+    alignSelf: "flex-end",
+    marginBottom: 24,
+  },
   forgotPasswordText: {
     fontSize: 14,
     fontWeight: "600",
