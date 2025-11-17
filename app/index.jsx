@@ -5,181 +5,162 @@ import {
   ActivityIndicator,
   Image,
   Animated,
-  Dimensions,
+  Alert,
 } from "react-native";
-import React, { useState, useEffect, useRef, useContext } from "react";
+import React, { useContext, useMemo, useState, useEffect, useRef } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../constants/Colors";
 import ThemedView from "../components/ThemedView";
 import ThemedText from "../components/ThemedText";
-import { router } from "expo-router";
-import { signInWithEmailAndPassword, onAuthStateChanged } from "firebase/auth";
-import { auth } from "../firebase";
+import { router, useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "../firebase";
-import { ProfileContext } from "../context/ProfileContext";
+import { useAuth } from "../context/AuthContext";
+import { useSplash } from "../context/SplashContext";
+import SplashScreen from "../components/SplashScreen";
 
 const Index = () => {
   const [showSplash, setShowSplash] = useState(true);
   const [savedUser, setSavedUser] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
 
-  // Get profile image from context
-  const { profileImage } = useContext(ProfileContext);
+  const { user, loading: authLoading } = useAuth();
+  const { hasShownSplash, markSplashAsShown } = useSplash();
 
-  // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
 
+  // Avatar colors for users without images - MOVED BEFORE EARLY RETURNS
+  const AVATAR_VARIANTS = [
+    { bg: "#FF6B6B", icon: "person" },
+    { bg: "#4ECDC4", icon: "person-circle" },
+    { bg: "#45B7D1", icon: "body" },
+    { bg: "#FFA07A", icon: "happy" },
+    { bg: "#98D8C8", icon: "person-outline" },
+  ];
+
+  const avatarVariant = useMemo(() => {
+    if (!savedUser) return AVATAR_VARIANTS[0];
+    const seed = savedUser.email || "User";
+    const hash = seed
+      .split("")
+      .reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return AVATAR_VARIANTS[hash % AVATAR_VARIANTS.length];
+  }, [savedUser]);
+
+  // Check saved user only once when component mounts
   useEffect(() => {
     checkSavedUser();
-
-    const timer = setTimeout(() => {
-      setShowSplash(false);
-      // Start entrance animations
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scaleAnim, {
-          toValue: 1,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }, 3000);
-
-    return () => clearTimeout(timer);
   }, []);
 
-  // Update savedUser when profileImage changes in context
+  // Handle splash screen
   useEffect(() => {
-    if (savedUser && profileImage) {
-      setSavedUser((prev) => ({
-        ...prev,
-        profileImg: profileImage,
-      }));
+    if (hasShownSplash) {
+      setShowSplash(false);
+      startAnimations();
     }
-  }, [profileImage]);
+  }, [hasShownSplash]);
+
+  // Handle authentication redirect - FIXED: Prevent infinite loop
+  useEffect(() => {
+    if (!authLoading && !showSplash && !hasCheckedAuth) {
+      if (user) {
+        console.log("User authenticated, redirecting to dashboard");
+        setHasCheckedAuth(true);
+        router.replace("/dashboard");
+      } else {
+        setHasCheckedAuth(true);
+      }
+    }
+  }, [user, authLoading, showSplash, hasCheckedAuth]);
+
+  const handleSplashComplete = () => {
+    markSplashAsShown();
+    setShowSplash(false);
+    startAnimations();
+  };
+
+  const startAnimations = () => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
 
   const checkSavedUser = async () => {
     try {
-      const unsubscribe = onAuthStateChanged(auth, async (user) => {
-        if (user) {
-          router.replace("/dashboard");
-        } else {
-          setSavedUser(null);
-          const savedEmail = await AsyncStorage.getItem("savedEmail");
-          const savedPassword = await AsyncStorage.getItem("savedPassword");
-          const savedName = await AsyncStorage.getItem("savedName");
-          const savedProfileImg = await AsyncStorage.getItem("savedProfileImg");
+      const savedEmail = await AsyncStorage.getItem("userEmail");
+      const savedName = await AsyncStorage.getItem("userName");
+      const savedProfileImg = await AsyncStorage.getItem("savedProfileImg");
 
-          // Use profileImage from context if available, otherwise fall back to AsyncStorage
-          const currentProfileImg = profileImage || savedProfileImg;
-
-          if (savedEmail && savedPassword) {
-            setSavedUser({
-              email: savedEmail,
-              password: savedPassword,
-              name: savedName || "User",
-              profileImg: currentProfileImg,
-            });
-          }
-        }
-        setCheckingAuth(false);
+      console.log("Saved user data:", {
+        savedEmail,
+        savedName,
+        hasProfileImg: !!savedProfileImg,
       });
 
-      return () => unsubscribe();
+      if (savedEmail && savedName) {
+        setSavedUser({
+          email: savedEmail,
+          name: savedName,
+          profileImg: savedProfileImg,
+        });
+      } else {
+        console.log("No saved user identity found");
+        setSavedUser(null);
+      }
     } catch (error) {
       console.error("Error checking saved user:", error);
-      setCheckingAuth(false);
+      setSavedUser(null);
     }
   };
 
-  const handleContinueAs = async () => {
+  const handleQuickLogin = () => {
     if (!savedUser) return;
 
-    setLoading(true);
-    try {
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        savedUser.email,
-        savedUser.password
-      );
-
-      // Update saved profile image from Firestore if available
-      try {
-        const userDocRef = doc(db, "users", userCredential.user.uid);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists() && userDoc.data().profileImg) {
-          await AsyncStorage.setItem(
-            "savedProfileImg",
-            userDoc.data().profileImg
-          );
-        }
-      } catch (err) {
-        console.warn("Could not update profile image:", err);
-      }
-
-      router.replace("/dashboard");
-    } catch (error) {
-      console.error("Auto-login error:", error);
-      await AsyncStorage.multiRemove([
-        "savedEmail",
-        "savedPassword",
-        "savedName",
-        "savedProfileImg",
-      ]);
-      setSavedUser(null);
-
-      Alert.alert(
-        "Login Failed",
-        "Unable to log in automatically. Please log in manually.",
-        [{ text: "OK" }]
-      );
-    } finally {
-      setLoading(false);
-    }
+    // Redirect to login with pre-filled email and welcome message
+    router.push({
+      pathname: "/login",
+      params: {
+        prefillEmail: savedUser.email,
+        message: `Welcome back, ${savedUser.name}! Please enter your password to continue.`,
+      },
+    });
   };
 
   const handleDifferentAccount = () => {
     router.push("/login");
   };
 
-  // Splash Screen
-  if (showSplash || checkingAuth) {
+  // Show splash screen only if not shown before
+  if (showSplash && !hasShownSplash) {
+    return <SplashScreen onSplashComplete={handleSplashComplete} />;
+  }
+
+  // If auth is still loading after splash, show loading
+  if (authLoading && !hasCheckedAuth) {
     return (
-      <ThemedView style={styles.splashContainer}>
-        <View style={styles.splashContent}>
-          <Animated.View style={styles.logoContainer}>
-            <ThemedText style={styles.splashTitle}>EMC</ThemedText>
-            <View style={styles.splashSubtitleContainer}>
-              <ThemedText style={styles.splashSubtitle}>
-                EPSU Management
-              </ThemedText>
-            </View>
-          </Animated.View>
-        </View>
-        <View style={styles.splashFooter}>
-          <ThemedText style={styles.splashFooterText}>
-            by jasper-tech
-          </ThemedText>
-        </View>
+      <ThemedView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={Colors.blueAccent} />
+        <ThemedText style={styles.loadingText}>Loading...</ThemedText>
       </ThemedView>
     );
   }
 
-  // Welcome Screen with saved user
   return (
     <ThemedView style={styles.container}>
       <View style={styles.backgroundGraphics}>
@@ -198,12 +179,6 @@ const Index = () => {
         ]}
       >
         <View style={styles.header}>
-          <View style={styles.welcomeBadge}>
-            <Ionicons name="flash" size={16} color={Colors.blueAccent} />
-            <ThemedText style={styles.welcomeBadgeText}>
-              Welcome Back
-            </ThemedText>
-          </View>
           <ThemedText type="title" style={styles.title}>
             Ready to Continue?
           </ThemedText>
@@ -214,29 +189,30 @@ const Index = () => {
 
         {savedUser ? (
           <View style={styles.userSection}>
-            {/* User Card */}
             <TouchableOpacity
               style={styles.userCard}
-              onPress={handleContinueAs}
+              onPress={handleQuickLogin}
               disabled={loading}
             >
               <View style={styles.userCardContent}>
                 <View style={styles.avatarContainer}>
                   {savedUser.profileImg ? (
                     <Image
-                      source={{
-                        uri: savedUser.profileImg.startsWith("data:")
-                          ? savedUser.profileImg
-                          : savedUser.profileImg,
-                      }}
+                      source={{ uri: savedUser.profileImg }}
                       style={styles.profileImage}
+                      onError={() => console.log("Image failed to load")}
                     />
                   ) : (
-                    <View style={styles.defaultAvatar}>
+                    <View
+                      style={[
+                        styles.defaultAvatar,
+                        { backgroundColor: avatarVariant.bg },
+                      ]}
+                    >
                       <Ionicons
-                        name="person"
+                        name={avatarVariant.icon}
                         size={28}
-                        color={Colors.blueAccent}
+                        color="#fff"
                       />
                     </View>
                   )}
@@ -262,14 +238,13 @@ const Index = () => {
               </View>
             </TouchableOpacity>
 
-            {/* Action Buttons */}
             <View style={styles.actionsContainer}>
               <TouchableOpacity
                 style={[
                   styles.continueButton,
                   loading && styles.buttonDisabled,
                 ]}
-                onPress={handleContinueAs}
+                onPress={handleQuickLogin}
                 disabled={loading}
               >
                 {loading ? (
@@ -295,6 +270,10 @@ const Index = () => {
                 </ThemedText>
               </TouchableOpacity>
             </View>
+            {/* 
+            <ThemedText style={styles.securityHint}>
+              🔒 Password required for security
+            </ThemedText> */}
           </View>
         ) : (
           <View style={styles.noUserSection}>
@@ -306,9 +285,9 @@ const Index = () => {
                 style={styles.noUserIcon}
               />
             </View>
-            <ThemedText style={styles.noUserTitle}>No Account Found</ThemedText>
+            <ThemedText style={styles.noUserTitle}>Welcome</ThemedText>
             <ThemedText style={styles.noUserText}>
-              Sign in to access your expense management dashboard
+              Sign in to access the union dashboard
             </ThemedText>
             <TouchableOpacity
               style={styles.loginButton}
@@ -322,7 +301,6 @@ const Index = () => {
           </View>
         )}
 
-        {/* Footer */}
         <View style={styles.footer}>
           <ThemedText style={styles.footerText}>
             Secure • Reliable • Fast
@@ -336,6 +314,16 @@ const Index = () => {
 export default Index;
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    opacity: 0.7,
+  },
   container: {
     flex: 1,
   },
@@ -377,21 +365,6 @@ const styles = StyleSheet.create({
   header: {
     alignItems: "center",
     marginBottom: 40,
-  },
-  welcomeBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: `${Colors.blueAccent}15`,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginBottom: 16,
-    gap: 6,
-  },
-  welcomeBadgeText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: Colors.blueAccent,
   },
   title: {
     fontSize: 32,
@@ -438,7 +411,6 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: `${Colors.blueAccent}10`,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
@@ -472,6 +444,7 @@ const styles = StyleSheet.create({
   },
   actionsContainer: {
     gap: 12,
+    marginBottom: 16,
   },
   continueButton: {
     backgroundColor: Colors.blueAccent,
@@ -509,6 +482,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.blueAccent,
     fontWeight: "600",
+  },
+  securityHint: {
+    textAlign: "center",
+    fontSize: 13,
+    opacity: 0.6,
+    fontStyle: "italic",
   },
   noUserSection: {
     width: "100%",
@@ -561,45 +540,6 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 12,
     opacity: 0.5,
-    letterSpacing: 1,
-  },
-  // Splash Screen Styles
-  splashContainer: {
-    flex: 1,
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 60,
-  },
-  splashContent: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  logoContainer: {
-    alignItems: "center",
-  },
-  splashTitle: {
-    fontSize: 72,
-    fontWeight: "bold",
-    letterSpacing: 4,
-    color: Colors.blueAccent,
-    marginBottom: 20,
-  },
-  splashSubtitleContainer: {
-    alignItems: "center",
-  },
-  splashSubtitle: {
-    fontSize: 18,
-    opacity: 0.8,
-    letterSpacing: 2,
-    marginBottom: 4,
-  },
-  splashFooter: {
-    paddingBottom: 20,
-  },
-  splashFooterText: {
-    fontSize: 14,
-    opacity: 0.6,
     letterSpacing: 1,
   },
 });

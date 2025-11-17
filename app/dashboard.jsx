@@ -1,6 +1,7 @@
 import { StyleSheet, ScrollView, View, ActivityIndicator } from "react-native";
-import React from "react";
+import React, { useEffect } from "react";
 import { GestureDetector, Gesture } from "react-native-gesture-handler";
+import { router } from "expo-router";
 import { Colors } from "../constants/Colors";
 import ThemedView from "../components/ThemedView";
 import StatCard from "../components/StatCard";
@@ -11,8 +12,35 @@ import { useAuth } from "../context/AuthContext";
 import RealTimeStats from "../components/RealTimeStats";
 
 const Dashboard = () => {
-  const { loading: authLoading } = useAuth();
+  const {
+    user,
+    userProfile,
+    pendingVerification,
+    loading: authLoading,
+  } = useAuth();
   const { statsData, loading: statsLoading } = RealTimeStats();
+
+  // Redirect if not authenticated or not verified
+  useEffect(() => {
+    if (!authLoading) {
+      if (!user) {
+        // No user signed in - redirect to login
+        console.log("No user, redirecting to login");
+        router.replace("/");
+        return;
+      }
+
+      if (pendingVerification) {
+        // User exists but not verified - redirect to verification
+        console.log("User not verified, redirecting to verification");
+        router.replace("/verification-required");
+        return;
+      }
+
+      // User is authenticated and verified - can stay on dashboard
+      console.log("User verified, allowing dashboard access");
+    }
+  }, [user, pendingVerification, authLoading]);
 
   // Swipe gesture to open panel
   const swipeGesture = Gesture.Pan()
@@ -25,11 +53,18 @@ const Dashboard = () => {
     })
     .runOnJS(true);
 
-  if (authLoading || statsLoading) {
+  // Show loading while checking auth status or if redirecting
+  if (authLoading || statsLoading || !user || pendingVerification) {
     return (
       <ThemedView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.blueAccent} />
-        <ThemedText style={styles.loadingText}>Loading dashboard...</ThemedText>
+        <ThemedText style={styles.loadingText}>
+          {authLoading
+            ? "Checking authentication..."
+            : pendingVerification
+            ? "Redirecting to verification..."
+            : "Loading dashboard..."}
+        </ThemedText>
       </ThemedView>
     );
   }
@@ -84,6 +119,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     opacity: 0.7,
   },
+  header: {
+    marginBottom: 20,
+    paddingHorizontal: 4,
+  },
+  welcomeTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 4,
+  },
+  roleText: {
+    fontSize: 16,
+    opacity: 0.7,
+    color: Colors.blueAccent,
+    fontWeight: "600",
+  },
   content: {
     flex: 1,
     paddingHorizontal: 20,
@@ -93,7 +143,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 16,
-    marginTop: 8,
   },
   statsContainer: {
     flexGrow: 0,

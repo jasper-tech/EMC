@@ -7,6 +7,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  TextInput, // Add this import
 } from "react-native";
 import React, { useState, useEffect, useContext } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,7 +17,7 @@ import ThemedText from "../components/ThemedText";
 import { router, useLocalSearchParams } from "expo-router";
 import {
   signInWithEmailAndPassword,
-  onAuthStateChanged,
+  signOut,
   sendEmailVerification,
 } from "firebase/auth";
 import { auth, db } from "../firebase";
@@ -27,23 +28,23 @@ import { useAuth } from "../context/AuthContext";
 
 const VerificationRequired = () => {
   const { scheme } = useContext(ThemeContext);
-  const { user, setPendingVerification } = useAuth();
+  const { setPendingVerification, refreshUserProfile } = useAuth();
   const theme = Colors[scheme] ?? Colors.light;
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [userEmail, setUserEmail] = useState("");
   const [isEmailVerified, setIsEmailVerified] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(false);
+  const [manualPassword, setManualPassword] = useState(""); // Add this state
+  const [showPasswordInput, setShowPasswordInput] = useState(false); // Add this state
 
   const params = useLocalSearchParams();
 
   useEffect(() => {
-    // Load email from params or AsyncStorage
     if (params.email) {
       setUserEmail(params.email);
     }
 
-    // Load pending user data
     const loadPendingData = async () => {
       try {
         const data = await AsyncStorage.getItem("pendingUserData");
@@ -59,62 +60,135 @@ const VerificationRequired = () => {
     loadPendingData();
   }, []);
 
-  useEffect(() => {
-    // Listen for auth state changes to check verification status
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        // Refresh the user to get latest email verification status
-        await currentUser.reload();
-        setIsEmailVerified(currentUser.emailVerified);
-
-        if (currentUser.emailVerified) {
-          // User has verified their email - save to Firestore and update state
-          await saveUserToFirestore();
-          setPendingVerification(false);
-        }
-      }
-    });
-
-    return unsubscribe;
-  }, []);
-
   const handleCheckVerification = async () => {
     setCheckingStatus(true);
     try {
-      if (auth.currentUser) {
-        // Refresh user to get latest verification status
-        await auth.currentUser.reload();
+      // Get saved credentials
+      const savedEmail = await AsyncStorage.getItem("savedEmail");
+      const savedPassword = await AsyncStorage.getItem("savedPassword");
 
-        if (auth.currentUser.emailVerified) {
-          setIsEmailVerified(true);
-          setPendingVerification(false);
-          Alert.alert("Success", "Email verified! You can now log in.");
-        } else {
-          Alert.alert(
-            "Not Verified Yet",
-            "Your email is still not verified. Please check your email and click the verification link."
-          );
+      console.log("Checking credentials:", {
+        hasEmail: !!savedEmail,
+        hasPassword: !!savedPassword,
+        email: savedEmail,
+      });
+
+      // Determine which email and password to use
+      const emailToUse = savedEmail || userEmail;
+      let passwordToUse = savedPassword;
+
+      // If no saved password but we have manual password input
+      if (!savedPassword && manualPassword) {
+        passwordToUse = manualPassword;
+      }
+
+      if (!emailToUse || !passwordToUse) {
+        // Show password input instead of redirecting to login
+        setShowPasswordInput(true);
+        Alert.alert(
+          "Password Required",
+          "For security reasons, please enter your password to check verification status.",
+          [{ text: "OK" }]
+        );
+        setCheckingStatus(false);
+        return;
+      }
+
+      // Sign in temporarily to check verification status
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        emailToUse,
+        passwordToUse
+      );
+
+      await userCredential.user.reload();
+
+      if (userCredential.user.emailVerified) {
+        setIsEmailVerified(true);
+
+        // Save the password if it was entered manually
+        if (manualPassword && !savedPassword) {
+          await AsyncStorage.setItem("savedPassword", manualPassword);
         }
+
+        // Save to Firestore immediately after verification
+        await saveUserToFirestore(emailToUse, passwordToUse);
+
+        // Sign out the user immediately - they need to click "Continue" to log in
+        await signOut(auth);
+
+        Alert.alert(
+          "Email Verified!",
+          "Your email has been verified. Click 'Continue to Dashboard' to proceed.",
+          [{ text: "OK" }]
+        );
       } else {
-        Alert.alert("Error", "No user found. Please try signing in again.");
+        // Sign out if not verified
+        await signOut(auth);
+        Alert.alert(
+          "Not Verified Yet",
+          "Please check your email and click the verification link."
+        );
       }
     } catch (error) {
       console.error("Error checking verification:", error);
-      Alert.alert("Error", "Failed to check verification status.");
+
+      if (error.code === "auth/wrong-password") {
+        Alert.alert(
+          "Incorrect Password",
+          "The password you entered is incorrect. Please try again.",
+          [{ text: "OK" }]
+        );
+        setManualPassword(""); // Clear the incorrect password
+      } else {
+        Alert.alert(
+          "Error",
+          `Failed to check verification status: ${error.message}`
+        );
+      }
     } finally {
       setCheckingStatus(false);
     }
   };
 
   const handleResendVerification = async () => {
-    if (!auth.currentUser) {
-      Alert.alert("Error", "No user found. Please try signing in again.");
-      return;
-    }
-
     setResending(true);
     try {
-      await sendEmailVerification(auth.currentUser);
+      const savedEmail = await AsyncStorage.getItem("savedEmail");
+      const savedPassword = await AsyncStorage.getItem("savedPassword");
+
+      // Determine which email and password to use
+      const emailToUse = savedEmail || userEmail;
+      let passwordToUse = savedPassword;
+
+      // If no saved password but we have manual password input
+      if (!savedPassword && manualPassword) {
+        passwordToUse = manualPassword;
+      }
+
+      if (!emailToUse || !passwordToUse) {
+        setShowPasswordInput(true);
+        Alert.alert(
+          "Password Required",
+          "Please enter your password to resend verification email.",
+          [{ text: "OK" }]
+        );
+        setResending(false);
+        return;
+      }
+
+      // Sign in temporarily to send verification email
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        emailToUse,
+        passwordToUse
+      );
+
+      await sendEmailVerification(userCredential.user);
+
+      // Sign out immediately
+      await signOut(auth);
+
       Alert.alert(
         "Success",
         "Verification email sent! Check your inbox and spam folder."
@@ -127,43 +201,71 @@ const VerificationRequired = () => {
     }
   };
 
-  const handleLogin = async () => {
+  const handleContinueToDashboard = async () => {
     if (!isEmailVerified) {
       Alert.alert(
         "Not Verified",
-        "Please verify your email first before logging in."
+        "Please verify your email first before proceeding."
       );
       return;
     }
 
     setLoading(true);
     try {
-      // Get stored credentials
       const savedEmail = await AsyncStorage.getItem("savedEmail");
       const savedPassword = await AsyncStorage.getItem("savedPassword");
 
-      if (!savedEmail || !savedPassword) {
+      // Determine which email and password to use
+      const emailToUse = savedEmail || userEmail;
+      let passwordToUse = savedPassword;
+
+      // If no saved password but we have manual password input
+      if (!savedPassword && manualPassword) {
+        passwordToUse = manualPassword;
+      }
+
+      if (!emailToUse || !passwordToUse) {
         Alert.alert(
-          "Error",
-          "No saved credentials found. Please sign in manually."
+          "Password Required",
+          "Please enter your password to continue to dashboard.",
+          [{ text: "OK" }]
         );
-        router.replace("/");
+        setLoading(false);
         return;
       }
 
-      // Sign in with saved credentials
+      // Fresh login to ensure AuthContext properly loads user data
       const userCredential = await signInWithEmailAndPassword(
         auth,
-        savedEmail,
-        savedPassword
+        emailToUse,
+        passwordToUse
       );
 
       if (userCredential.user.emailVerified) {
+        // Save the password if it was entered manually
+        if (manualPassword && !savedPassword) {
+          await AsyncStorage.setItem("savedPassword", manualPassword);
+        }
+
         // Clear pending data
         await AsyncStorage.removeItem("pendingUserData");
+
         setPendingVerification(false);
+
+        // Force refresh of user profile from AuthContext
+        if (refreshUserProfile) {
+          await refreshUserProfile();
+        }
+
+        // Add a delay to ensure all context updates propagate
+        await new Promise((resolve) => setTimeout(resolve, 800));
+
+        // Navigate to dashboard
         router.replace("/dashboard");
+
+        Alert.alert("Welcome!", "Successfully logged into your dashboard.");
       } else {
+        await signOut(auth);
         Alert.alert(
           "Not Verified",
           "Email still not verified. Please check your email."
@@ -173,15 +275,14 @@ const VerificationRequired = () => {
       console.error("Error during login:", error);
       Alert.alert(
         "Login Failed",
-        "Failed to log in. Please try signing in manually."
+        "Failed to log in. Please check your password and try again."
       );
-      router.replace("/");
     } finally {
       setLoading(false);
     }
   };
 
-  const saveUserToFirestore = async () => {
+  const saveUserToFirestore = async (email, password) => {
     try {
       const pendingData = await AsyncStorage.getItem("pendingUserData");
       if (!pendingData) {
@@ -189,13 +290,16 @@ const VerificationRequired = () => {
       }
 
       const userData = JSON.parse(pendingData);
-      const currentUser = auth.currentUser;
 
-      if (!currentUser) {
-        throw new Error("No user logged in");
-      }
+      // Temporary sign in to get user UID
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
 
-      // Save to users collection
+      const currentUser = userCredential.user;
+
       await setDoc(doc(db, "users", currentUser.uid), {
         fullName: userData.fullName,
         email: userData.email,
@@ -208,7 +312,6 @@ const VerificationRequired = () => {
         updatedAt: new Date().toISOString(),
       });
 
-      // Save to members collection
       await addDoc(collection(db, "members"), {
         fullname: userData.fullName,
         email: userData.email,
@@ -222,7 +325,6 @@ const VerificationRequired = () => {
         updatedAt: new Date().toISOString(),
       });
 
-      // Create notification
       await addDoc(collection(db, "notifications"), {
         type: "user_created",
         title: "New Executive Joined",
@@ -230,6 +332,9 @@ const VerificationRequired = () => {
         timestamp: new Date(),
         read: false,
       });
+
+      // Sign out after saving
+      await signOut(auth);
 
       console.log("User data saved to Firestore after verification");
     } catch (error) {
@@ -250,7 +355,7 @@ const VerificationRequired = () => {
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.content}>
-            {/* Header */}
+            {/* Icon and Title */}
             <View style={styles.header}>
               <View
                 style={[
@@ -263,102 +368,112 @@ const VerificationRequired = () => {
                 ]}
               >
                 <Ionicons
-                  name={isEmailVerified ? "checkmark-circle" : "mail-outline"}
-                  size={48}
+                  name={isEmailVerified ? "checkmark-circle" : "mail"}
+                  size={56}
                   color={isEmailVerified ? Colors.green : Colors.blueAccent}
                 />
               </View>
 
               <ThemedText type="title" style={styles.title}>
-                {isEmailVerified ? "Email Verified!" : "Verify Your Email"}
+                {isEmailVerified ? "Email Verified ✓" : "Check Your Email"}
               </ThemedText>
 
               <ThemedText style={styles.subtitle}>
                 {isEmailVerified
-                  ? "Your email has been successfully verified!"
-                  : "We sent a verification link to:"}
+                  ? "Ready to continue to your dashboard"
+                  : `Verification link sent to`}
               </ThemedText>
 
-              <ThemedText style={styles.emailText}>{userEmail}</ThemedText>
-
-              {!isEmailVerified && (
-                <View style={styles.demoCodeContainer}>
-                  <ThemedText style={styles.demoCodeText}>
-                    Check your inbox and spam folder
-                  </ThemedText>
-                </View>
+              {userEmail && (
+                <ThemedText style={styles.emailText}>{userEmail}</ThemedText>
               )}
             </View>
 
-            {/* Status Section */}
-            <View
-              style={[
-                styles.statusContainer,
-                {
-                  backgroundColor: isEmailVerified
-                    ? `${Colors.green}10`
-                    : `${Colors.blueAccent}10`,
-                },
-              ]}
-            >
-              <Ionicons
-                name={isEmailVerified ? "checkmark-circle" : "time-outline"}
-                size={24}
-                color={isEmailVerified ? Colors.green : Colors.blueAccent}
-              />
-              <ThemedText
-                style={[
-                  styles.statusText,
-                  { color: isEmailVerified ? Colors.green : Colors.blueAccent },
-                ]}
-              >
-                {isEmailVerified
-                  ? "Email verified successfully!"
-                  : "Awaiting email verification..."}
-              </ThemedText>
-            </View>
-
-            {/* Instructions */}
-            {!isEmailVerified && (
-              <View style={styles.instructions}>
-                <ThemedText style={styles.instructionTitle}>
-                  How to verify your email:
+            {/* Password Input (shown when needed) */}
+            {showPasswordInput && !isEmailVerified && (
+              <View style={styles.passwordCard}>
+                <ThemedText style={styles.passwordTitle}>
+                  Security Check Required
                 </ThemedText>
-                <ThemedText style={styles.instructionText}>
-                  1. Check your email inbox{"\n"}
-                  2. Look for an email from Union Management System{"\n"}
-                  3. Click the verification link in the email{"\n"}
-                  4. Return here and click "Check Verification Status"{"\n"}
-                  5. Once verified, the login button will appear
+                <ThemedText style={styles.passwordSubtitle}>
+                  For security reasons, please enter your password to verify
+                  your identity.
+                </ThemedText>
+
+                <View style={styles.passwordInputContainer}>
+                  <Ionicons
+                    name="lock-closed"
+                    size={20}
+                    color={Colors.blueAccent}
+                    style={styles.passwordIcon}
+                  />
+                  <TextInput
+                    style={styles.passwordInput}
+                    placeholder="Enter your password"
+                    secureTextEntry
+                    value={manualPassword}
+                    onChangeText={setManualPassword}
+                    placeholderTextColor="#999"
+                    autoCapitalize="none"
+                  />
+                </View>
+
+                <ThemedText style={styles.passwordNote}>
+                  Your password is required to access verification status for
+                  security purposes.
                 </ThemedText>
               </View>
             )}
 
+            {/* Main Content Card */}
+            <View style={styles.card}>
+              {!isEmailVerified ? (
+                <>
+                  <ThemedText style={styles.cardTitle}>Next Steps:</ThemedText>
+                  <ThemedText style={styles.instructionText}>
+                    1. Open your email inbox{"\n"}
+                    2. Click the verification link{"\n"}
+                    3. Return here and check status
+                  </ThemedText>
+
+                  <View style={styles.divider} />
+
+                  <ThemedText style={styles.noteText}>
+                    Don't see the email? Check your spam folder or request a new
+                    one.
+                  </ThemedText>
+                </>
+              ) : (
+                <ThemedText style={styles.successText}>
+                  Your email has been verified successfully! Click the button
+                  below to log in and continue to your dashboard.
+                </ThemedText>
+              )}
+            </View>
+
             {/* Action Buttons */}
             <View style={styles.actions}>
               {isEmailVerified ? (
-                // Show login button when email is verified
                 <TouchableOpacity
                   style={[
                     styles.primaryButton,
                     { backgroundColor: Colors.green },
                   ]}
-                  onPress={handleLogin}
+                  onPress={handleContinueToDashboard}
                   disabled={loading}
                 >
                   {loading ? (
                     <ActivityIndicator color="#fff" size="small" />
                   ) : (
                     <>
-                      <Ionicons name="log-in-outline" size={20} color="#fff" />
+                      <Ionicons name="log-in" size={20} color="#fff" />
                       <ThemedText style={styles.primaryButtonText}>
-                        Proceed to Login
+                        Continue to Dashboard
                       </ThemedText>
                     </>
                   )}
                 </TouchableOpacity>
               ) : (
-                // Show verification actions when not verified
                 <>
                   <TouchableOpacity
                     style={[
@@ -366,17 +481,15 @@ const VerificationRequired = () => {
                       { backgroundColor: Colors.blueAccent },
                     ]}
                     onPress={handleCheckVerification}
-                    disabled={checkingStatus}
+                    disabled={
+                      checkingStatus || (showPasswordInput && !manualPassword)
+                    }
                   >
                     {checkingStatus ? (
                       <ActivityIndicator color="#fff" size="small" />
                     ) : (
                       <>
-                        <Ionicons
-                          name="refresh-outline"
-                          size={20}
-                          color="#fff"
-                        />
+                        <Ionicons name="refresh" size={20} color="#fff" />
                         <ThemedText style={styles.primaryButtonText}>
                           Check Verification Status
                         </ThemedText>
@@ -387,7 +500,9 @@ const VerificationRequired = () => {
                   <TouchableOpacity
                     style={styles.secondaryButton}
                     onPress={handleResendVerification}
-                    disabled={resending}
+                    disabled={
+                      resending || (showPasswordInput && !manualPassword)
+                    }
                   >
                     {resending ? (
                       <ActivityIndicator
@@ -395,40 +510,24 @@ const VerificationRequired = () => {
                         size="small"
                       />
                     ) : (
-                      <>
-                        <Ionicons
-                          name="mail-outline"
-                          size={20}
-                          color={Colors.blueAccent}
-                        />
-                        <ThemedText style={styles.secondaryButtonText}>
-                          Resend Verification Email
-                        </ThemedText>
-                      </>
+                      <ThemedText style={styles.secondaryButtonText}>
+                        Resend Verification Email
+                      </ThemedText>
                     )}
                   </TouchableOpacity>
                 </>
               )}
-
-              {/* Always show home button */}
-              <TouchableOpacity
-                style={styles.tertiaryButton}
-                onPress={handleGoToHome}
-              >
-                <ThemedText style={styles.tertiaryButtonText}>
-                  Go to Home
-                </ThemedText>
-              </TouchableOpacity>
             </View>
 
-            {/* Additional Info */}
-            <View style={styles.infoBox}>
-              <ThemedText style={styles.infoText}>
-                {isEmailVerified
-                  ? "You're all set! Click 'Proceed to Login' to access your dashboard."
-                  : "This page automatically checks for email verification. You don't need to enter any codes."}
+            {/* Footer Link */}
+            <TouchableOpacity
+              style={styles.footerLink}
+              onPress={handleGoToHome}
+            >
+              <ThemedText style={styles.footerLinkText}>
+                Back to Home
               </ThemedText>
-            </View>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -451,137 +550,154 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 60,
+    paddingTop: 80,
     paddingBottom: 40,
   },
   header: {
     alignItems: "center",
-    marginBottom: 40,
+    marginBottom: 32,
   },
   iconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 24,
+    marginBottom: 20,
   },
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 12,
-  },
-  subtitle: {
-    fontSize: 16,
-    opacity: 0.7,
+    fontSize: 26,
+    fontWeight: "700",
     textAlign: "center",
     marginBottom: 8,
   },
+  subtitle: {
+    fontSize: 15,
+    opacity: 0.6,
+    textAlign: "center",
+    marginBottom: 6,
+  },
   emailText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "600",
     textAlign: "center",
     color: Colors.blueAccent,
+    marginTop: 4,
   },
-  demoCodeContainer: {
-    marginTop: 16,
-    padding: 12,
-    backgroundColor: `${Colors.blueAccent}15`,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.blueAccent,
-  },
-  demoCodeText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: Colors.blueAccent,
-    textAlign: "center",
-  },
-  statusContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-    marginBottom: 30,
-    padding: 16,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  instructions: {
+  // New styles for password input
+  passwordCard: {
     backgroundColor: Colors.uiBackground,
     padding: 20,
     borderRadius: 16,
-    marginBottom: 30,
+    marginBottom: 20,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.blueAccent,
   },
-  instructionTitle: {
+  passwordTitle: {
     fontSize: 16,
     fontWeight: "600",
+    marginBottom: 8,
+    color: Colors.blueAccent,
+  },
+  passwordSubtitle: {
+    fontSize: 14,
+    opacity: 0.7,
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  passwordInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: `${Colors.blueAccent}08`,
+    borderRadius: 12,
+    paddingHorizontal: 16,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: `${Colors.blueAccent}20`,
+  },
+  passwordIcon: {
+    marginRight: 12,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingVertical: 16,
+    fontSize: 16,
+    color: Colors.text,
+  },
+  passwordNote: {
+    fontSize: 12,
+    opacity: 0.6,
+    fontStyle: "italic",
+  },
+  card: {
+    backgroundColor: Colors.uiBackground,
+    padding: 24,
+    borderRadius: 16,
+    marginBottom: 24,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 16,
   },
   instructionText: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 24,
+    opacity: 0.7,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginVertical: 16,
+    opacity: 0.3,
+  },
+  noteText: {
+    fontSize: 13,
+    opacity: 0.6,
+    fontStyle: "italic",
+  },
+  successText: {
+    fontSize: 15,
+    lineHeight: 22,
     opacity: 0.8,
+    textAlign: "center",
   },
   actions: {
     gap: 12,
-    marginBottom: 30,
+    marginBottom: 24,
   },
   primaryButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    padding: 18,
-    borderRadius: 16,
+    padding: 16,
+    borderRadius: 12,
   },
   primaryButtonText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: "600",
   },
   secondaryButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
     padding: 16,
-    borderRadius: 16,
-    borderWidth: 2,
+    borderRadius: 12,
+    alignItems: "center",
+    borderWidth: 1.5,
     borderColor: Colors.blueAccent,
   },
   secondaryButtonText: {
     color: Colors.blueAccent,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "600",
   },
-  tertiaryButton: {
-    padding: 16,
-    borderRadius: 16,
+  footerLink: {
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: Colors.border,
+    paddingVertical: 12,
   },
-  tertiaryButtonText: {
-    color: Colors.text,
-    fontSize: 14,
+  footerLinkText: {
+    fontSize: 15,
+    opacity: 0.6,
     fontWeight: "500",
-  },
-  infoBox: {
-    backgroundColor: `${Colors.blueAccent}08`,
-    padding: 16,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: Colors.blueAccent,
-  },
-  infoText: {
-    fontSize: 14,
-    lineHeight: 20,
-    opacity: 0.8,
-    textAlign: "center",
   },
 });

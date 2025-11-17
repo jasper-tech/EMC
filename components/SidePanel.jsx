@@ -7,7 +7,7 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
-import React, { useContext, useMemo, useState } from "react";
+import React, { useContext, useMemo, useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, {
   useSharedValue,
@@ -31,11 +31,11 @@ import {
   query,
   where,
   getDocs,
+  getDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useProfile } from "../context/ProfileContext";
-import { useAuth } from "../context/AuthContext"; // ✅ ADD THIS IMPORT
+import { useAuth } from "../context/AuthContext";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const PANEL_WIDTH = SCREEN_WIDTH * 0.8;
@@ -53,33 +53,84 @@ const AVATAR_VARIANTS = [
 ];
 
 const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
-  // ✅ REMOVE THE DEFAULT PROPS
   const { scheme, toggleScheme } = useContext(ThemeContext);
-  const { user, userProfile } = useAuth(); // ✅ USE THE AUTH CONTEXT
+  const { user } = useAuth();
   const theme = Colors[scheme] ?? Colors.light;
   const [uploading, setUploading] = useState(false);
+  const [currentUserAvatar, setCurrentUserAvatar] = useState(null);
+  const [userName, setUserName] = useState("");
+  const [userRole, setUserRole] = useState("Member");
+  const [loadingProfile, setLoadingProfile] = useState(false);
 
   const translateX = useSharedValue(isOpen ? 0 : -PANEL_WIDTH);
-  const { profileImage, updateProfileImage } = useProfile();
 
-  const currentUserAvatar = profileImage || userProfile?.profileImg;
-
-  // Generate consistent avatar variant based on userId or userName
-  const avatarVariant = useMemo(() => {
-    const seed = user?.uid || userProfile?.fullName || "User";
-    const hash = seed
-      .split("")
-      .reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    return AVATAR_VARIANTS[hash % AVATAR_VARIANTS.length];
-  }, [user?.uid, userProfile?.fullName]);
-
-  React.useEffect(() => {
+  useEffect(() => {
     translateX.value = withSpring(isOpen ? 0 : -PANEL_WIDTH, {
       damping: 25,
       stiffness: 300,
       mass: 0.5,
     });
   }, [isOpen]);
+
+  // Load user profile data from Firestore when panel opens
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      if (isOpen && user) {
+        setLoadingProfile(true);
+        try {
+          // Load basic user data from AsyncStorage first
+          const savedName = await AsyncStorage.getItem("userName");
+          const savedProfileImg = await AsyncStorage.getItem("savedProfileImg");
+
+          setUserName(
+            savedName || user.displayName || user.email.split("@")[0]
+          );
+          setCurrentUserAvatar(savedProfileImg);
+
+          // Then load detailed user data from Firestore
+          const userDoc = await getDoc(doc(db, "users", user.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            // console.log("User profile data:", userData);
+
+            // Update with Firestore data if available
+            if (userData.fullName) {
+              setUserName(userData.fullName);
+              await AsyncStorage.setItem("userName", userData.fullName);
+            }
+
+            if (userData.role) {
+              setUserRole(userData.role);
+            }
+
+            if (userData.profileImg) {
+              setCurrentUserAvatar(userData.profileImg);
+              await AsyncStorage.setItem(
+                "savedProfileImg",
+                userData.profileImg
+              );
+            }
+          } else {
+            console.log("No user data found in Firestore, using basic profile");
+            // User exists in auth but not in Firestore - this shouldn't happen with new flow
+            // But we'll handle it gracefully
+            setUserRole("Member");
+          }
+        } catch (error) {
+          console.error("Error loading user profile:", error);
+          // Fallback to basic data
+          const savedName = await AsyncStorage.getItem("userName");
+          setUserName(
+            savedName || user.displayName || user.email.split("@")[0]
+          );
+        } finally {
+          setLoadingProfile(false);
+        }
+      }
+    };
+
+    loadUserProfile();
+  }, [isOpen, user]);
 
   const panelStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],
@@ -89,6 +140,14 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
     opacity: withTiming(isOpen ? 0.5 : 0, { duration: 200 }),
     pointerEvents: isOpen ? "auto" : "none",
   }));
+
+  const avatarVariant = useMemo(() => {
+    const seed = user?.uid || userName || "User";
+    const hash = seed
+      .split("")
+      .reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return AVATAR_VARIANTS[hash % AVATAR_VARIANTS.length];
+  }, [user?.uid, userName]);
 
   const handleSignOut = async () => {
     try {
@@ -110,7 +169,6 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
 
   const handlePickImage = async () => {
     try {
-      // Request permission
       const { status } =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
 
@@ -122,7 +180,6 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
         return;
       }
 
-      // Launch image picker
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -151,14 +208,12 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
     setUploading(true);
 
     try {
-      // Convert image to base64
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      // Get the file extension to determine the mime type
       const fileExtension = uri.split(".").pop().toLowerCase();
-      let mimeType = "image/jpeg"; // default
+      let mimeType = "image/jpeg";
 
       if (fileExtension === "png") {
         mimeType = "image/png";
@@ -170,17 +225,16 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
         mimeType = "image/webp";
       }
 
-      // Create data URI with base64
       const base64Image = `data:${mimeType};base64,${base64}`;
 
-      // Update Firestore user document with base64 image
+      // Update Firestore user document
       const userRef = doc(db, "users", auth.currentUser.uid);
       await updateDoc(userRef, {
         profileImg: base64Image,
         updatedAt: new Date().toISOString(),
       });
 
-      // ALSO UPDATE MEMBERS COLLECTION FOR EXECUTIVES
+      // Update members collection
       const membersQuery = query(
         collection(db, "members"),
         where("uid", "==", auth.currentUser.uid)
@@ -196,13 +250,10 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
         });
       }
 
-      // UPDATE ASYNCSTORAGE FOR PERSISTENCE
+      // Update AsyncStorage and local state
       await AsyncStorage.setItem("savedProfileImg", base64Image);
+      setCurrentUserAvatar(base64Image);
 
-      // UPDATE CONTEXT FOR IMMEDIATE UI UPDATE
-      updateProfileImage(base64Image);
-
-      // Still call the callback for parent component if needed
       if (onAvatarUpdate) {
         onAvatarUpdate(base64Image);
       }
@@ -216,13 +267,37 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
     }
   };
 
-  // ✅ Get user data from auth context
-  const userName =
-    userProfile?.fullName ||
-    user?.displayName ||
-    user?.email?.split("@")[0] ||
-    "User";
-  const userRole = userProfile?.role || "Member";
+  if (loadingProfile) {
+    return (
+      <>
+        <Animated.View
+          style={[styles.overlay, overlayStyle]}
+          pointerEvents={isOpen ? "auto" : "none"}
+        >
+          <TouchableOpacity
+            style={styles.overlayTouchable}
+            activeOpacity={1}
+            onPress={onClose}
+          />
+        </Animated.View>
+
+        <Animated.View
+          style={[
+            styles.panel,
+            { backgroundColor: theme.navBackground, width: PANEL_WIDTH },
+            panelStyle,
+          ]}
+        >
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Colors.blueAccent} />
+            <ThemedText style={styles.loadingText}>
+              Loading profile...
+            </ThemedText>
+          </View>
+        </Animated.View>
+      </>
+    );
+  }
 
   return (
     <>
@@ -301,7 +376,7 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
                 <TouchableOpacity
                   style={[
                     styles.editButton,
-                    { backgroundColor: Colors.primary },
+                    { backgroundColor: Colors.blueAccent },
                   ]}
                   onPress={handlePickImage}
                   activeOpacity={0.8}
@@ -401,40 +476,6 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
               opacity={0.3}
             />
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => {
-              onClose();
-              router.push("/help");
-            }}
-            activeOpacity={0.7}
-          >
-            <View
-              style={[
-                styles.menuIconContainer,
-                { backgroundColor: theme.uiBackground },
-              ]}
-            >
-              <Ionicons
-                name="help-circle-outline"
-                size={20}
-                color={theme.text}
-              />
-            </View>
-            <View style={styles.menuTextContainer}>
-              <ThemedText style={styles.menuText}>Help & Support</ThemedText>
-              <ThemedText style={styles.menuSubtext}>
-                FAQs and contact
-              </ThemedText>
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={18}
-              color={theme.text}
-              opacity={0.3}
-            />
-          </TouchableOpacity>
         </View>
 
         {/* Bottom Section */}
@@ -471,6 +512,7 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
 };
 
 export default SidePanel;
+
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
@@ -635,5 +677,16 @@ const styles = StyleSheet.create({
   signOutText: {
     fontSize: 16,
     fontWeight: "600",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    opacity: 0.7,
   },
 });

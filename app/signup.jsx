@@ -25,10 +25,10 @@ import {
   createUserWithEmailAndPassword,
   updateProfile,
   sendEmailVerification,
+  signOut,
 } from "firebase/auth";
 import { auth } from "../firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useAuth } from "../context/AuthContext";
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -48,7 +48,6 @@ const Signup = () => {
     useState(false);
 
   const { scheme } = useContext(ThemeContext);
-  const { generateVerificationCode, storeVerificationCode } = useAuth();
   const theme = Colors[scheme] ?? Colors.light;
 
   // Animation values
@@ -102,7 +101,7 @@ const Signup = () => {
       !formData.role ||
       !formData.password ||
       !formData.confirmPassword ||
-      !formData.address // Added address validation
+      !formData.address
     ) {
       Alert.alert("Error", "Please fill in all fields");
       return false;
@@ -126,6 +125,7 @@ const Signup = () => {
 
     setLoading(true);
     try {
+      // 1. Create user in Firebase Auth only
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         formData.email,
@@ -134,15 +134,12 @@ const Signup = () => {
 
       const user = userCredential.user;
 
-      // Update profile with display name
+      // 2. Update profile with display name
       await updateProfile(user, {
         displayName: formData.fullName,
       });
 
-      // ✅ SEND EMAIL VERIFICATION LINK (instead of OTP)
-      await sendEmailVerification(user);
-
-      // Store user data temporarily for later Firestore save
+      // 3. Save user data temporarily (NOT to Firestore yet)
       const userData = {
         fullName: formData.fullName,
         email: formData.email,
@@ -152,12 +149,33 @@ const Signup = () => {
         createdAt: new Date().toISOString(),
       };
 
-      // Save to AsyncStorage for use in verification screen
       await AsyncStorage.setItem("pendingUserData", JSON.stringify(userData));
 
-      // Also save credentials for auto-login after verification
-      await AsyncStorage.setItem("savedEmail", formData.email);
-      await AsyncStorage.setItem("savedPassword", formData.password);
+      // 4. Send verification email
+      await sendEmailVerification(user);
+
+      // 5. Sign out immediately (user cannot access app until verified)
+      await signOut(auth);
+
+      Alert.alert(
+        "Verification Required",
+        `We've sent a verification link to ${formData.email}. Please check your inbox and verify your email to continue.`,
+        [
+          {
+            text: "Continue to Login",
+            onPress: () => {
+              // Redirect to login with email pre-filled
+              router.replace({
+                pathname: "/login",
+                params: {
+                  prefillEmail: formData.email,
+                  message: "Please verify your email and sign in to continue",
+                },
+              });
+            },
+          },
+        ]
+      );
 
       // Clear form
       setFormData({
@@ -169,18 +187,6 @@ const Signup = () => {
         confirmPassword: "",
         address: "",
       });
-
-      // ✅ REDIRECT TO VERIFICATION SCREEN (no code needed)
-      Alert.alert(
-        "Verification Email Sent",
-        `We've sent a verification link to ${formData.email}. Please check your inbox and click the link to verify your account.`,
-        [
-          {
-            text: "Continue to Verification",
-            onPress: () => router.replace("/verification-required"),
-          },
-        ]
-      );
     } catch (error) {
       console.error("Signup error:", error);
       let errorMessage = "An error occurred during signup";
@@ -269,24 +275,9 @@ const Signup = () => {
           >
             {/* Header Section */}
             <View style={styles.header}>
-              {/* <View style={styles.logoContainer}>
-                <View style={styles.logoCircle}>
-                  <Ionicons name="people" size={32} color={Colors.blueAccent} />
-                </View>
-                <View style={styles.welcomeBadge}>
-                  <Ionicons name="flash" size={14} color={Colors.blueAccent} />
-                  <ThemedText style={styles.welcomeBadgeText}>
-                    Join Our Union
-                  </ThemedText>
-                </View>
-              </View> */}
-
               <ThemedText type="title" style={styles.title}>
                 Create Your Account
               </ThemedText>
-              {/* <ThemedText style={styles.subtitle}>
-                Create an account to start managing the union
-              </ThemedText> */}
             </View>
 
             {/* Form Section */}
@@ -668,7 +659,7 @@ const Signup = () => {
                   Already have an account?{" "}
                 </ThemedText>
                 <TouchableOpacity
-                  onPress={() => router.push("/")}
+                  onPress={() => router.push("/login")}
                   disabled={loading}
                 >
                   <ThemedText style={styles.loginLink}>Sign In</ThemedText>
@@ -740,6 +731,54 @@ const Signup = () => {
   );
 };
 
+// Export the saveUserToFirestore function for login component
+export const saveUserToFirestore = async (user) => {
+  try {
+    const pendingData = await AsyncStorage.getItem("pendingUserData");
+    if (!pendingData) {
+      console.log("No pending user data found");
+      return;
+    }
+
+    const userData = JSON.parse(pendingData);
+    const { db } = require("../firebase");
+    const { doc, setDoc, collection, addDoc } = require("firebase/firestore");
+
+    // Save to users collection
+    await setDoc(doc(db, "users", user.uid), {
+      ...userData,
+      uid: user.uid,
+      emailVerified: true,
+      profileImg: "",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    // Save to members collection
+    await addDoc(collection(db, "members"), {
+      fullname: userData.fullName,
+      email: userData.email,
+      phone: userData.phone,
+      role: userData.role,
+      address: userData.address,
+      dateJoined: new Date().toISOString().split("T")[0],
+      isExecutive: true,
+      uid: user.uid,
+      profileImg: "",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    // Clear pending data
+    await AsyncStorage.removeItem("pendingUserData");
+
+    console.log("User saved to Firestore after verification");
+  } catch (error) {
+    console.error("Error saving to Firestore:", error);
+    throw error;
+  }
+};
+
 export default Signup;
 
 const styles = StyleSheet.create({
@@ -791,48 +830,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 40,
   },
-  logoContainer: {
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  logoCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: `${Colors.blueAccent}15`,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-    borderWidth: 2,
-    borderColor: `${Colors.blueAccent}20`,
-  },
-  welcomeBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: `${Colors.blueAccent}15`,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    gap: 6,
-  },
-  welcomeBadgeText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: Colors.blueAccent,
-  },
   title: {
     fontSize: 32,
     fontWeight: "bold",
     textAlign: "center",
     marginBottom: 12,
     lineHeight: 38,
-  },
-  subtitle: {
-    fontSize: 16,
-    opacity: 0.7,
-    textAlign: "center",
-    lineHeight: 22,
-    maxWidth: 300,
   },
   form: {
     width: "100%",

@@ -7,18 +7,31 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ThemeProvider, ThemeContext } from "../context/ThemeContext";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 import { SidePanelProvider } from "../context/SidepanelContext";
-import { ProfileProvider } from "../context/ProfileContext";
+import { SplashProvider } from "../context/SplashContext";
 import AppWrapper from "../components/AppWrapper";
 
+// Create a separate component that uses hooks
 const LayoutContent = () => {
   const { scheme } = useContext(ThemeContext);
-  const { user } = useAuth(); // Get auth state
-  const pathname = usePathname(); // Get current route
+  const { user, loading: authLoading } = useAuth();
+  const pathname = usePathname();
   const theme = Colors[scheme] ?? Colors.light;
 
   // Define routes that should NOT have the AppWrapper (auth screens)
-  const authRoutes = ["/", "/login", "/signup"];
+  const authRoutes = ["/", "/login", "/signup", "/verification-required"];
   const isAuthRoute = authRoutes.includes(pathname);
+
+  // Show loading while auth is initializing
+  if (authLoading) {
+    return (
+      <GestureHandlerRootView
+        style={{ flex: 1, backgroundColor: theme.background }}
+      >
+        <StatusBar style={scheme === "dark" ? "light" : "dark"} />
+        {/* You can add a loading spinner here if needed */}
+      </GestureHandlerRootView>
+    );
+  }
 
   return (
     <>
@@ -54,9 +67,16 @@ const LayoutContent = () => {
               headerTitle: "Sign Up",
             }}
           />
+          <Stack.Screen
+            name="verification-required"
+            options={{
+              headerTitle: "Verification",
+              gestureEnabled: false,
+              headerBackVisible: false,
+            }}
+          />
         </Stack>
       ) : (
-        // Render with AppWrapper for authenticated routes
         <AppWrapper>
           <Stack
             screenOptions={{
@@ -137,11 +157,13 @@ const RootLayout = () => {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
         <AuthProvider>
-          <SidePanelProvider>
-            <ProfileProvider>
+          <SplashProvider>
+            <SidePanelProvider>
+              {/* <ProfileProvider> */}
               <LayoutContent />
-            </ProfileProvider>
-          </SidePanelProvider>
+              {/* </ProfileProvider> */}
+            </SidePanelProvider>
+          </SplashProvider>
         </AuthProvider>
       </ThemeProvider>
     </GestureHandlerRootView>

@@ -16,30 +16,32 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../constants/Colors";
 import ThemedView from "../components/ThemedView";
 import ThemedText from "../components/ThemedText";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import {
   signInWithEmailAndPassword,
   sendEmailVerification,
 } from "firebase/auth";
 import { auth, db } from "../firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { doc, getDoc, setDoc, addDoc, collection } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { ThemeContext } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
+import { saveUserToFirestore } from "./signup";
 
 WebBrowser.maybeCompleteAuthSession();
 
 const Login = () => {
   const { scheme } = useContext(ThemeContext);
-  const { pendingVerification, setPendingVerification } = useAuth();
+  const { user } = useAuth();
   const theme = Colors[scheme] ?? Colors.light;
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
-  const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const params = useLocalSearchParams();
+  const [securityMessage, setSecurityMessage] = useState("");
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -68,6 +70,15 @@ const Login = () => {
     ]).start();
   }, []);
 
+  useEffect(() => {
+    if (params.prefillEmail) {
+      setFormData((prev) => ({ ...prev, email: params.prefillEmail }));
+    }
+    if (params.message) {
+      setSecurityMessage(params.message);
+    }
+  }, [params.prefillEmail, params.message]);
+
   const handleInputFocus = () => {
     Animated.timing(inputFocusAnim, {
       toValue: 1,
@@ -83,6 +94,7 @@ const Login = () => {
       useNativeDriver: true,
     }).start();
   };
+
   const handleLogin = async () => {
     if (!formData.email || !formData.password) {
       Alert.alert("Error", "Please fill in all fields");
@@ -99,11 +111,13 @@ const Login = () => {
 
       const user = userCredential.user;
 
-      // Check if email is verified
+      // Force reload to get latest verification status
+      await user.reload();
+
       if (!user.emailVerified) {
         Alert.alert(
           "Email Not Verified",
-          "Please verify your email before signing in. Check your inbox for the verification link.",
+          "Please verify your email before signing in.",
           [
             {
               text: "Resend Verification",
@@ -111,43 +125,47 @@ const Login = () => {
                 try {
                   await sendEmailVerification(user);
                   Alert.alert("Success", "Verification email sent!");
-                  // Redirect to verification screen
-                  router.push("/verification-required");
                 } catch (error) {
                   Alert.alert("Error", "Failed to send verification email");
                 }
               },
             },
-            {
-              text: "Go to Verification",
-              onPress: () => router.push("/verification-required"),
-            },
+            { text: "OK" },
           ]
         );
         setLoading(false);
         return;
       }
 
-      // User is verified - proceed with login
-      console.log("User logged in:", user.uid);
+      // ✅ USER IS VERIFIED - Proceed with login
 
-      // Check if user exists in Firestore, if not, create them
+      // Save user identity for quick login
+      await AsyncStorage.setItem("userEmail", user.email);
+      await AsyncStorage.setItem(
+        "userName",
+        user.displayName || user.email.split("@")[0]
+      );
+
+      // Check if we need to save to Firestore (first time login after verification)
+      const pendingData = await AsyncStorage.getItem("pendingUserData");
+      if (pendingData) {
+        await saveUserToFirestore(user);
+      }
+
+      // Check if user exists in Firestore, if not create basic profile
       const userDoc = await getDoc(doc(db, "users", user.uid));
       if (!userDoc.exists()) {
-        // Check if we have pending user data from signup
-        const pendingData = await AsyncStorage.getItem("pendingUserData");
-        if (pendingData) {
-          const userData = JSON.parse(pendingData);
-          await saveUserToFirestore(user, userData);
-          await AsyncStorage.removeItem("pendingUserData");
-        }
+        await setDoc(doc(db, "users", user.uid), {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          emailVerified: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
       }
 
-      if (rememberMe) {
-        await AsyncStorage.setItem("savedEmail", formData.email);
-        await AsyncStorage.setItem("savedPassword", formData.password);
-      }
-
+      console.log("Login successful, navigating to dashboard");
       router.replace("/dashboard");
     } catch (error) {
       console.error("Login error:", error);
@@ -179,46 +197,6 @@ const Login = () => {
     }
   };
 
-  const saveUserToFirestore = async (user, userData) => {
-    try {
-      // Save to users collection
-      await setDoc(doc(db, "users", user.uid), {
-        ...userData,
-        uid: user.uid,
-        emailVerified: true,
-        updatedAt: new Date().toISOString(),
-      });
-
-      // Save to members collection
-      await addDoc(collection(db, "members"), {
-        fullname: userData.fullName,
-        email: userData.email,
-        phone: userData.phone,
-        role: userData.role,
-        address: userData.address,
-        dateJoined: new Date().toISOString().split("T")[0],
-        isExecutive: true,
-        uid: user.uid,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-
-      // Create notification
-      await addDoc(collection(db, "notifications"), {
-        type: "user_created",
-        title: "New Executive Joined",
-        message: `${userData.fullName} (${userData.role}) has joined the union as an executive`,
-        timestamp: new Date(),
-        read: false,
-      });
-
-      console.log("User data saved to Firestore");
-    } catch (error) {
-      console.error("Error saving user to Firestore:", error);
-      throw error;
-    }
-  };
-
   return (
     <ThemedView style={styles.container}>
       <View style={styles.backgroundGraphics}>
@@ -245,27 +223,44 @@ const Login = () => {
             ]}
           >
             {/* Header Section */}
-            <View style={styles.header}>
-              {/* <View style={styles.logoContainer}>
-                <View style={styles.logoCircle}>
-                  <Ionicons
-                    name="lock-closed"
-                    size={32}
-                    color={Colors.blueAccent}
-                  />
-                </View>
-                <View style={styles.welcomeBadge}>
-                  <Ionicons name="flash" size={14} color={Colors.blueAccent} />
-                  <ThemedText style={styles.welcomeBadgeText}>
-                    Welcome Back
-                  </ThemedText>
-                </View>
-              </View> */}
-
+            {/* <View style={styles.header}>
               <ThemedText type="title" style={styles.title}>
                 Sign In to Your Account
               </ThemedText>
-            </View>
+            </View> */}
+
+            {/* Security Notice */}
+            {securityMessage && (
+              <View style={styles.securityNotice}>
+                <Ionicons
+                  name="shield-checkmark"
+                  size={20}
+                  color={Colors.blueAccent}
+                />
+                <ThemedText style={styles.securityText}>
+                  {securityMessage}
+                </ThemedText>
+              </View>
+            )}
+
+            {/* Default Security Message */}
+            {!securityMessage && (
+              <View style={styles.securityNotice}>
+                <Ionicons
+                  name="lock-closed"
+                  size={20}
+                  color={Colors.blueAccent}
+                />
+                <View>
+                  <ThemedText style={styles.securityTitle}>
+                    Secure Authentication Required
+                  </ThemedText>
+                  <ThemedText style={styles.securitySubtitle}>
+                    For security reasons, password entry is required for access
+                  </ThemedText>
+                </View>
+              </View>
+            )}
 
             {/* Form Section */}
             <View style={styles.form}>
@@ -367,26 +362,6 @@ const Login = () => {
               {/* Options Row */}
               <View style={styles.optionsRow}>
                 <TouchableOpacity
-                  style={styles.rememberMeContainer}
-                  onPress={() => setRememberMe(!rememberMe)}
-                  disabled={loading}
-                >
-                  <View
-                    style={[
-                      styles.checkbox,
-                      rememberMe && styles.checkboxChecked,
-                    ]}
-                  >
-                    {rememberMe && (
-                      <Ionicons name="checkmark" size={16} color="#fff" />
-                    )}
-                  </View>
-                  <ThemedText style={styles.rememberMeText}>
-                    Remember me
-                  </ThemedText>
-                </TouchableOpacity>
-
-                <TouchableOpacity
                   style={styles.forgotPassword}
                   disabled={loading}
                 >
@@ -416,36 +391,6 @@ const Login = () => {
                   </>
                 )}
               </TouchableOpacity>
-
-              {/* Divider */}
-              {/* <View style={styles.divider}>
-                <View style={styles.dividerLine} />
-                <ThemedText style={styles.dividerText}>or</ThemedText>
-                <View style={styles.dividerLine} />
-              </View> */}
-
-              {/* Alternative Sign In Options */}
-              {/* <View style={styles.alternativeAuthContainer}>
-                <TouchableOpacity
-                  style={styles.alternativeButton}
-                  disabled={loading}
-                >
-                  <Ionicons name="logo-google" size={20} color="#DB4437" />
-                  <ThemedText style={styles.alternativeButtonText}>
-                    Continue with Google
-                  </ThemedText>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.alternativeButton}
-                  disabled={loading}
-                >
-                  <Ionicons name="logo-apple" size={20} color="#000" />
-                  <ThemedText style={styles.alternativeButtonText}>
-                    Continue with Apple
-                  </ThemedText>
-                </TouchableOpacity>
-              </View> */}
 
               {/* Sign Up Link */}
               <View style={styles.signupContainer}>
@@ -525,36 +470,7 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: "center",
-    marginBottom: 40,
-  },
-  logoContainer: {
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  logoCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: `${Colors.blueAccent}15`,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-    borderWidth: 2,
-    borderColor: `${Colors.blueAccent}20`,
-  },
-  welcomeBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: `${Colors.blueAccent}15`,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    gap: 6,
-  },
-  welcomeBadgeText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: Colors.blueAccent,
+    marginBottom: 20,
   },
   title: {
     fontSize: 32,
@@ -563,12 +479,33 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     lineHeight: 38,
   },
-  subtitle: {
+  securityNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#E8F4FD",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 24,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.blueAccent,
+    gap: 12,
+  },
+  securityTitle: {
     fontSize: 16,
-    opacity: 0.7,
-    textAlign: "center",
-    lineHeight: 22,
-    maxWidth: 300,
+    fontWeight: "600",
+    color: "#0C4D6B",
+    marginBottom: 4,
+  },
+  securitySubtitle: {
+    fontSize: 14,
+    color: "#0C4D6B",
+    opacity: 0.8,
+  },
+  securityText: {
+    fontSize: 14,
+    color: "#0C4D6B",
+    fontWeight: "500",
+    flex: 1,
   },
   form: {
     width: "100%",
@@ -610,30 +547,9 @@ const styles = StyleSheet.create({
   },
   optionsRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
     alignItems: "center",
     marginBottom: 32,
-  },
-  rememberMeContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: Colors.blueAccent,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  checkboxChecked: {
-    backgroundColor: Colors.blueAccent,
-  },
-  rememberMeText: {
-    fontSize: 14,
-    fontWeight: "500",
   },
   forgotPassword: {},
   forgotPasswordText: {
@@ -663,41 +579,6 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
-  },
-  divider: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: `${Colors.blueAccent}20`,
-  },
-  dividerText: {
-    marginHorizontal: 16,
-    fontSize: 14,
-    opacity: 0.5,
-    fontWeight: "500",
-  },
-  alternativeAuthContainer: {
-    gap: 12,
-    marginBottom: 32,
-  },
-  alternativeButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: `${Colors.blueAccent}20`,
-    backgroundColor: Colors.uiBackground,
-  },
-  alternativeButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
   },
   signupContainer: {
     flexDirection: "row",
