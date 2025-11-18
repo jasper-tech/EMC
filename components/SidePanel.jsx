@@ -412,7 +412,7 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
                   <Ionicons
                     name="shield-checkmark"
                     size={12}
-                    color={theme.text}
+                    color={Colors.goldAccent}
                   />
                   <ThemedText style={[styles.roleText, { color: theme.text }]}>
                     {userRole}

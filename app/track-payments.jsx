@@ -57,16 +57,24 @@ const TrackPayments = () => {
   }, []);
 
   useEffect(() => {
-    if (searchQuery.trim() === "") {
-      setFilteredMembers(members);
-    } else {
-      const filtered = members.filter(
+    let filtered = members;
+
+    if (searchQuery.trim() !== "") {
+      filtered = members.filter(
         (member) =>
           member.fullname?.toLowerCase().includes(searchQuery.toLowerCase()) ||
           member.phone?.includes(searchQuery)
       );
-      setFilteredMembers(filtered);
     }
+
+    const sortedMembers = [...filtered].sort((a, b) => {
+      if (a.isExecutive && !b.isExecutive) return -1;
+      if (!a.isExecutive && b.isExecutive) return 1;
+
+      return a.fullname?.localeCompare(b.fullname);
+    });
+
+    setFilteredMembers(sortedMembers);
   }, [searchQuery, members]);
 
   const loadMembers = async () => {
@@ -254,7 +262,7 @@ const TrackPayments = () => {
                 />
               ) : (
                 <Ionicons
-                  name={member.isExecutive ? "star" : "person"}
+                  name={member.isExecutive ? "shield-checkmark" : "person"}
                   size={20}
                   color={
                     member.isExecutive ? Colors.goldAccent : Colors.blueAccent
@@ -268,11 +276,11 @@ const TrackPayments = () => {
                   {member.fullname}
                 </ThemedText>
                 {member.isExecutive && (
-                  <View style={styles.executiveBadge}>
-                    <ThemedText style={styles.executiveBadgeText}>
-                      Executive
-                    </ThemedText>
-                  </View>
+                  <Ionicons
+                    name="shield-checkmark"
+                    size={16}
+                    color={Colors.goldAccent}
+                  />
                 )}
               </View>
               <ThemedText style={styles.memberPhone}>{member.phone}</ThemedText>
@@ -282,7 +290,7 @@ const TrackPayments = () => {
             <MaterialIcons
               name="warning"
               size={16}
-              color={Colors.orangeAccent}
+              color={Colors.yellowAccent}
             />
             <ThemedText style={styles.noAllocationText}>
               No dues allocated for {selectedYear}
@@ -316,7 +324,7 @@ const TrackPayments = () => {
               />
             ) : (
               <Ionicons
-                name={member.isExecutive ? "star" : "person"}
+                name={member.isExecutive ? "shield-checkmark" : "person"}
                 size={20}
                 color={
                   member.isExecutive ? Colors.goldAccent : Colors.blueAccent
@@ -330,11 +338,11 @@ const TrackPayments = () => {
                 {member.fullname}
               </ThemedText>
               {member.isExecutive && (
-                <View style={styles.executiveBadge}>
-                  <ThemedText style={styles.executiveBadgeText}>
-                    Executive
-                  </ThemedText>
-                </View>
+                <Ionicons
+                  name="shield-checkmark"
+                  size={16}
+                  color={Colors.goldAccent}
+                />
               )}
             </View>
             <ThemedText style={styles.memberPhone}>{member.phone}</ThemedText>
@@ -346,13 +354,13 @@ const TrackPayments = () => {
           <View style={styles.statItem}>
             <ThemedText style={styles.statLabel}>Paid</ThemedText>
             <ThemedText style={styles.statValue}>
-              GH₵{summary.paidAmount.toFixed(2)}
+              GH₵{summary.paidAmount}
             </ThemedText>
           </View>
           <View style={styles.statItem}>
             <ThemedText style={styles.statLabel}>Owing</ThemedText>
             <ThemedText style={[styles.statValue, styles.owingText]}>
-              GH₵{summary.owingAmount.toFixed(2)}
+              GH₵{summary.owingAmount}
             </ThemedText>
           </View>
           <View style={styles.statItem}>
@@ -484,7 +492,7 @@ const TrackPayments = () => {
           activeOpacity={0.7}
         >
           <ThemedText style={styles.summaryTitle}>
-            Year {selectedYear} Summary
+            Year {selectedYear} Dues Summary
           </ThemedText>
           <MaterialIcons
             name={showSummaryTiles ? "expand-less" : "expand-more"}
@@ -498,7 +506,7 @@ const TrackPayments = () => {
           <MaterialIcons name="account-balance" size={20} color={theme.text} />
           <View style={styles.expectedAmountInfo}>
             <ThemedText style={styles.expectedAmountLabel}>
-              Expected Amount for {selectedYear}
+              Expected Dues for {selectedYear}
             </ThemedText>
             <ThemedText style={styles.expectedAmountValue}>
               GH₵{totalExpected.toFixed(2)}
@@ -506,7 +514,7 @@ const TrackPayments = () => {
             <ThemedText style={styles.amountLeftText}>
               Amount left to reach:{" "}
               <ThemedText style={styles.amountLeftValue}>
-                GH₵{totalOwing.toFixed(2)}
+                GH₵{totalOwing}
               </ThemedText>
             </ThemedText>
           </View>
@@ -516,22 +524,22 @@ const TrackPayments = () => {
         {showSummaryTiles && (
           <View style={styles.summaryGrid}>
             <View style={styles.summaryCard}>
-              <MaterialIcons
+              {/* <MaterialIcons
                 name="people"
                 size={24}
                 color={Colors.blueAccent}
-              />
+              /> */}
               <ThemedText style={styles.summaryValue}>
                 {totalMembers}
               </ThemedText>
               <ThemedText style={styles.summaryLabel}>Total Members</ThemedText>
             </View>
             <View style={styles.summaryCard}>
-              <MaterialIcons
+              {/* <MaterialIcons
                 name="payments"
-                size={24}
+                size={24}ss
                 color={Colors.greenAccent}
-              />
+              /> */}
               <ThemedText style={styles.summaryValue}>
                 GH₵{totalPaid.toFixed(0)}
               </ThemedText>
@@ -540,11 +548,11 @@ const TrackPayments = () => {
               </ThemedText>
             </View>
             <View style={styles.summaryCard}>
-              <MaterialIcons
+              {/* <MaterialIcons
                 name="person-remove"
                 size={24}
                 color={Colors.orangeAccent}
-              />
+              /> */}
               <ThemedText style={styles.summaryValue}>
                 {membersOwing}
               </ThemedText>
@@ -748,9 +756,9 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   executiveAvatar: {
-    backgroundColor: Colors.goldAccent + "20",
+    // backgroundColor: Colors.goldAccent + "20",
     borderWidth: 2,
-    borderColor: Colors.goldAccent,
+    // borderColor: Colors.goldAccent,
   },
   memberDetails: {
     flex: 1,
@@ -769,30 +777,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     opacity: 0.6,
   },
-  executiveBadge: {
-    backgroundColor: Colors.goldAccent + "20",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  executiveBadgeText: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: Colors.goldAccent,
-  },
+
   noAllocationMessage: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     padding: 8,
-    backgroundColor: Colors.orangeAccent + "20",
+    // backgroundColor: Colors.orangeAccent + "20",
     borderRadius: 8,
     alignSelf: "flex-start",
   },
   noAllocationText: {
-    fontSize: 12,
-    color: Colors.orangeAccent,
-    fontWeight: "500",
+    fontSize: 11,
+    // color: Colors.yellowAccent,
+    fontWeight: "200",
   },
   quickStats: {
     flexDirection: "row",
@@ -813,7 +811,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   owingText: {
-    color: Colors.orangeAccent,
+    // color: Colors.orangeAccent,
   },
   progressContainer: {
     marginBottom: 8,
@@ -903,7 +901,7 @@ const styles = StyleSheet.create({
   expectedAmountBanner: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.blueAccent + "15",
+    // backgroundColor: Colors.blueAccent + "15",
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
@@ -931,7 +929,7 @@ const styles = StyleSheet.create({
   amountLeftValue: {
     fontSize: 12,
     color: Colors.redAccent,
-    fontWeight: "600",
+    fontWeight: "500",
   },
   searchContainer: {
     flexDirection: "row",
@@ -957,7 +955,7 @@ const styles = StyleSheet.create({
   },
 
   membersScrollView: {
-    maxHeight: 400, // Adjust this height as needed
+    maxHeight: 400,
   },
 
   membersScrollContent: {
