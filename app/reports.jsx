@@ -886,7 +886,7 @@ const Reports = () => {
                                   <ThemedText
                                     style={[
                                       styles.owingDetailValue,
-                                      { color: Colors.redAccent },
+                                      // { color: Colors.redAccent },
                                     ]}
                                   >
                                     GH₵{member.owingAmount.toFixed(2)}
@@ -902,7 +902,7 @@ const Reports = () => {
                                   <ThemedText
                                     style={[
                                       styles.owingDetailValue,
-                                      { color: Colors.orangeAccent },
+                                      // { color: Colors.orangeAccent },
                                     ]}
                                   >
                                     {member.monthsOwing} months
@@ -920,7 +920,7 @@ const Reports = () => {
                                   <ThemedText
                                     style={[
                                       styles.owingDetailValue,
-                                      { color: Colors.greenAccent },
+                                      // { color: Colors.greenAccent },
                                     ]}
                                   >
                                     {member.paidMonths} / 12
@@ -936,7 +936,7 @@ const Reports = () => {
                                   <ThemedText
                                     style={[
                                       styles.owingDetailValue,
-                                      { color: Colors.blueAccent },
+                                      // { color: Colors.blueAccent },
                                     ]}
                                   >
                                     {selectedYear}
