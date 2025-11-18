@@ -803,7 +803,6 @@ const styles = StyleSheet.create({
     margin: 16,
     marginBottom: 8,
   },
-
   searchInput: {
     flex: 1,
     fontSize: 16,

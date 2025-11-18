@@ -7,6 +7,8 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import React, { useState, useEffect, useContext } from "react";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -21,10 +23,8 @@ import {
   onSnapshot,
   doc,
   getDoc,
-  setDoc,
-  updateDoc,
-  increment,
 } from "firebase/firestore";
+import { Picker } from "@react-native-picker/picker";
 import { db, auth } from "../firebase";
 
 const Finances = () => {
@@ -35,11 +35,15 @@ const Finances = () => {
   const [duesAmount, setDuesAmount] = useState(0);
   const [contributionsAmount, setContributionsAmount] = useState(0);
   const [othersAmount, setOthersAmount] = useState(0);
+  const [budgetAmount, setBudgetAmount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
   const [selectedType, setSelectedType] = useState(null);
-
+  const [selectedYear, setSelectedYear] = useState(
+    new Date().getFullYear().toString()
+  );
+  const [existingBudgetYears, setExistingBudgetYears] = useState([]);
   const [formData, setFormData] = useState({
     amount: "",
     description: "",
@@ -47,8 +51,27 @@ const Finances = () => {
     type: "",
   });
 
+  const [userFullName, setUserFullName] = useState("");
+
   useEffect(() => {
-    // Subscribe to finances collection
+    const fetchUserData = async () => {
+      const user = auth.currentUser;
+      if (user) {
+        try {
+          const userDoc = await getDoc(doc(db, "users", user.uid));
+          if (userDoc.exists()) {
+            setUserFullName(userDoc.data().fullName || "");
+          }
+        } catch (error) {
+          console.error("Error fetching user data:", error);
+        }
+      }
+    };
+
+    fetchUserData();
+  }, []);
+
+  useEffect(() => {
     const financesRef = collection(db, "finances");
     const q = query(financesRef);
 
@@ -59,6 +82,8 @@ const Finances = () => {
         let dues = 0;
         let contributions = 0;
         let others = 0;
+        let budget = 0;
+        const budgetYears = [];
 
         snapshot.docs.forEach((doc) => {
           const data = doc.data();
@@ -76,6 +101,12 @@ const Finances = () => {
             case "other":
               others += amount;
               break;
+            case "budget":
+              budget += amount;
+              if (data.year) {
+                budgetYears.push(data.year);
+              }
+              break;
           }
         });
 
@@ -83,6 +114,8 @@ const Finances = () => {
         setDuesAmount(dues);
         setContributionsAmount(contributions);
         setOthersAmount(others);
+        setBudgetAmount(budget);
+        setExistingBudgetYears(budgetYears);
         setLoading(false);
       },
       (error) => {
@@ -95,14 +128,45 @@ const Finances = () => {
   }, []);
 
   const openAddModal = (type) => {
+    if (type === "budget") {
+      const currentYear = new Date().getFullYear().toString();
+      if (existingBudgetYears.includes(currentYear)) {
+        Alert.alert(
+          "Error",
+          `Budget for ${currentYear} has already been added`
+        );
+        return;
+      }
+      setSelectedYear(currentYear);
+      setFormData({
+        amount: "",
+        description: `Budget for ${currentYear}`,
+        addedBy: userFullName,
+        type,
+      });
+    } else {
+      setFormData({
+        amount: "",
+        description: "",
+        addedBy: userFullName,
+        type,
+      });
+    }
     setSelectedType(type);
-    setFormData({ ...formData, type });
     setShowAddModal(true);
   };
 
   const handleAddMoney = async () => {
-    if (!formData.amount || !formData.description || !formData.addedBy) {
+    if (!formData.amount || !formData.addedBy) {
       Alert.alert("Error", "Please fill in all fields");
+      return;
+    }
+
+    if (
+      formData.type === "budget" &&
+      existingBudgetYears.includes(selectedYear)
+    ) {
+      Alert.alert("Error", `Budget for ${selectedYear} has already been added`);
       return;
     }
 
@@ -116,30 +180,43 @@ const Finances = () => {
     try {
       const user = auth.currentUser;
 
-      // Add to finances collection
-      await addDoc(collection(db, "finances"), {
+      const financeData = {
         amount: amount,
         description: formData.description,
         addedBy: formData.addedBy,
         userId: user?.uid || "unknown",
         timestamp: new Date(),
         type: formData.type,
-      });
+      };
 
-      // Create notification
+      if (formData.type === "budget") {
+        financeData.year = selectedYear;
+      }
+
+      await addDoc(collection(db, "finances"), financeData);
+
       const typeLabel =
         formData.type === "dues"
           ? "Dues"
           : formData.type === "contribution"
           ? "Contribution"
-          : "Other";
+          : formData.type === "budget"
+          ? `Budget for ${selectedYear}`
+          : "Miscellaneous";
+
+      const notificationMessage =
+        formData.type === "budget"
+          ? `${formData.addedBy} set budget of GH₵${amount.toFixed(
+              2
+            )} for ${selectedYear}`
+          : `${formData.addedBy} added GH₵${amount.toFixed(
+              2
+            )} to ${typeLabel.toLowerCase()}`;
 
       await addDoc(collection(db, "notifications"), {
         type: "payment_received",
         title: `${typeLabel} Added`,
-        message: `${formData.addedBy} added GH₵${amount.toFixed(
-          2
-        )} to ${typeLabel.toLowerCase()}`,
+        message: notificationMessage,
         timestamp: new Date(),
         read: false,
       });
@@ -148,6 +225,7 @@ const Finances = () => {
       setShowAddModal(false);
       setFormData({ amount: "", description: "", addedBy: "", type: "" });
       setSelectedType(null);
+      setSelectedYear(new Date().getFullYear().toString());
     } catch (error) {
       console.error("Error adding money:", error);
       Alert.alert("Error", "Failed to add money. Please try again.");
@@ -168,6 +246,8 @@ const Finances = () => {
         return "Contributions";
       case "other":
         return "Others";
+      case "budget":
+        return "Budget";
       default:
         return "";
     }
@@ -181,6 +261,8 @@ const Finances = () => {
         return "volunteer-activism";
       case "other":
         return "payments";
+      case "budget":
+        return "account-balance-wallet";
       default:
         return "attach-money";
     }
@@ -194,6 +276,8 @@ const Finances = () => {
         return Colors.greenAccent;
       case "other":
         return Colors.orangeAccent;
+      case "budget":
+        return Colors.purpleAccent;
       default:
         return Colors.primary;
     }
@@ -337,6 +421,37 @@ const Finances = () => {
               />
             </View>
           </TouchableOpacity>
+
+          {/* Budget Card */}
+          <TouchableOpacity
+            style={[styles.typeCard, { backgroundColor: theme.uiBackground }]}
+            onPress={() => openAddModal("budget")}
+            activeOpacity={0.7}
+          >
+            <View
+              style={[
+                styles.typeIconContainer,
+                { backgroundColor: Colors.purpleAccent + "20" },
+              ]}
+            >
+              <MaterialIcons
+                name="account-balance-wallet"
+                size={28}
+                color={Colors.purpleAccent}
+              />
+            </View>
+            <ThemedText style={styles.typeLabel}>Budget</ThemedText>
+            <ThemedText style={styles.typeAmount}>
+              {formatCurrency(budgetAmount)}
+            </ThemedText>
+            <View style={styles.addIconContainer}>
+              <MaterialIcons
+                name="add-circle"
+                size={20}
+                color={Colors.purpleAccent}
+              />
+            </View>
+          </TouchableOpacity>
         </View>
       </ScrollView>
 
@@ -347,7 +462,10 @@ const Finances = () => {
         animationType="slide"
         onRequestClose={() => setShowAddModal(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalOverlay}
+        >
           <TouchableOpacity
             style={styles.modalBackdrop}
             activeOpacity={1}
@@ -392,7 +510,59 @@ const Finances = () => {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.modalBody}>
+            <ScrollView
+              style={styles.modalBody}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              {selectedType === "budget" && (
+                <View style={styles.yearPickerContainer}>
+                  <ThemedText style={styles.label}>Select Year</ThemedText>
+                  <View
+                    style={[
+                      styles.pickerWrapper,
+                      { backgroundColor: theme.uiBackground },
+                    ]}
+                  >
+                    <Picker
+                      selectedValue={selectedYear}
+                      onValueChange={(itemValue) => {
+                        if (existingBudgetYears.includes(itemValue)) {
+                          Alert.alert(
+                            "Error",
+                            `Budget for ${itemValue} has already been added`
+                          );
+                          return;
+                        }
+                        setSelectedYear(itemValue);
+                        setFormData({
+                          ...formData,
+                          description: `Budget for ${itemValue}`,
+                        });
+                      }}
+                      style={{ color: theme.text }}
+                    >
+                      {Array.from(
+                        { length: new Date().getFullYear() - 2021 },
+                        (_, i) => {
+                          const year = (
+                            new Date().getFullYear() - i
+                          ).toString();
+                          return (
+                            <Picker.Item
+                              key={year}
+                              label={year}
+                              value={year}
+                              enabled={!existingBudgetYears.includes(year)}
+                            />
+                          );
+                        }
+                      )}
+                    </Picker>
+                  </View>
+                </View>
+              )}
+
               <View style={styles.inputContainer}>
                 <ThemedText style={styles.label}>Amount (GH₵)</ThemedText>
                 <TextInput
@@ -402,7 +572,8 @@ const Finances = () => {
                   ]}
                   placeholder="0.00"
                   placeholderTextColor="#999"
-                  keyboardType="decimal-pad"
+                  keyboardType="numeric"
+                  returnKeyType="next"
                   value={formData.amount}
                   onChangeText={(text) =>
                     setFormData({ ...formData, amount: text })
@@ -424,7 +595,7 @@ const Finances = () => {
                   onChangeText={(text) =>
                     setFormData({ ...formData, description: text })
                   }
-                  editable={!addLoading}
+                  editable={!addLoading && formData.type !== "budget"}
                 />
               </View>
 
@@ -441,7 +612,7 @@ const Finances = () => {
                   onChangeText={(text) =>
                     setFormData({ ...formData, addedBy: text })
                   }
-                  editable={!addLoading}
+                  editable={false}
                 />
               </View>
 
@@ -466,9 +637,9 @@ const Finances = () => {
                   </ThemedText>
                 )}
               </TouchableOpacity>
-            </View>
+            </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </ThemedView>
   );
@@ -503,7 +674,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
   },
-
   coffersHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -619,6 +789,17 @@ const styles = StyleSheet.create({
   modalBody: {
     paddingHorizontal: 20,
     paddingTop: 20,
+    paddingBottom: 20,
+    maxHeight: "70%",
+  },
+  yearPickerContainer: {
+    marginBottom: 20,
+  },
+  pickerWrapper: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+    marginTop: 8,
   },
   inputContainer: {
     marginBottom: 20,
