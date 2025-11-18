@@ -453,15 +453,10 @@ const Reports = () => {
                     { backgroundColor: theme.uiBackground },
                   ]}
                 >
-                  <MaterialIcons
-                    name="receipt"
-                    size={24}
-                    color={Colors.blueAccent}
-                  />
+                  <ThemedText style={[styles.statLabel]}>Dues</ThemedText>
                   <ThemedText style={styles.statValue}>
-                    GH₵{stats.duesAmount.toFixed(0)}
+                    GH₵{stats.duesAmount}
                   </ThemedText>
-                  <ThemedText style={styles.statLabel}>Dues</ThemedText>
                 </View>
                 <View
                   style={[
@@ -469,17 +464,12 @@ const Reports = () => {
                     { backgroundColor: theme.uiBackground },
                   ]}
                 >
-                  <MaterialIcons
-                    name="volunteer-activism"
-                    size={24}
-                    color={Colors.greenAccent}
-                  />
-                  <ThemedText style={styles.statValue}>
-                    GH₵{stats.contributionsAmount.toFixed(0)}
-                  </ThemedText>
-                  <ThemedText style={styles.statLabel}>
+                  <ThemedText style={[styles.statLabelCont]}>
                     Contributions
                   </ThemedText>
+                  <ThemedText style={styles.statValue}>
+                    GH₵{stats.contributionsAmount}
+                  </ThemedText>
                 </View>
                 <View
                   style={[
@@ -487,15 +477,10 @@ const Reports = () => {
                     { backgroundColor: theme.uiBackground },
                   ]}
                 >
-                  <MaterialIcons
-                    name="payments"
-                    size={24}
-                    color={Colors.orangeAccent}
-                  />
+                  <ThemedText style={[styles.statLabel]}>Others</ThemedText>
                   <ThemedText style={styles.statValue}>
-                    GH₵{stats.othersAmount.toFixed(0)}
+                    GH₵{stats.othersAmount}
                   </ThemedText>
-                  <ThemedText style={styles.statLabel}>Others</ThemedText>
                 </View>
               </View>
             </View>
@@ -581,7 +566,7 @@ const Reports = () => {
                       <MaterialIcons
                         name="pending"
                         size={24}
-                        color={Colors.orangeAccent}
+                        color={Colors.redAccent}
                       />
                       <ThemedText style={styles.statValue}>
                         GH₵{stats.totalOwing.toFixed(0)}
@@ -1075,21 +1060,33 @@ const styles = StyleSheet.create({
   },
   statCard: {
     width: "31%",
-    padding: 12,
+    minHeight: 90,
+    padding: 16,
     borderRadius: 12,
     alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1,
     borderColor: Colors.border,
+    gap: 8,
   },
   statValue: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: "bold",
-    marginVertical: 6,
+    textAlign: "center",
+    numberOfLines: 1,
+    flexShrink: 1,
   },
   statLabel: {
-    fontSize: 11,
-    opacity: 0.7,
+    fontSize: 12,
+    fontWeight: "600",
     textAlign: "center",
+    numberOfLines: 1,
+  },
+  statLabelCont: {
+    fontSize: 10,
+    fontWeight: "700",
+    textAlign: "center",
+    numberOfLines: 1,
   },
   coffersCard: {
     borderRadius: 12,
