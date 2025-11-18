@@ -132,6 +132,13 @@ const LayoutContent = () => {
               }}
             />
             <Stack.Screen
+              name="yearly-reports"
+              options={{
+                headerTitle: "Yearly Reports",
+                gestureEnabled: false,
+              }}
+            />
+            <Stack.Screen
               name="track-payments"
               options={{
                 headerTitle: "Track Payments",
