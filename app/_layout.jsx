@@ -118,6 +118,13 @@ const LayoutContent = () => {
               }}
             />
             <Stack.Screen
+              name="withdrawal"
+              options={{
+                headerTitle: "Withdrawal",
+                gestureEnabled: false,
+              }}
+            />
+            <Stack.Screen
               name="members"
               options={{
                 headerTitle: "Union Members",
