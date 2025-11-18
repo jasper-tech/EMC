@@ -409,7 +409,7 @@ const Finances = () => {
                 color={Colors.orangeAccent}
               />
             </View>
-            <ThemedText style={styles.typeLabel}>Others</ThemedText>
+            <ThemedText style={styles.typeLabel}>Misc/Others</ThemedText>
             <ThemedText style={styles.typeAmount}>
               {formatCurrency(othersAmount)}
             </ThemedText>
@@ -595,7 +595,11 @@ const Finances = () => {
                   onChangeText={(text) =>
                     setFormData({ ...formData, description: text })
                   }
-                  editable={!addLoading && formData.type !== "budget"}
+                  editable={
+                    !addLoading &&
+                    formData.type !== "budget" &&
+                    formData.type != "dues"
+                  }
                 />
               </View>
 

@@ -137,6 +137,13 @@ const Reports = () => {
     return duesAllocations.find((allocation) => allocation.year === year);
   };
 
+  const getBudgetForYear = (year) => {
+    const budgetEntry = finances.find(
+      (finance) => finance.type === "budget" && finance.year === year
+    );
+    return budgetEntry ? budgetEntry.amount : 0;
+  };
+
   const getMemberPaymentSummary = (member, year) => {
     const allocation = getDuesAllocationForYear(year);
     if (!allocation) {
@@ -195,6 +202,7 @@ const Reports = () => {
     let duesAmount = 0;
     let contributionsAmount = 0;
     let othersAmount = 0;
+    let budgetAmount = 0;
 
     finances.forEach((finance) => {
       const amount = finance.amount || 0;
@@ -210,8 +218,14 @@ const Reports = () => {
         case "other":
           othersAmount += amount;
           break;
+        case "budget":
+          budgetAmount += amount;
+          break;
       }
     });
+
+    // Get current year's budget
+    const currentYearBudget = getBudgetForYear(selectedYear);
 
     return {
       totalMembers,
@@ -221,6 +235,8 @@ const Reports = () => {
       duesAmount,
       contributionsAmount,
       othersAmount,
+      budgetAmount,
+      currentYearBudget,
     };
   };
 
@@ -344,11 +360,6 @@ const Reports = () => {
           activeOpacity={0.7}
         >
           <View style={styles.sectionHeaderLeft}>
-            {/* <MaterialIcons
-              name="dashboard"
-              size={24}
-              color={Colors.blueAccent}
-            /> */}
             <ThemedText style={styles.sectionTitle}>
               Overview Statistics
             </ThemedText>
@@ -447,6 +458,30 @@ const Reports = () => {
                 </ThemedText>
               </View>
 
+              {/* Current Year Budget */}
+              {stats.currentYearBudget > 0 && (
+                <View
+                  style={[
+                    styles.budgetCard,
+                    { backgroundColor: theme.uiBackground },
+                  ]}
+                >
+                  <View style={styles.budgetHeader}>
+                    <MaterialIcons
+                      name="account-balance-wallet"
+                      size={24}
+                      color={Colors.purpleAccent}
+                    />
+                    <ThemedText style={styles.budgetTitle}>
+                      Budget for {selectedYear}
+                    </ThemedText>
+                  </View>
+                  <ThemedText style={styles.budgetAmount}>
+                    GH₵{stats.currentYearBudget.toFixed(2)}
+                  </ThemedText>
+                </View>
+              )}
+
               <View style={styles.statsGrid}>
                 <View
                   style={[
@@ -483,6 +518,19 @@ const Reports = () => {
                     GH₵{stats.othersAmount}
                   </ThemedText>
                 </View>
+                <View
+                  style={[
+                    styles.statCard,
+                    { backgroundColor: theme.uiBackground },
+                  ]}
+                >
+                  <ThemedText style={[styles.statLabel]}>
+                    Year Budget
+                  </ThemedText>
+                  <ThemedText style={styles.statValue}>
+                    GH₵{stats.budgetAmount}
+                  </ThemedText>
+                </View>
               </View>
             </View>
           </View>
@@ -503,11 +551,6 @@ const Reports = () => {
           activeOpacity={0.7}
         >
           <View style={styles.sectionHeaderLeft}>
-            {/* <MaterialIcons
-              name="payments"
-              size={24}
-              color={Colors.greenAccent}
-            /> */}
             <ThemedText style={styles.sectionTitle}>
               Payment Report - {selectedYear}
             </ThemedText>
@@ -552,7 +595,7 @@ const Reports = () => {
                         color={Colors.greenAccent}
                       />
                       <ThemedText style={styles.statValue}>
-                        GH₵{stats.totalPaid.toFixed(0)}
+                        GH₵{stats.totalPaid}
                       </ThemedText>
                       <ThemedText style={styles.statLabel}>
                         Total Paid
@@ -570,7 +613,7 @@ const Reports = () => {
                         color={Colors.redAccent}
                       />
                       <ThemedText style={styles.statValue}>
-                        GH₵{stats.totalOwing.toFixed(0)}
+                        GH₵{stats.totalOwing}
                       </ThemedText>
                       <ThemedText style={styles.statLabel}>
                         Total Owing
@@ -724,11 +767,6 @@ const Reports = () => {
           activeOpacity={0.7}
         >
           <View style={styles.sectionHeaderLeft}>
-            {/* <MaterialIcons
-              name="person-remove"
-              size={24}
-              color={Colors.redAccent}
-            /> */}
             <ThemedText style={styles.sectionTitle}>
               Members Owing - {selectedYear} ({owingMembers.length})
             </ThemedText>
@@ -883,12 +921,7 @@ const Reports = () => {
                                   <ThemedText style={styles.owingDetailLabel}>
                                     Amount Owing
                                   </ThemedText>
-                                  <ThemedText
-                                    style={[
-                                      styles.owingDetailValue,
-                                      // { color: Colors.redAccent },
-                                    ]}
-                                  >
+                                  <ThemedText style={[styles.owingDetailValue]}>
                                     GH₵{member.owingAmount.toFixed(2)}
                                   </ThemedText>
                                 </View>
@@ -899,12 +932,7 @@ const Reports = () => {
                                   <ThemedText style={styles.owingDetailLabel}>
                                     Months Owing
                                   </ThemedText>
-                                  <ThemedText
-                                    style={[
-                                      styles.owingDetailValue,
-                                      // { color: Colors.orangeAccent },
-                                    ]}
-                                  >
+                                  <ThemedText style={[styles.owingDetailValue]}>
                                     {member.monthsOwing} months
                                   </ThemedText>
                                 </View>
@@ -917,12 +945,7 @@ const Reports = () => {
                                   <ThemedText style={styles.owingDetailLabel}>
                                     Months Paid
                                   </ThemedText>
-                                  <ThemedText
-                                    style={[
-                                      styles.owingDetailValue,
-                                      // { color: Colors.greenAccent },
-                                    ]}
-                                  >
+                                  <ThemedText style={[styles.owingDetailValue]}>
                                     {member.paidMonths} / 12
                                   </ThemedText>
                                 </View>
@@ -933,12 +956,7 @@ const Reports = () => {
                                   <ThemedText style={styles.owingDetailLabel}>
                                     Year
                                   </ThemedText>
-                                  <ThemedText
-                                    style={[
-                                      styles.owingDetailValue,
-                                      // { color: Colors.blueAccent },
-                                    ]}
-                                  >
+                                  <ThemedText style={[styles.owingDetailValue]}>
                                     {selectedYear}
                                   </ThemedText>
                                 </View>
@@ -1131,6 +1149,29 @@ const styles = StyleSheet.create({
   coffersAmount: {
     fontSize: 36,
     fontWeight: "bold",
+  },
+  budgetCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: Colors.purpleAccent,
+  },
+  budgetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  budgetTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginLeft: 12,
+    color: Colors.purpleAccent,
+  },
+  budgetAmount: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: Colors.purpleAccent,
   },
   horizontalStats: {
     gap: 12,
