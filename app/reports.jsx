@@ -1216,8 +1216,6 @@ const styles = StyleSheet.create({
   },
   executiveAvatar: {
     backgroundColor: Colors.goldAccent + "20",
-    borderWidth: 2,
-    borderColor: Colors.goldAccent,
   },
   profileImage: {
     width: "100%",
