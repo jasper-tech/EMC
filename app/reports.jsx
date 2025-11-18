@@ -33,6 +33,7 @@ const Reports = () => {
     owingMembers: false,
   });
   const [owingSearchQuery, setOwingSearchQuery] = useState("");
+  const [expandedOwingMember, setExpandedOwingMember] = useState(null);
 
   // Generate years from 2022 to current year
   const years = Array.from(
@@ -803,14 +804,26 @@ const Reports = () => {
                         member.phone?.includes(owingSearchQuery)
                     )
                     .map((member) => (
-                      <View
+                      <TouchableOpacity
                         key={member.id}
                         style={[
                           styles.owingMemberCard,
                           { backgroundColor: theme.uiBackground },
                         ]}
+                        onPress={() =>
+                          setExpandedOwingMember(
+                            expandedOwingMember === member.id ? null : member.id
+                          )
+                        }
+                        activeOpacity={0.7}
                       >
-                        <View style={styles.owingMemberHeader}>
+                        <View
+                          style={[
+                            styles.owingMemberHeader,
+                            expandedOwingMember === member.id &&
+                              styles.owingMemberHeaderExpanded,
+                          ]}
+                        >
                           <View
                             style={[
                               styles.avatar,
@@ -852,78 +865,88 @@ const Reports = () => {
                               {member.phone}
                             </ThemedText>
                           </View>
+                          <MaterialIcons
+                            name={
+                              expandedOwingMember === member.id
+                                ? "expand-less"
+                                : "expand-more"
+                            }
+                            size={24}
+                            color={theme.text}
+                          />
                         </View>
+                        {expandedOwingMember === member.id && (
+                          <View style={styles.owingDetails}>
+                            <View style={styles.owingDetailRow}>
+                              <View style={styles.owingDetailItem}>
+                                <View>
+                                  <ThemedText style={styles.owingDetailLabel}>
+                                    Amount Owing
+                                  </ThemedText>
+                                  <ThemedText
+                                    style={[
+                                      styles.owingDetailValue,
+                                      { color: Colors.redAccent },
+                                    ]}
+                                  >
+                                    GH₵{member.owingAmount.toFixed(2)}
+                                  </ThemedText>
+                                </View>
+                              </View>
 
-                        <View style={styles.owingDetails}>
-                          <View style={styles.owingDetailRow}>
-                            <View style={styles.owingDetailItem}>
-                              <View>
-                                <ThemedText style={styles.owingDetailLabel}>
-                                  Amount Owing
-                                </ThemedText>
-                                <ThemedText
-                                  style={[
-                                    styles.owingDetailValue,
-                                    { color: Colors.redAccent },
-                                  ]}
-                                >
-                                  GH₵{member.owingAmount.toFixed(2)}
-                                </ThemedText>
+                              <View style={styles.owingDetailItem}>
+                                <View>
+                                  <ThemedText style={styles.owingDetailLabel}>
+                                    Months Owing
+                                  </ThemedText>
+                                  <ThemedText
+                                    style={[
+                                      styles.owingDetailValue,
+                                      { color: Colors.orangeAccent },
+                                    ]}
+                                  >
+                                    {member.monthsOwing} months
+                                  </ThemedText>
+                                </View>
                               </View>
                             </View>
 
-                            <View style={styles.owingDetailItem}>
-                              <View>
-                                <ThemedText style={styles.owingDetailLabel}>
-                                  Months Owing
-                                </ThemedText>
-                                <ThemedText
-                                  style={[
-                                    styles.owingDetailValue,
-                                    { color: Colors.orangeAccent },
-                                  ]}
-                                >
-                                  {member.monthsOwing} months
-                                </ThemedText>
+                            <View style={styles.owingDetailRow}>
+                              <View style={styles.owingDetailItem}>
+                                <View>
+                                  <ThemedText style={styles.owingDetailLabel}>
+                                    Months Paid
+                                  </ThemedText>
+                                  <ThemedText
+                                    style={[
+                                      styles.owingDetailValue,
+                                      { color: Colors.greenAccent },
+                                    ]}
+                                  >
+                                    {member.paidMonths} / 12
+                                  </ThemedText>
+                                </View>
+                              </View>
+
+                              <View style={styles.owingDetailItem}>
+                                <View>
+                                  <ThemedText style={styles.owingDetailLabel}>
+                                    Year
+                                  </ThemedText>
+                                  <ThemedText
+                                    style={[
+                                      styles.owingDetailValue,
+                                      { color: Colors.blueAccent },
+                                    ]}
+                                  >
+                                    {selectedYear}
+                                  </ThemedText>
+                                </View>
                               </View>
                             </View>
                           </View>
-
-                          <View style={styles.owingDetailRow}>
-                            <View style={styles.owingDetailItem}>
-                              <View>
-                                <ThemedText style={styles.owingDetailLabel}>
-                                  Months Paid
-                                </ThemedText>
-                                <ThemedText
-                                  style={[
-                                    styles.owingDetailValue,
-                                    { color: Colors.greenAccent },
-                                  ]}
-                                >
-                                  {member.paidMonths} / 12
-                                </ThemedText>
-                              </View>
-                            </View>
-
-                            <View style={styles.owingDetailItem}>
-                              <View>
-                                <ThemedText style={styles.owingDetailLabel}>
-                                  Year
-                                </ThemedText>
-                                <ThemedText
-                                  style={[
-                                    styles.owingDetailValue,
-                                    { color: Colors.blueAccent },
-                                  ]}
-                                >
-                                  {selectedYear}
-                                </ThemedText>
-                              </View>
-                            </View>
-                          </View>
-                        </View>
-                      </View>
+                        )}
+                      </TouchableOpacity>
                     ))}
                 </ScrollView>
               </>
@@ -1265,5 +1288,16 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
+  },
+  owingMemberHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  owingMemberHeaderExpanded: {
+    marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border + "40",
   },
 });
