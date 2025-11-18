@@ -26,6 +26,7 @@ import {
 } from "firebase/firestore";
 import { Picker } from "@react-native-picker/picker";
 import { db, auth } from "../firebase";
+import { router } from "expo-router";
 
 const Finances = () => {
   const { scheme } = useContext(ThemeContext);
@@ -453,6 +454,19 @@ const Finances = () => {
             </View>
           </TouchableOpacity>
         </View>
+        <TouchableOpacity
+          style={[
+            styles.withdrawalButton,
+            { backgroundColor: Colors.blueAccent },
+          ]}
+          onPress={() => router.push("/withdrawal")}
+          activeOpacity={0.7}
+        >
+          <MaterialIcons name="arrow-forward" size={24} color="#fff" />
+          <ThemedText style={styles.withdrawalButtonText}>
+            Make Withdrawal
+          </ThemedText>
+        </TouchableOpacity>
       </ScrollView>
 
       {/* Add Money Modal */}
@@ -830,6 +844,20 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   addButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  withdrawalButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 20,
+    gap: 8,
+  },
+  withdrawalButtonText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",

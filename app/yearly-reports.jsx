@@ -16,7 +16,7 @@ import { ThemeContext } from "../context/ThemeContext";
 import { collection, query, onSnapshot, orderBy } from "firebase/firestore";
 import { db } from "../firebase";
 
-const Reports = () => {
+const YearlyReports = () => {
   const { scheme } = useContext(ThemeContext);
   const theme = Colors[scheme] ?? Colors.light;
 
@@ -1002,7 +1002,7 @@ const Reports = () => {
   );
 };
 
-export default Reports;
+export default YearlyReports;
 
 const styles = StyleSheet.create({
   container: {
