@@ -73,10 +73,10 @@ module.exports = ({ config }) => {
       ...config.expo,
       scheme,
       extra: {
-        // preserve any existing extra values from app.json (if provided)
-        ...(config.expo && config.expo.extra ? config.expo.extra : {}),
+        ...(config.expo?.extra ?? {}),
         ...extra,
       },
+      plugins: [...(config.expo?.plugins ?? []), "expo-router"],
     },
   };
 };

@@ -922,7 +922,7 @@ const styles = StyleSheet.create({
   expectedAmountValue: {
     fontSize: 20,
     fontWeight: "bold",
-    color: Colors.blueAccent,
+    // color: Colors.blueAccent,
   },
   amountLeftText: {
     fontSize: 12,
