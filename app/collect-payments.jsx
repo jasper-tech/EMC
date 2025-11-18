@@ -623,7 +623,9 @@ const CollectPayments = () => {
                         />
                       ) : (
                         <Ionicons
-                          name={item.isExecutive ? "star" : "person"}
+                          name={
+                            item.isExecutive ? "shield-checkmark" : "person"
+                          }
                           size={20}
                           color={
                             item.isExecutive
@@ -639,11 +641,11 @@ const CollectPayments = () => {
                           {item.fullname}
                         </ThemedText>
                         {item.isExecutive && (
-                          <View style={styles.executiveBadge}>
-                            <ThemedText style={styles.executiveBadgeText}>
-                              Executive
-                            </ThemedText>
-                          </View>
+                          <Ionicons
+                            name="shield-checkmark"
+                            size={16}
+                            color={Colors.goldAccent}
+                          />
                         )}
                       </View>
                       <ThemedText style={styles.memberPhone}>
@@ -807,11 +809,11 @@ const CollectPayments = () => {
                     {selectedMember.fullname}
                   </ThemedText>
                   {selectedMember.isExecutive && (
-                    <View style={styles.executiveBadgeSmall}>
-                      <ThemedText style={styles.executiveBadgeTextSmall}>
-                        Executive Member
-                      </ThemedText>
-                    </View>
+                    <Ionicons
+                      name="shield-checkmark"
+                      size={16}
+                      color={Colors.goldAccent}
+                    />
                   )}
                 </View>
               )}
@@ -1135,9 +1137,9 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   executiveAvatar: {
-    backgroundColor: Colors.goldAccent + "20",
-    borderWidth: 2,
-    borderColor: Colors.goldAccent,
+    // backgroundColor: Colors.goldAccent + "20",
+    // borderWidth: 2,
+    // borderColor: Colors.goldAccent,
   },
   memberDetails: {
     flex: 1,
