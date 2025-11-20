@@ -55,24 +55,7 @@ const Finances = () => {
   const [userFullName, setUserFullName] = useState("");
   const [withdrawalsAmount, setWithdrawalsAmount] = useState(0);
   const [withdrawalsTimeSpan, setWithdrawalsTimeSpan] = useState("");
-
-  useEffect(() => {
-    const fetchUserData = async () => {
-      const user = auth.currentUser;
-      if (user) {
-        try {
-          const userDoc = await getDoc(doc(db, "users", user.uid));
-          if (userDoc.exists()) {
-            setUserFullName(userDoc.data().fullName || "");
-          }
-        } catch (error) {
-          console.error("Error fetching user data:", error);
-        }
-      }
-    };
-
-    fetchUserData();
-  }, []);
+  const [totalMoneyFlow, setTotalMoneyFlow] = useState(0);
 
   useEffect(() => {
     const financesRef = collection(db, "finances");
@@ -121,7 +104,9 @@ const Finances = () => {
           }
         });
 
-        if (withdrawalsAmount > 0) {
+        const moneyFlow = total + withdrawals;
+
+        if (withdrawals > 0) {
           setWithdrawalsTimeSpan("All-time");
         } else {
           setWithdrawalsTimeSpan("No withdrawals yet");
@@ -133,6 +118,7 @@ const Finances = () => {
         setOthersAmount(others);
         setBudgetAmount(budget);
         setWithdrawalsAmount(withdrawals);
+        setTotalMoneyFlow(moneyFlow);
         setExistingBudgetYears(budgetYears);
         setLoading(false);
       },
@@ -144,7 +130,6 @@ const Finances = () => {
 
     return () => unsubscribe();
   }, []);
-
   const openAddModal = (type) => {
     if (type === "budget") {
       const currentYear = new Date().getFullYear().toString();
@@ -159,6 +144,15 @@ const Finances = () => {
       setFormData({
         amount: "",
         description: `Budget for ${currentYear}`,
+        addedBy: userFullName,
+        type,
+      });
+    } else if (type === "dues") {
+      const currentYear = new Date().getFullYear().toString();
+      setSelectedYear(currentYear);
+      setFormData({
+        amount: "",
+        description: `Dues payment for ${currentYear}`,
         addedBy: userFullName,
         type,
       });
@@ -207,11 +201,29 @@ const Finances = () => {
         type: formData.type,
       };
 
-      if (formData.type === "budget") {
+      // Add year field for budget and dues
+      if (formData.type === "budget" || formData.type === "dues") {
         financeData.year = selectedYear;
       }
 
+      // Save to finances collection
       await addDoc(collection(db, "finances"), financeData);
+
+      // If it's dues, also save to transactions collection
+      if (formData.type === "dues") {
+        const transactionData = {
+          amount: amount,
+          description: formData.description,
+          recordedBy: formData.addedBy,
+          recordedById: user?.uid || "unknown",
+          timestamp: new Date(),
+          type: "dues",
+          year: selectedYear,
+          status: "completed",
+        };
+
+        await addDoc(collection(db, "transactions"), transactionData);
+      }
 
       const typeLabel =
         formData.type === "dues"
@@ -345,6 +357,20 @@ const Finances = () => {
             <ThemedText style={styles.withdrawalsTimeSpan}>
               {withdrawalsTimeSpan}
             </ThemedText>
+          </View>
+
+          {/* Total Money Flow */}
+          <View style={styles.moneyFlowContainer}>
+            <View style={styles.moneyFlowRow}>
+              <View style={styles.moneyFlowItem}>
+                <ThemedText style={styles.moneyFlowLabel}>
+                  Total Amount before Withdrawals:
+                </ThemedText>
+              </View>
+              <ThemedText style={styles.moneyFlowAmount}>
+                {formatCurrency(totalMoneyFlow)}
+              </ThemedText>
+            </View>
           </View>
         </View>
         {/* Coffers Card */}
@@ -570,7 +596,7 @@ const Finances = () => {
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
-              {selectedType === "budget" && (
+              {(selectedType === "budget" || selectedType === "dues") && (
                 <View style={styles.yearPickerContainer}>
                   <ThemedText style={styles.label}>Select Year</ThemedText>
                   <View
@@ -582,7 +608,10 @@ const Finances = () => {
                     <Picker
                       selectedValue={selectedYear}
                       onValueChange={(itemValue) => {
-                        if (existingBudgetYears.includes(itemValue)) {
+                        if (
+                          selectedType === "budget" &&
+                          existingBudgetYears.includes(itemValue)
+                        ) {
                           Alert.alert(
                             "Error",
                             `Budget for ${itemValue} has already been added`
@@ -592,7 +621,10 @@ const Finances = () => {
                         setSelectedYear(itemValue);
                         setFormData({
                           ...formData,
-                          description: `Budget for ${itemValue}`,
+                          description:
+                            selectedType === "budget"
+                              ? `Budget for ${itemValue}`
+                              : `Dues payment for ${itemValue}`,
                         });
                       }}
                       style={{ color: theme.text }}
@@ -608,7 +640,10 @@ const Finances = () => {
                               key={year}
                               label={year}
                               value={year}
-                              enabled={!existingBudgetYears.includes(year)}
+                              enabled={
+                                selectedType === "dues" ||
+                                !existingBudgetYears.includes(year)
+                              }
                             />
                           );
                         }
@@ -650,11 +685,7 @@ const Finances = () => {
                   onChangeText={(text) =>
                     setFormData({ ...formData, description: text })
                   }
-                  editable={
-                    !addLoading &&
-                    formData.type !== "budget" &&
-                    formData.type != "dues"
-                  }
+                  editable={!addLoading && formData.type !== "budget"}
                 />
               </View>
 
@@ -954,6 +985,38 @@ const styles = StyleSheet.create({
   withdrawalsTimeSpan: {
     fontSize: 14,
     opacity: 0.7,
+    fontStyle: "italic",
+  },
+  moneyFlowContainer: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#e0e0e0",
+  },
+  moneyFlowRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  moneyFlowItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  moneyFlowLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    opacity: 0.8,
+  },
+  moneyFlowAmount: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: Colors.greenAccent,
+  },
+  moneyFlowSubtext: {
+    fontSize: 12,
+    opacity: 0.6,
     fontStyle: "italic",
   },
 });

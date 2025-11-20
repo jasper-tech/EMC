@@ -65,12 +65,12 @@ const FinancialLog = () => {
                 source: "transactions",
               }));
 
-              // Filter out withdrawals from finances collection to avoid duplication
+              // Filter out withdrawals AND dues from finances collection to avoid duplication
               const filteredFinances = financesData.filter(
-                (item) => item.type !== "withdrawal"
+                (item) => item.type !== "withdrawal" && item.type !== "dues"
               );
 
-              // Combine finances (without withdrawals) and transactions
+              // Combine finances (without withdrawals and dues) and transactions
               const combinedData = [
                 ...filteredFinances,
                 ...transactionsData,
@@ -118,8 +118,8 @@ const FinancialLog = () => {
     const filtered = allTransactions.filter((transaction) => {
       let transactionYear;
 
-      if (transaction.type === "dues") {
-        // For dues payments from transactions, use the year field
+      if (transaction.type === "dues" || transaction.type === "budget") {
+        // For dues payments and budget allocations, use the year field
         transactionYear =
           typeof transaction.year === "string"
             ? parseInt(transaction.year)
@@ -134,11 +134,6 @@ const FinancialLog = () => {
             : new Date(transaction.timestamp);
           transactionYear = date.getFullYear();
         }
-      } else if (transaction.type === "budget") {
-        transactionYear =
-          typeof transaction.year === "string"
-            ? parseInt(transaction.year)
-            : transaction.year;
       } else {
         // For contributions, other, and other finances - use timestamp year
         const date = transaction.timestamp?.toDate
