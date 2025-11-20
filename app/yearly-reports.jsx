@@ -16,6 +16,7 @@ import { ThemeContext } from "../context/ThemeContext";
 import { collection, query, onSnapshot, orderBy } from "firebase/firestore";
 import { db } from "../firebase";
 import { router } from "expo-router";
+import ReportGenerator from "../components/ReportsGenerator";
 
 const YearlyReports = () => {
   const { scheme } = useContext(ThemeContext);
@@ -35,6 +36,7 @@ const YearlyReports = () => {
   });
   const [owingSearchQuery, setOwingSearchQuery] = useState("");
   const [expandedOwingMember, setExpandedOwingMember] = useState(null);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   // Generate years from 2022 to current year
   const years = Array.from(
@@ -1011,7 +1013,29 @@ const YearlyReports = () => {
         {renderOverviewSection()}
         {renderPaymentSection()}
         {renderOwingMembersSection()}
+        {/* <TouchableOpacity
+          style={[
+            styles.generateReportButton,
+            { backgroundColor: Colors.blueAccent },
+          ]}
+          onPress={() => setShowReportModal(true)}
+          activeOpacity={0.7}
+        >
+          <MaterialIcons name="summarize" size={20} color="#fff" />
+          <ThemedText style={styles.generateReportButtonText}>
+            Generate Full Report
+          </ThemedText>
+        </TouchableOpacity> */}
       </ScrollView>
+      <ReportGenerator
+        visible={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        selectedYear={selectedYear}
+        members={members}
+        transactions={transactions}
+        finances={finances}
+        duesAllocations={duesAllocations}
+      />
     </ThemedView>
   );
 };
@@ -1367,4 +1391,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
+  // generateReportButton: {
+  //   flexDirection: "row",
+  //   alignItems: "center",
+  //   justifyContent: "center",
+  //   padding: 16,
+  //   borderRadius: 12,
+  //   marginTop: 16,
+  //   gap: 8,
+  // },
+  // generateReportButtonText: {
+  //   color: "#fff",
+  //   fontSize: 16,
+  //   fontWeight: "bold",
+  // },
 });
