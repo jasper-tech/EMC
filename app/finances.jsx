@@ -53,6 +53,8 @@ const Finances = () => {
   });
 
   const [userFullName, setUserFullName] = useState("");
+  const [withdrawalsAmount, setWithdrawalsAmount] = useState(0);
+  const [withdrawalsTimeSpan, setWithdrawalsTimeSpan] = useState("");
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -84,7 +86,9 @@ const Finances = () => {
         let contributions = 0;
         let others = 0;
         let budget = 0;
+        let withdrawals = 0;
         const budgetYears = [];
+        const withdrawalDates = [];
 
         snapshot.docs.forEach((doc) => {
           const data = doc.data();
@@ -108,14 +112,27 @@ const Finances = () => {
                 budgetYears.push(data.year);
               }
               break;
+            case "withdrawal":
+              withdrawals += Math.abs(amount);
+              if (data.timestamp) {
+                withdrawalDates.push(new Date(data.timestamp));
+              }
+              break;
           }
         });
+
+        if (withdrawalsAmount > 0) {
+          setWithdrawalsTimeSpan("All-time");
+        } else {
+          setWithdrawalsTimeSpan("No withdrawals yet");
+        }
 
         setTotalAmount(total);
         setDuesAmount(dues);
         setContributionsAmount(contributions);
         setOthersAmount(others);
         setBudgetAmount(budget);
+        setWithdrawalsAmount(withdrawals);
         setExistingBudgetYears(budgetYears);
         setLoading(false);
       },
@@ -300,6 +317,36 @@ const Finances = () => {
   return (
     <ThemedView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Tracking Notice */}
+        <View style={styles.trackingNotice}>
+          <MaterialIcons name="info" size={20} color={Colors.goldAccent} />
+          <ThemedText style={styles.trackingText}>
+            All transactions are tracked in real-time. The coffers reflects net
+            funds after all additions and deductions.
+          </ThemedText>
+        </View>
+
+        {/* Withdrawals Summary */}
+        <View style={styles.withdrawalsSummary}>
+          <View style={styles.withdrawalsHeader}>
+            <MaterialIcons
+              name="trending-down"
+              size={20}
+              color={Colors.orangeAccent}
+            />
+            <ThemedText style={styles.withdrawalsTitle}>
+              Total Withdrawn
+            </ThemedText>
+          </View>
+          <View style={styles.withdrawalsDetails}>
+            <ThemedText style={styles.withdrawalsAmount}>
+              {formatCurrency(withdrawalsAmount)}
+            </ThemedText>
+            <ThemedText style={styles.withdrawalsTimeSpan}>
+              {withdrawalsTimeSpan}
+            </ThemedText>
+          </View>
+        </View>
         {/* Coffers Card */}
         <View
           style={[styles.coffersCard, { backgroundColor: Colors.uiBackground }]}
@@ -349,9 +396,7 @@ const Finances = () => {
               />
             </View>
             <ThemedText style={styles.typeLabel}>Dues</ThemedText>
-            <ThemedText style={styles.typeAmount}>
-              {formatCurrency(duesAmount)}
-            </ThemedText>
+            <ThemedText style={styles.typeAmount}>GH₵{duesAmount}</ThemedText>
             <View style={styles.addIconContainer}>
               <MaterialIcons
                 name="add-circle"
@@ -381,7 +426,7 @@ const Finances = () => {
             </View>
             <ThemedText style={styles.typeLabel}>Contributions</ThemedText>
             <ThemedText style={styles.typeAmount}>
-              {formatCurrency(contributionsAmount)}
+              GH₵{contributionsAmount}
             </ThemedText>
             <View style={styles.addIconContainer}>
               <MaterialIcons
@@ -411,9 +456,7 @@ const Finances = () => {
               />
             </View>
             <ThemedText style={styles.typeLabel}>Misc/Others</ThemedText>
-            <ThemedText style={styles.typeAmount}>
-              {formatCurrency(othersAmount)}
-            </ThemedText>
+            <ThemedText style={styles.typeAmount}>GH₵{othersAmount}</ThemedText>
             <View style={styles.addIconContainer}>
               <MaterialIcons
                 name="add-circle"
@@ -442,9 +485,7 @@ const Finances = () => {
               />
             </View>
             <ThemedText style={styles.typeLabel}>Budget</ThemedText>
-            <ThemedText style={styles.typeAmount}>
-              {formatCurrency(budgetAmount)}
-            </ThemedText>
+            <ThemedText style={styles.typeAmount}>GH₵{budgetAmount}</ThemedText>
             <View style={styles.addIconContainer}>
               <MaterialIcons
                 name="add-circle"
@@ -855,11 +896,64 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     marginTop: 20,
+
     gap: 8,
   },
   withdrawalButtonText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
+  },
+  trackingNotice: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: Colors.yellowAccent + "15",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 12,
+  },
+  trackingText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+    // color: Colors.orangeAccent,
+  },
+  withdrawalsSummary: {
+    backgroundColor: Colors.uiBackground,
+    padding: 20,
+    borderRadius: 16,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  withdrawalsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  withdrawalsTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    // color: Colors.redAccent,
+  },
+  withdrawalsDetails: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  withdrawalsAmount: {
+    fontSize: 20,
+    fontWeight: "bold",
+    // color: Colors.redAccent,
+  },
+  withdrawalsTimeSpan: {
+    fontSize: 14,
+    opacity: 0.7,
+    fontStyle: "italic",
   },
 });
