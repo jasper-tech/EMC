@@ -153,6 +153,13 @@ const LayoutContent = () => {
               }}
             />
             <Stack.Screen
+              name="financial-logs"
+              options={{
+                headerTitle: "Track Financial Logs",
+                gestureEnabled: false,
+              }}
+            />
+            <Stack.Screen
               name="forgotpassword"
               options={{
                 headerTitle: "Forgot Password",
