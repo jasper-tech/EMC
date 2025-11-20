@@ -58,6 +58,22 @@ const Finances = () => {
   const [totalMoneyFlow, setTotalMoneyFlow] = useState(0);
 
   useEffect(() => {
+    const fetchUserData = async () => {
+      const user = auth.currentUser;
+      if (user) {
+        try {
+          const userDoc = await getDoc(doc(db, "users", user.uid));
+          if (userDoc.exists()) {
+            setUserFullName(userDoc.data().fullName || "");
+          }
+        } catch (error) {
+          console.error("Error fetching user data:", error);
+        }
+      }
+    };
+
+    fetchUserData();
+
     const financesRef = collection(db, "finances");
     const q = query(financesRef);
 
@@ -688,7 +704,6 @@ const Finances = () => {
                   editable={!addLoading && formData.type !== "budget"}
                 />
               </View>
-
               <View style={styles.inputContainer}>
                 <ThemedText style={styles.label}>Added By</ThemedText>
                 <TextInput
@@ -702,7 +717,7 @@ const Finances = () => {
                   onChangeText={(text) =>
                     setFormData({ ...formData, addedBy: text })
                   }
-                  editable={false}
+                  editable={false} // This makes it non-editable
                 />
               </View>
 

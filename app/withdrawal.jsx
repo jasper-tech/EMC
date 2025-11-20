@@ -603,19 +603,19 @@ const Withdrawal = () => {
                   editable={false}
                 />
               </View>
-
               <View style={styles.inputContainer}>
                 <ThemedText style={styles.label}>Withdrawal Date</ThemedText>
                 <TextInput
                   style={[
                     styles.input,
-                    { color: theme.text, backgroundColor: theme.uiBackground },
+                    {
+                      color: theme.text,
+                      backgroundColor: theme.uiBackground,
+                      opacity: 0.7,
+                    },
                   ]}
                   value={formData.withdrawalDate}
-                  onChangeText={(text) =>
-                    setFormData({ ...formData, withdrawalDate: text })
-                  }
-                  editable={!withdrawalLoading}
+                  editable={false}
                   placeholder="YYYY-MM-DD"
                 />
               </View>
@@ -625,13 +625,14 @@ const Withdrawal = () => {
                 <TextInput
                   style={[
                     styles.input,
-                    { color: theme.text, backgroundColor: theme.uiBackground },
+                    {
+                      color: theme.text,
+                      backgroundColor: theme.uiBackground,
+                      opacity: 0.7,
+                    },
                   ]}
                   value={formData.withdrawnBy}
-                  onChangeText={(text) =>
-                    setFormData({ ...formData, withdrawnBy: text })
-                  }
-                  editable={!withdrawalLoading}
+                  editable={false}
                 />
               </View>
 
