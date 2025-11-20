@@ -289,7 +289,7 @@ const FinancialLog = () => {
               size={16}
               color={Colors.greenAccent}
             />
-            <ThemedText style={styles.summaryLabel}>Money Added:</ThemedText>
+            <ThemedText style={styles.summaryLabel}>Income:</ThemedText>
           </View>
           <ThemedText
             style={[styles.summaryValue, { color: Colors.greenAccent }]}
@@ -305,9 +305,7 @@ const FinancialLog = () => {
               size={16}
               color={Colors.redAccent}
             />
-            <ThemedText style={styles.summaryLabel}>
-              Money Withdrawn:
-            </ThemedText>
+            <ThemedText style={styles.summaryLabel}>Expenses:</ThemedText>
           </View>
           <ThemedText
             style={[styles.summaryValue, { color: Colors.redAccent }]}
@@ -317,7 +315,7 @@ const FinancialLog = () => {
         </View>
 
         <View style={[styles.summaryRow, styles.netRow]}>
-          <ThemedText style={styles.summaryLabel}>Net Flow:</ThemedText>
+          <ThemedText style={styles.summaryLabel}>Net Income:</ThemedText>
           <ThemedText
             style={[
               styles.summaryValue,
