@@ -347,7 +347,7 @@ const FinancialLog = () => {
             <MaterialIcons
               name="warning"
               size={48}
-              color={Colors.orangeAccent}
+              color={Colors.yellowAccent}
             />
             <ThemedText style={styles.emptyStateTitle}>
               Nothing to audit for {selectedYear}
@@ -387,18 +387,6 @@ const FinancialLog = () => {
                       >
                         <View style={styles.transactionHeader}>
                           <View style={styles.transactionInfo}>
-                            <View
-                              style={[
-                                styles.iconContainer,
-                                { backgroundColor: color + "20" },
-                              ]}
-                            >
-                              <MaterialIcons
-                                name={icon}
-                                size={20}
-                                color={color}
-                              />
-                            </View>
                             <View style={styles.transactionDetails}>
                               <ThemedText style={styles.transactionType}>
                                 {getTransactionLabel(transaction)}
@@ -456,14 +444,6 @@ const FinancialLog = () => {
                   >
                     <View style={styles.transactionHeader}>
                       <View style={styles.transactionInfo}>
-                        <View
-                          style={[
-                            styles.iconContainer,
-                            { backgroundColor: color + "20" },
-                          ]}
-                        >
-                          <MaterialIcons name={icon} size={20} color={color} />
-                        </View>
                         <View style={styles.transactionDetails}>
                           <ThemedText style={styles.transactionType}>
                             {getTransactionLabel(transaction)}
@@ -597,7 +577,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 8,
     textAlign: "center",
-    color: Colors.orangeAccent,
+    color: Colors.yellowAccent,
   },
   emptyStateSubtext: {
     fontSize: 14,
@@ -624,15 +604,9 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 12,
+    // gap: 12,
   },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+
   transactionDetails: {
     flex: 1,
   },
