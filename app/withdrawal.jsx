@@ -27,7 +27,6 @@ import {
 } from "firebase/firestore";
 import { Picker } from "@react-native-picker/picker";
 import { db, auth } from "../firebase";
-import { router } from "expo-router";
 
 const Withdrawal = () => {
   const { scheme } = useContext(ThemeContext);
@@ -42,7 +41,7 @@ const Withdrawal = () => {
 
   const [formData, setFormData] = useState({
     amount: "",
-    reasonType: "event", // event, camp, others
+    reasonType: "event",
     eventName: "",
     campName: "",
     otherReason: "",
@@ -50,6 +49,11 @@ const Withdrawal = () => {
     year: new Date().getFullYear().toString(),
     withdrawalDate: new Date().toISOString().split("T")[0],
   });
+  const [showAllWithdrawals, setShowAllWithdrawals] = useState(false);
+
+  const displayedWithdrawals = showAllWithdrawals
+    ? withdrawals
+    : withdrawals.slice(0, 5);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -178,12 +182,11 @@ const Withdrawal = () => {
         type: "withdrawal",
         status: "completed",
         timestamp: new Date(),
-        reasonType: formData.reasonType, // Store the reason type for filtering
+        reasonType: formData.reasonType,
       };
 
-      // Add negative amount to finances to reduce coffers
       const financeData = {
-        amount: -amount, // Negative amount to deduct from total
+        amount: -amount,
         description: description,
         addedBy: formData.withdrawnBy,
         userId: user?.uid || "unknown",
@@ -244,9 +247,13 @@ const Withdrawal = () => {
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-GB", {
+      weekday: "short",
       day: "2-digit",
       month: "short",
       year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
     });
   };
 
@@ -302,9 +309,29 @@ const Withdrawal = () => {
 
         {/* Withdrawals List */}
         <View style={styles.withdrawalsSection}>
-          <ThemedText style={styles.sectionTitle}>
-            Recent Withdrawals ({withdrawals.length})
-          </ThemedText>
+          <View style={styles.sectionHeader}>
+            <ThemedText style={styles.sectionTitle}>
+              Recent Withdrawals ({withdrawals.length})
+            </ThemedText>
+
+            {withdrawals.length > 5 && (
+              <TouchableOpacity
+                style={styles.viewAllButton}
+                onPress={() => setShowAllWithdrawals(!showAllWithdrawals)}
+              >
+                <ThemedText style={styles.viewAllButtonText}>
+                  {showAllWithdrawals
+                    ? "Show Less"
+                    : `View All (${withdrawals.length})`}
+                </ThemedText>
+                <MaterialIcons
+                  name={showAllWithdrawals ? "expand-less" : "expand-more"}
+                  size={20}
+                  color={Colors.blueAccent}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
 
           {withdrawals.length === 0 ? (
             <View style={styles.emptyState}>
@@ -321,65 +348,68 @@ const Withdrawal = () => {
               </ThemedText>
             </View>
           ) : (
-            withdrawals.map((withdrawal) => (
-              <View
-                key={withdrawal.id}
-                style={[
-                  styles.withdrawalCard,
-                  { backgroundColor: theme.uiBackground },
-                ]}
-              >
-                <View style={styles.withdrawalHeader}>
-                  <View style={styles.amountContainer}>
-                    <ThemedText style={styles.withdrawalAmount}>
-                      {formatCurrency(withdrawal.amount)}
-                    </ThemedText>
-                    <View
-                      style={[
-                        styles.statusBadge,
-                        { backgroundColor: Colors.greenAccent + "20" },
-                      ]}
-                    >
-                      <MaterialIcons
-                        name="check-circle"
-                        size={16}
-                        color={Colors.greenAccent}
-                      />
-                      <ThemedText
+            <ScrollView
+              style={styles.withdrawalsScrollView}
+              showsVerticalScrollIndicator={true}
+              nestedScrollEnabled={true}
+            >
+              {displayedWithdrawals.map((withdrawal) => (
+                <View
+                  key={withdrawal.id}
+                  style={[
+                    styles.withdrawalCard,
+                    { backgroundColor: theme.uiBackground },
+                  ]}
+                >
+                  <View style={styles.withdrawalHeader}>
+                    <View style={styles.amountContainer}>
+                      <ThemedText style={styles.withdrawalAmount}>
+                        {formatCurrency(withdrawal.amount)}
+                      </ThemedText>
+                      <View
                         style={[
-                          styles.statusText,
-                          { color: Colors.greenAccent },
+                          styles.statusBadge,
+                          { backgroundColor: Colors.greenAccent + "20" },
                         ]}
                       >
-                        Completed
-                      </ThemedText>
+                        <MaterialIcons
+                          name="check-circle"
+                          size={16}
+                          color={Colors.greenAccent}
+                        />
+                        <ThemedText
+                          style={[
+                            styles.statusText,
+                            { color: Colors.greenAccent },
+                          ]}
+                        >
+                          Completed
+                        </ThemedText>
+                      </View>
                     </View>
-                  </View>
-                  <ThemedText style={styles.withdrawalDate}>
-                    {formatDate(withdrawal.withdrawalDate)}
-                  </ThemedText>
-                </View>
-
-                <View style={styles.withdrawalDetails}>
-                  <ThemedText style={styles.descriptionText}>
-                    {withdrawal.description}
-                  </ThemedText>
-                  <ThemedText style={styles.withdrawnByText}>
-                    By: {withdrawal.withdrawnBy}
-                  </ThemedText>
-                  <ThemedText style={styles.yearText}>
-                    Year: {withdrawal.year}
-                  </ThemedText>
-                  {/* {withdrawal.reasonType && (
-                    <ThemedText style={styles.reasonTypeText}>
-                      Type:{" "}
-                      {withdrawal.reasonType.charAt(0).toUpperCase() +
-                        withdrawal.reasonType.slice(1)}
+                    <ThemedText style={styles.withdrawalDate}>
+                      {formatDate(
+                        withdrawal.timestamp?.toDate
+                          ? withdrawal.timestamp.toDate()
+                          : new Date(withdrawal.timestamp)
+                      )}
                     </ThemedText>
-                  )} */}
+                  </View>
+
+                  <View style={styles.withdrawalDetails}>
+                    <ThemedText style={styles.descriptionText}>
+                      {withdrawal.description}
+                    </ThemedText>
+                    <ThemedText style={styles.withdrawnByText}>
+                      By: {withdrawal.withdrawnBy}
+                    </ThemedText>
+                    <ThemedText style={styles.yearText}>
+                      Year: {withdrawal.year}
+                    </ThemedText>
+                  </View>
                 </View>
-              </View>
-            ))
+              ))}
+            </ScrollView>
           )}
         </View>
       </ScrollView>
@@ -408,11 +438,11 @@ const Withdrawal = () => {
           >
             <View style={styles.modalHeader}>
               <View style={styles.modalHeaderLeft}>
-                <MaterialIcons
+                {/* <MaterialIcons
                   name="account-balance-wallet"
                   size={24}
                   color={Colors.blueAccent}
-                />
+                /> */}
                 <ThemedText style={styles.modalTitle}>
                   Withdraw Funds
                 </ThemedText>
@@ -862,5 +892,28 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  viewAllButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: Colors.blueAccent + "15",
+  },
+  viewAllButtonText: {
+    // color: Colors.blueAccent,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  withdrawalsScrollView: {
+    maxHeight: 500,
   },
 });
