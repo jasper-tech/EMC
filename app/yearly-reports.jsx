@@ -15,6 +15,7 @@ import ThemedText from "../components/ThemedText";
 import { ThemeContext } from "../context/ThemeContext";
 import { collection, query, onSnapshot, orderBy } from "firebase/firestore";
 import { db } from "../firebase";
+import { router } from "expo-router";
 
 const YearlyReports = () => {
   const { scheme } = useContext(ThemeContext);
@@ -569,7 +570,7 @@ const YearlyReports = () => {
                 <MaterialIcons
                   name="warning"
                   size={48}
-                  color={Colors.orangeAccent}
+                  color={Colors.yellowAccent}
                 />
                 <ThemedText style={styles.noDataText}>
                   No dues allocation found for {selectedYear}
@@ -589,11 +590,11 @@ const YearlyReports = () => {
                         { backgroundColor: theme.uiBackground },
                       ]}
                     >
-                      <MaterialIcons
+                      {/* <MaterialIcons
                         name="check-circle"
                         size={24}
                         color={Colors.greenAccent}
-                      />
+                      /> */}
                       <ThemedText style={styles.statValue}>
                         GH₵{stats.totalPaid}
                       </ThemedText>
@@ -607,11 +608,11 @@ const YearlyReports = () => {
                         { backgroundColor: theme.uiBackground },
                       ]}
                     >
-                      <MaterialIcons
+                      {/* <MaterialIcons
                         name="pending"
                         size={24}
                         color={Colors.redAccent}
-                      />
+                      /> */}
                       <ThemedText style={styles.statValue}>
                         GH₵{stats.totalOwing}
                       </ThemedText>
@@ -638,6 +639,19 @@ const YearlyReports = () => {
                       </ThemedText>
                     </View>
                   </View>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.viewExpensesButton,
+                      { backgroundColor: Colors.blueAccent },
+                    ]}
+                    onPress={() => router.push("/financial-logs")}
+                    activeOpacity={0.7}
+                  >
+                    <ThemedText style={styles.viewExpensesButtonText}>
+                      View Expenses for {selectedYear}
+                    </ThemedText>
+                  </TouchableOpacity>
                 </View>
 
                 {/* Members Payment Status */}
@@ -785,7 +799,7 @@ const YearlyReports = () => {
                 <MaterialIcons
                   name="warning"
                   size={48}
-                  color={Colors.orangeAccent}
+                  color={Colors.yellowAccent}
                 />
                 <ThemedText style={styles.noDataText}>
                   No dues allocation found for {selectedYear}
@@ -1338,5 +1352,19 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border + "40",
+  },
+  viewExpensesButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 16,
+    gap: 8,
+  },
+  viewExpensesButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });

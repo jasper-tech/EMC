@@ -370,52 +370,61 @@ const FinancialLog = () => {
                   </ThemedText>
                 </View>
 
-                {filteredTransactions
-                  .filter((transaction) => transaction.type === "withdrawal")
-                  .map((transaction) => {
-                    const { icon, color } = getTransactionIcon(transaction);
+                <ScrollView
+                  style={styles.sectionScrollView}
+                  showsVerticalScrollIndicator={true}
+                  nestedScrollEnabled={true}
+                >
+                  {filteredTransactions
+                    .filter((transaction) => transaction.type === "withdrawal")
+                    .map((transaction) => {
+                      const { icon, color } = getTransactionIcon(transaction);
 
-                    return (
-                      <View
-                        key={`${transaction.source}-${transaction.id}`}
-                        style={[
-                          styles.transactionCard,
-                          { backgroundColor: theme.uiBackground },
-                        ]}
-                      >
-                        <View style={styles.transactionHeader}>
-                          <View style={styles.transactionInfo}>
-                            <View style={styles.transactionDetails}>
-                              <ThemedText style={styles.transactionType}>
-                                {getTransactionLabel(transaction)}
-                              </ThemedText>
-                              <ThemedText style={styles.transactionDescription}>
-                                {transaction.description}
-                              </ThemedText>
-                              <ThemedText style={styles.transactionMeta}>
-                                By {transaction.withdrawnBy} •{" "}
-                                {formatDate(transaction.timestamp)}
-                                {transaction.year && ` • ${transaction.year}`}
+                      return (
+                        <View
+                          key={`${transaction.source}-${transaction.id}`}
+                          style={[
+                            styles.transactionCard,
+                            { backgroundColor: theme.uiBackground },
+                          ]}
+                        >
+                          <View style={styles.transactionHeader}>
+                            <View style={styles.transactionInfo}>
+                              <View style={styles.transactionDetails}>
+                                <ThemedText style={styles.transactionType}>
+                                  {getTransactionLabel(transaction)}
+                                </ThemedText>
+                                <ThemedText
+                                  style={styles.transactionDescription}
+                                >
+                                  {transaction.description}
+                                </ThemedText>
+                                <ThemedText style={styles.transactionMeta}>
+                                  By {transaction.withdrawnBy} •{" "}
+                                  {formatDate(transaction.timestamp)}
+                                  {transaction.year && ` • ${transaction.year}`}
+                                </ThemedText>
+                              </View>
+                            </View>
+                            <View style={styles.amountContainer}>
+                              <ThemedText
+                                style={[
+                                  styles.amount,
+                                  { color: Colors.redAccent },
+                                ]}
+                              >
+                                - {formatCurrency(transaction.amount)}
                               </ThemedText>
                             </View>
                           </View>
-                          <View style={styles.amountContainer}>
-                            <ThemedText
-                              style={[
-                                styles.amount,
-                                { color: Colors.redAccent },
-                              ]}
-                            >
-                              - {formatCurrency(transaction.amount)}
-                            </ThemedText>
-                          </View>
                         </View>
-                      </View>
-                    );
-                  })}
+                      );
+                    })}
+                </ScrollView>
               </>
             )}
-            {/* OTHER Income Sources Section */}
+
+            {/* Income Sources Section */}
             <View style={styles.sectionHeader}>
               <MaterialIcons
                 name="trending-up"
@@ -427,51 +436,60 @@ const FinancialLog = () => {
               </ThemedText>
             </View>
 
-            {filteredTransactions
-              .filter((transaction) => transaction.type !== "withdrawal")
-              .map((transaction) => {
-                const { icon, color } = getTransactionIcon(transaction);
+            <ScrollView
+              style={styles.sectionScrollView}
+              showsVerticalScrollIndicator={true}
+              nestedScrollEnabled={true}
+            >
+              {filteredTransactions
+                .filter((transaction) => transaction.type !== "withdrawal")
+                .map((transaction) => {
+                  const { icon, color } = getTransactionIcon(transaction);
 
-                return (
-                  <View
-                    key={`${transaction.source}-${transaction.id}`}
-                    style={[
-                      styles.transactionCard,
-                      { backgroundColor: theme.uiBackground },
-                    ]}
-                  >
-                    <View style={styles.transactionHeader}>
-                      <View style={styles.transactionInfo}>
-                        <View style={styles.transactionDetails}>
-                          <ThemedText style={styles.transactionType}>
-                            {getTransactionLabel(transaction)}
-                          </ThemedText>
-                          <ThemedText style={styles.transactionDescription}>
-                            {transaction.description}
-                          </ThemedText>
-                          <ThemedText style={styles.transactionMeta}>
-                            By {transaction.addedBy || transaction.recordedBy} •{" "}
-                            {formatDate(transaction.timestamp)}
-                            {transaction.type === "dues" &&
-                              transaction.year &&
-                              ` • ${transaction.year} Dues`}
-                            {transaction.type === "budget" &&
-                              transaction.year &&
-                              ` • ${transaction.year} Budget`}
+                  return (
+                    <View
+                      key={`${transaction.source}-${transaction.id}`}
+                      style={[
+                        styles.transactionCard,
+                        { backgroundColor: theme.uiBackground },
+                      ]}
+                    >
+                      <View style={styles.transactionHeader}>
+                        <View style={styles.transactionInfo}>
+                          <View style={styles.transactionDetails}>
+                            <ThemedText style={styles.transactionType}>
+                              {getTransactionLabel(transaction)}
+                            </ThemedText>
+                            <ThemedText style={styles.transactionDescription}>
+                              {transaction.description}
+                            </ThemedText>
+                            <ThemedText style={styles.transactionMeta}>
+                              By {transaction.addedBy || transaction.recordedBy}{" "}
+                              • {formatDate(transaction.timestamp)}
+                              {transaction.type === "dues" &&
+                                transaction.year &&
+                                ` • ${transaction.year} Dues`}
+                              {transaction.type === "budget" &&
+                                transaction.year &&
+                                ` • ${transaction.year} Budget`}
+                            </ThemedText>
+                          </View>
+                        </View>
+                        <View style={styles.amountContainer}>
+                          <ThemedText
+                            style={[
+                              styles.amount,
+                              { color: Colors.greenAccent },
+                            ]}
+                          >
+                            + {formatCurrency(transaction.amount)}
                           </ThemedText>
                         </View>
                       </View>
-                      <View style={styles.amountContainer}>
-                        <ThemedText
-                          style={[styles.amount, { color: Colors.greenAccent }]}
-                        >
-                          + {formatCurrency(transaction.amount)}
-                        </ThemedText>
-                      </View>
                     </View>
-                  </View>
-                );
-              })}
+                  );
+                })}
+            </ScrollView>
           </View>
         )}
       </ScrollView>
@@ -637,9 +655,20 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 24,
     fontWeight: "bold",
-    // color: theme.text,
+  },
+  sectionScrollView: {
+    maxHeight: 400,
+    marginBottom: 16,
+  },
+  withdrawalsScrollView: {
+    maxHeight: 400,
+    marginBottom: 16,
+  },
+  incomeScrollView: {
+    maxHeight: 350,
+    marginBottom: 16,
   },
 });
 
