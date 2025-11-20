@@ -42,8 +42,9 @@ const Withdrawal = () => {
 
   const [formData, setFormData] = useState({
     amount: "",
-    reasonType: "event", // event, others
+    reasonType: "event", // event, camp, others
     eventName: "",
+    campName: "",
     otherReason: "",
     withdrawnBy: "",
     year: new Date().getFullYear().toString(),
@@ -126,8 +127,14 @@ const Withdrawal = () => {
       return;
     }
 
+    // Validation for different reason types
     if (formData.reasonType === "event" && !formData.eventName) {
       Alert.alert("Error", "Please enter the event name");
+      return;
+    }
+
+    if (formData.reasonType === "camp" && !formData.campName) {
+      Alert.alert("Error", "Please select a camp");
       return;
     }
 
@@ -155,6 +162,8 @@ const Withdrawal = () => {
       let description = "";
       if (formData.reasonType === "event") {
         description = `Withdrawal for event: ${formData.eventName}`;
+      } else if (formData.reasonType === "camp") {
+        description = `Withdrawal for camp: ${formData.campName}`;
       } else {
         description = `Withdrawal: ${formData.otherReason}`;
       }
@@ -167,12 +176,34 @@ const Withdrawal = () => {
         year: formData.year,
         withdrawalDate: formData.withdrawalDate,
         type: "withdrawal",
-        status: "completed", // Since it's like taking from bank, it's completed immediately
+        status: "completed",
         timestamp: new Date(),
+        reasonType: formData.reasonType, // Store the reason type for filtering
+      };
+
+      // Add negative amount to finances to reduce coffers
+      const financeData = {
+        amount: -amount, // Negative amount to deduct from total
+        description: description,
+        addedBy: formData.withdrawnBy,
+        userId: user?.uid || "unknown",
+        timestamp: new Date(),
+        type: "withdrawal",
+        withdrawalDetails: {
+          reasonType: formData.reasonType,
+          eventName: formData.eventName,
+          campName: formData.campName,
+          otherReason: formData.otherReason,
+          year: formData.year,
+          withdrawalDate: formData.withdrawalDate,
+        },
       };
 
       // Save to transactions collection
       await addDoc(collection(db, "transactions"), transactionData);
+
+      // Save negative amount to finances collection
+      await addDoc(collection(db, "finances"), financeData);
 
       // Create notification for the withdrawal
       await addDoc(collection(db, "notifications"), {
@@ -192,6 +223,7 @@ const Withdrawal = () => {
         amount: "",
         reasonType: "event",
         eventName: "",
+        campName: "",
         otherReason: "",
         withdrawnBy: userFullName,
         year: new Date().getFullYear().toString(),
@@ -338,6 +370,13 @@ const Withdrawal = () => {
                   <ThemedText style={styles.yearText}>
                     Year: {withdrawal.year}
                   </ThemedText>
+                  {/* {withdrawal.reasonType && (
+                    <ThemedText style={styles.reasonTypeText}>
+                      Type:{" "}
+                      {withdrawal.reasonType.charAt(0).toUpperCase() +
+                        withdrawal.reasonType.slice(1)}
+                    </ThemedText>
+                  )} */}
                 </View>
               </View>
             ))
@@ -435,12 +474,14 @@ const Withdrawal = () => {
                         ...formData,
                         reasonType: itemValue,
                         eventName: "",
+                        campName: "",
                         otherReason: "",
                       })
                     }
                     style={{ color: theme.text }}
                   >
                     <Picker.Item label="Event" value="event" />
+                    <Picker.Item label="Camp" value="camp" />
                     <Picker.Item label="Others" value="others" />
                   </Picker>
                 </View>
@@ -457,7 +498,7 @@ const Withdrawal = () => {
                         backgroundColor: theme.uiBackground,
                       },
                     ]}
-                    placeholder="e.g., End of Year Party, Sports Competition, etc."
+                    placeholder="e.g., End of Year Party, Food Bazaar, etc."
                     placeholderTextColor="#999"
                     value={formData.eventName}
                     onChangeText={(text) =>
@@ -465,6 +506,36 @@ const Withdrawal = () => {
                     }
                     editable={!withdrawalLoading}
                   />
+                </View>
+              )}
+
+              {formData.reasonType === "camp" && (
+                <View style={styles.inputContainer}>
+                  <ThemedText style={styles.label}>Camp Name *</ThemedText>
+                  <View
+                    style={[
+                      styles.pickerWrapper,
+                      { backgroundColor: theme.uiBackground },
+                    ]}
+                  >
+                    <Picker
+                      selectedValue={formData.campName}
+                      onValueChange={(itemValue) =>
+                        setFormData({ ...formData, campName: itemValue })
+                      }
+                      style={{ color: theme.text }}
+                    >
+                      <Picker.Item label="" value="" />
+                      <Picker.Item
+                        label="Meridian Camp"
+                        value="Meridian Camp"
+                      />
+                      <Picker.Item
+                        label="National Camp"
+                        value="National Camp"
+                      />
+                    </Picker>
+                  </View>
                 </View>
               )}
 
@@ -479,7 +550,7 @@ const Withdrawal = () => {
                         backgroundColor: theme.uiBackground,
                       },
                     ]}
-                    placeholder="e.g., Purchase of equipment, Office supplies, etc."
+                    placeholder="e.g., Member Support, Supplies, etc."
                     placeholderTextColor="#999"
                     value={formData.otherReason}
                     onChangeText={(text) =>
@@ -698,6 +769,11 @@ const styles = StyleSheet.create({
   yearText: {
     fontSize: 14,
     opacity: 0.7,
+  },
+  reasonTypeText: {
+    fontSize: 14,
+    opacity: 0.7,
+    fontStyle: "italic",
   },
   modalOverlay: {
     flex: 1,
