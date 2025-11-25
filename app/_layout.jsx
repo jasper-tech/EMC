@@ -174,6 +174,14 @@ const LayoutContent = () => {
                 headerBackVisible: false,
               }}
             />
+            <Stack.Screen
+              name="generate-reports"
+              options={{
+                headerTitle: "Generate Reports",
+                gestureEnabled: false,
+                // headerBackVisible: false,
+              }}
+            />
           </Stack>
         </AppWrapper>
       )}
