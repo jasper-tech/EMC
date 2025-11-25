@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
+import { ThemeContext } from "../context/ThemeContext";
+import { Colors } from "../constants/Colors";
 import {
   StyleSheet,
   View,
@@ -26,6 +28,9 @@ const GenerateReportsPage = () => {
   const [transactions, setTransactions] = useState([]);
   const [finances, setFinances] = useState([]);
   const [duesAllocations, setDuesAllocations] = useState([]);
+
+  const { scheme } = useContext(ThemeContext);
+  const theme = Colors[scheme] ?? Colors.light;
 
   // Generate years from 2022 to current year
   const years = Array.from(
@@ -576,34 +581,41 @@ const GenerateReportsPage = () => {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3b82f6" />
-        <Text style={styles.loadingText}>Loading reports data...</Text>
+      <View
+        style={[styles.loadingContainer, { backgroundColor: theme.background }]}
+      >
+        <ActivityIndicator size="large" color={Colors.blueAccent} />
+        <Text style={[styles.loadingText, { color: theme.text }]}>
+          Loading reports data...
+        </Text>
       </View>
     );
   }
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: theme.background }]}
       contentContainerStyle={styles.contentContainer}
     >
       {/* Header */}
-      <View style={styles.header}>
+      {/* <View style={styles.header}>
         <View style={styles.headerIcon}>
           <MaterialIcons name="download" size={32} color="#fff" />
         </View>
-        <Text style={styles.headerTitle}>Generate Reports</Text>
-        <Text style={styles.headerSubtitle}>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>
+          Generate Reports
+        </Text>
+        <Text style={[styles.headerSubtitle, { color: theme.text }]}>
           Download comprehensive financial reports for any year
         </Text>
-      </View>
+      </View> */}
 
       {/* Year Selection */}
-      <View style={styles.section}>
+      <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
         <View style={styles.sectionHeader}>
-          <MaterialIcons name="calendar-today" size={20} color="#3b82f6" />
-          <Text style={styles.sectionTitle}>Select Report Year</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>
+            Select Report Year
+          </Text>
         </View>
 
         <ScrollView
@@ -617,6 +629,7 @@ const GenerateReportsPage = () => {
                 key={year}
                 style={[
                   styles.yearButton,
+                  { backgroundColor: theme.inputBackground },
                   selectedYear === year && styles.yearButtonSelected,
                 ]}
                 onPress={() => setSelectedYear(year)}
@@ -624,6 +637,7 @@ const GenerateReportsPage = () => {
                 <Text
                   style={[
                     styles.yearButtonText,
+                    { color: theme.text },
                     selectedYear === year && styles.yearButtonTextSelected,
                   ]}
                 >
@@ -636,81 +650,130 @@ const GenerateReportsPage = () => {
       </View>
 
       {/* Report Preview */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Report Preview - {selectedYear}</Text>
+      <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>
+          Report Preview - {selectedYear}
+        </Text>
 
         <View style={styles.previewGrid}>
-          <View style={[styles.previewCard, styles.incomeCard]}>
+          <View
+            style={[
+              styles.previewCard,
+              styles.incomeCard,
+              { backgroundColor: theme.uiBackground },
+            ]}
+          >
             <View style={styles.previewCardHeader}>
-              <MaterialIcons name="trending-up" size={20} color="#16a34a" />
-              <Text style={styles.previewCardLabel}>Income</Text>
+              <MaterialIcons
+                name="trending-up"
+                size={20}
+                color={Colors.greenAccent}
+              />
+              <Text style={[styles.previewCardLabel, { color: theme.text }]}>
+                Income
+              </Text>
             </View>
-            <Text style={styles.previewCardValue}>
+            <Text style={[styles.previewCardValue, { color: theme.text }]}>
               GH₵{reportData.totalIncome.toLocaleString()}
             </Text>
           </View>
 
-          <View style={[styles.previewCard, styles.expenseCard]}>
+          <View
+            style={[
+              styles.previewCard,
+              styles.expenseCard,
+              { backgroundColor: theme.uiBackground },
+            ]}
+          >
             <View style={styles.previewCardHeader}>
-              <MaterialIcons name="trending-down" size={20} color="#dc2626" />
-              <Text style={styles.previewCardLabel}>Expenses</Text>
+              <MaterialIcons
+                name="trending-down"
+                size={20}
+                color={Colors.redAccent}
+              />
+              <Text style={[styles.previewCardLabel, { color: theme.text }]}>
+                Expenses
+              </Text>
             </View>
-            <Text style={styles.previewCardValue}>
+            <Text style={[styles.previewCardValue, { color: theme.text }]}>
               GH₵{reportData.totalExpenses.toLocaleString()}
             </Text>
           </View>
 
-          <View style={[styles.previewCard, styles.netIncomeCard]}>
+          <View
+            style={[
+              styles.previewCard,
+              styles.netIncomeCard,
+              { backgroundColor: theme.uiBackground },
+            ]}
+          >
             <View style={styles.previewCardHeader}>
-              <MaterialIcons
-                name="account-balance-wallet"
-                size={20}
-                color="#3b82f6"
-              />
-              <Text style={styles.previewCardLabel}>Net Income</Text>
+              <Text style={[styles.previewCardLabel, { color: theme.text }]}>
+                Net Income
+              </Text>
             </View>
             <Text
               style={[
                 styles.previewCardValue,
-                { color: reportData.netIncome >= 0 ? "#3b82f6" : "#dc2626" },
+                {
+                  color:
+                    reportData.netIncome >= 0
+                      ? Colors.greenAccent
+                      : Colors.redAccent,
+                },
               ]}
             >
               GH₵{reportData.netIncome.toLocaleString()}
             </Text>
           </View>
 
-          <View style={[styles.previewCard, styles.membersCard]}>
+          <View
+            style={[
+              styles.previewCard,
+              styles.membersCard,
+              { backgroundColor: theme.uiBackground },
+            ]}
+          >
             <View style={styles.previewCardHeader}>
-              <Ionicons name="people" size={20} color="#7c3aed" />
-              <Text style={styles.previewCardLabel}>Members Paid</Text>
+              <Text style={[styles.previewCardLabel, { color: theme.text }]}>
+                Members Paid
+              </Text>
             </View>
-            <Text style={styles.previewCardValue}>
+            <Text style={[styles.previewCardValue, { color: theme.text }]}>
               {reportData.membersPaid}/{reportData.totalMembers}
             </Text>
           </View>
         </View>
 
-        <View style={styles.infoBox}>
-          <MaterialIcons name="info" size={20} color="#3b82f6" />
+        <View
+          style={[styles.infoBox, { backgroundColor: theme.infoBackground }]}
+        >
+          <MaterialIcons name="info" size={20} color={Colors.blueAccent} />
           <View style={styles.infoContent}>
-            <Text style={styles.infoTitle}>Report Includes:</Text>
-            <Text style={styles.infoText}>
+            <Text style={[styles.infoTitle, { color: theme.text }]}>
+              Report Includes:
+            </Text>
+            <Text style={[styles.infoText, { color: theme.text }]}>
               • Financial summary and breakdown
             </Text>
-            <Text style={styles.infoText}>
+            <Text style={[styles.infoText, { color: theme.text }]}>
               • Income and expense transactions
             </Text>
-            <Text style={styles.infoText}>
+            <Text style={[styles.infoText, { color: theme.text }]}>
               • Member payment status and dues allocation
             </Text>
-            <Text style={styles.infoText}>• Detailed transaction history</Text>
+            <Text style={[styles.infoText, { color: theme.text }]}>
+              • Detailed transaction history
+            </Text>
           </View>
         </View>
       </View>
 
       {/* Download Options */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Download Report</Text>
+      <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>
+          Download Report
+        </Text>
 
         <View style={styles.downloadGrid}>
           {/* PDF Option */}
@@ -724,9 +787,9 @@ const GenerateReportsPage = () => {
             ) : (
               <>
                 <MaterialIcons name="picture-as-pdf" size={32} color="#fff" />
-                <Text style={styles.downloadButtonText}>PDF Report</Text>
+                {/* <Text style={styles.downloadButtonText}>PDF Report</Text> */}
                 <Text style={styles.downloadButtonSubtext}>
-                  Formatted document with charts and tables
+                  Formatted document with tables
                 </Text>
               </>
             )}
@@ -743,7 +806,7 @@ const GenerateReportsPage = () => {
             ) : (
               <>
                 <FontAwesome5 name="file-excel" size={32} color="#fff" />
-                <Text style={styles.downloadButtonText}>Excel Report</Text>
+                {/* <Text style={styles.downloadButtonText}>Excel Report</Text> */}
                 <Text style={styles.downloadButtonSubtext}>
                   Raw data in CSV format for analysis
                 </Text>
@@ -752,9 +815,11 @@ const GenerateReportsPage = () => {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.noteBox}>
-          <MaterialIcons name="warning" size={20} color="#d97706" />
-          <Text style={styles.noteText}>
+        <View
+          style={[styles.noteBox, { backgroundColor: theme.warningBackground }]}
+        >
+          <MaterialIcons name="warning" size={20} color={Colors.yellowAccent} />
+          <Text style={[styles.noteText, { color: theme.text }]}>
             Reports may take a few moments to generate depending on the amount
             of data for {selectedYear}.
           </Text>
@@ -767,7 +832,6 @@ const GenerateReportsPage = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    // backgroundColor: "#f8fafc",
   },
   contentContainer: {
     padding: 16,
@@ -777,12 +841,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f8fafc",
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: "#64748b",
     fontWeight: "500",
   },
   header: {
@@ -801,17 +863,14 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 28,
     fontWeight: "bold",
-    color: "#1e293b",
     marginBottom: 8,
     textAlign: "center",
   },
   headerSubtitle: {
     fontSize: 16,
-    color: "#64748b",
     textAlign: "center",
   },
   section: {
-    backgroundColor: "#fff",
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
@@ -830,7 +889,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#1e293b",
     marginBottom: 16,
   },
   yearsScrollView: {
@@ -844,7 +902,6 @@ const styles = StyleSheet.create({
   yearButton: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: "#f1f5f9",
     borderRadius: 12,
     minWidth: 80,
     alignItems: "center",
@@ -856,7 +913,6 @@ const styles = StyleSheet.create({
   yearButtonText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#64748b",
   },
   yearButtonTextSelected: {
     color: "#fff",
@@ -871,24 +927,23 @@ const styles = StyleSheet.create({
     width: "48%",
     padding: 16,
     borderRadius: 12,
-    backgroundColor: "#f8fafc",
   },
-  incomeCard: {
-    borderLeftWidth: 4,
-    borderLeftColor: "#16a34a",
-  },
-  expenseCard: {
-    borderLeftWidth: 4,
-    borderLeftColor: "#dc2626",
-  },
-  netIncomeCard: {
-    borderLeftWidth: 4,
-    borderLeftColor: "#3b82f6",
-  },
-  membersCard: {
-    borderLeftWidth: 4,
-    borderLeftColor: "#7c3aed",
-  },
+  //   incomeCard: {
+  //     borderLeftWidth: 4,
+  //     borderLeftColor: "#16a34a",
+  //   },
+  //   expenseCard: {
+  //     borderLeftWidth: 4,
+  //     borderLeftColor: "#dc2626",
+  //   },
+  //   netIncomeCard: {
+  //     borderLeftWidth: 4,
+  //     borderLeftColor: "#3b82f6",
+  //   },
+  //   membersCard: {
+  //     borderLeftWidth: 4,
+  //     borderLeftColor: "#7c3aed",
+  //   },
   previewCardHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -898,16 +953,13 @@ const styles = StyleSheet.create({
   previewCardLabel: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#64748b",
   },
   previewCardValue: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#1e293b",
   },
   infoBox: {
     flexDirection: "row",
-    backgroundColor: "#eff6ff",
     padding: 16,
     borderRadius: 12,
     gap: 12,
@@ -918,12 +970,10 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#1e40af",
     marginBottom: 4,
   },
   infoText: {
     fontSize: 12,
-    color: "#374151",
     marginBottom: 2,
   },
   downloadGrid: {
@@ -936,10 +986,10 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   pdfButton: {
-    backgroundColor: "#dc2626",
+    backgroundColor: Colors.redAccent,
   },
   excelButton: {
-    backgroundColor: "#16a34a",
+    backgroundColor: Colors.greenAccent,
   },
   downloadButtonText: {
     fontSize: 20,
@@ -954,7 +1004,6 @@ const styles = StyleSheet.create({
   },
   noteBox: {
     flexDirection: "row",
-    backgroundColor: "#fffbeb",
     padding: 16,
     borderRadius: 12,
     gap: 12,
@@ -963,7 +1012,6 @@ const styles = StyleSheet.create({
   noteText: {
     flex: 1,
     fontSize: 14,
-    color: "#92400e",
     fontWeight: "500",
   },
 });
