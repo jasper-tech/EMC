@@ -6,6 +6,7 @@ import {
   Dimensions,
   Alert,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import React, { useContext, useMemo, useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -36,11 +37,11 @@ import {
 import { db } from "../firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "../context/AuthContext";
+import SigningOutScreen from "./SignOutScreen";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const PANEL_WIDTH = SCREEN_WIDTH * 0.8;
 
-// Avatar colors and icons for users without images
 const AVATAR_VARIANTS = [
   { bg: "#FF6B6B", icon: "person" },
   { bg: "#4ECDC4", icon: "person-circle" },
@@ -61,6 +62,8 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
   const [userName, setUserName] = useState("");
   const [userRole, setUserRole] = useState("Member");
   const [loadingProfile, setLoadingProfile] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [showConfirmSignOut, setShowConfirmSignOut] = useState(false);
 
   const translateX = useSharedValue(isOpen ? 0 : -PANEL_WIDTH);
 
@@ -146,14 +149,41 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
     return AVATAR_VARIANTS[hash % AVATAR_VARIANTS.length];
   }, [user?.uid, userName]);
 
-  const handleSignOut = async () => {
+  const handleSignOutClick = () => {
+    // Close the side panel first
+    onClose();
+    // Show confirmation modal
+    setShowConfirmSignOut(true);
+  };
+
+  const handleConfirmSignOut = () => {
+    setShowConfirmSignOut(false);
+    setIsSigningOut(true);
+  };
+
+  const handleCancelSignOut = () => {
+    setShowConfirmSignOut(false);
+  };
+
+  const handleSignOutComplete = async () => {
     try {
+      // Now perform the actual sign out
       await signOut(auth);
-      onClose();
+
+      // Clear any stored data
+      await AsyncStorage.multiRemove([
+        `userName_${user.uid}`,
+        `savedProfileImg_${user.uid}`,
+        "savedProfileImg",
+      ]);
+
+      // Navigate to login screen
       router.replace("/");
     } catch (error) {
-      console.error("Error signing out:", error);
+      console.error("Error during sign out:", error);
       Alert.alert("Sign Out Error", "Failed to sign out properly.");
+    } finally {
+      setIsSigningOut(false);
     }
   };
 
@@ -275,6 +305,11 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
       setUploading(false);
     }
   };
+
+  // If we're in the signing out process, show the signing out screen
+  if (isSigningOut) {
+    return <SigningOutScreen onSignOutComplete={handleSignOutComplete} />;
+  }
 
   if (loadingProfile) {
     return (
@@ -493,7 +528,7 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
 
           <TouchableOpacity
             style={styles.signOutButton}
-            onPress={handleSignOut}
+            onPress={handleSignOutClick}
             activeOpacity={0.7}
           >
             <View
@@ -516,6 +551,60 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
           </TouchableOpacity>
         </View>
       </Animated.View>
+
+      {/* Confirmation Modal */}
+      <Modal
+        visible={showConfirmSignOut}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleCancelSignOut}
+      >
+        <View style={styles.confirmModalOverlay}>
+          <View
+            style={[
+              styles.confirmModalContent,
+              { backgroundColor: theme.navBackground },
+            ]}
+          >
+            <View style={styles.confirmHeader}>
+              <Ionicons
+                name="log-out-outline"
+                size={32}
+                color={Colors.redAccent}
+              />
+              <ThemedText style={styles.confirmTitle}>
+                Confirm Sign Out
+              </ThemedText>
+              <ThemedText style={styles.confirmMessage}>
+                Are you sure you want to sign out?
+              </ThemedText>
+            </View>
+
+            <View style={styles.confirmButtons}>
+              <TouchableOpacity
+                style={[styles.confirmButton, styles.cancelButton]}
+                onPress={handleCancelSignOut}
+                activeOpacity={0.7}
+              >
+                <ThemedText style={styles.cancelButtonText}>
+                  No, Stay
+                </ThemedText>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.confirmButton, styles.signOutConfirmButton]}
+                onPress={handleConfirmSignOut}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="log-out-outline" size={18} color="#fff" />
+                <ThemedText style={styles.signOutConfirmButtonText}>
+                  Yes, Sign Out
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 };
@@ -697,5 +786,72 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 16,
     opacity: 0.7,
+  },
+  // Confirmation Modal Styles
+  confirmModalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    padding: 20,
+  },
+  confirmModalContent: {
+    borderRadius: 20,
+    padding: 24,
+    width: "100%",
+    maxWidth: 400,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  confirmHeader: {
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  confirmTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    marginTop: 12,
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  confirmMessage: {
+    fontSize: 16,
+    opacity: 0.7,
+    textAlign: "center",
+    lineHeight: 22,
+  },
+  confirmButtons: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  confirmButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  cancelButton: {
+    backgroundColor: Colors.uiBackground,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  signOutConfirmButton: {
+    backgroundColor: Colors.redAccent,
+  },
+  signOutConfirmButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
