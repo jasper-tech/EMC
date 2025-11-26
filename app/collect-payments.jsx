@@ -171,7 +171,17 @@ const CollectPayments = () => {
       (member) => !paidMemberIds.includes(member.id)
     );
 
-    setUnpaidMembers(unpaid);
+    // Sort: executives first, then by name
+    const sortedUnpaid = unpaid.sort((a, b) => {
+      // Executives come first
+      if (a.isExecutive && !b.isExecutive) return -1;
+      if (!a.isExecutive && b.isExecutive) return 1;
+
+      // If same type (both executives or both regular), sort alphabetically by name
+      return a.fullname.localeCompare(b.fullname);
+    });
+
+    setUnpaidMembers(sortedUnpaid);
   };
 
   const openPaymentModal = (member) => {
