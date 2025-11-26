@@ -64,6 +64,8 @@ const SplashScreen = ({ onSplashComplete }) => {
       </View>
 
       <View style={styles.footer}>
+        <ThemedText style={styles.subtitle}>beta-version</ThemedText>
+
         <ThemedText style={styles.footerText}>by jasper-tech</ThemedText>
       </View>
     </ThemedView>
