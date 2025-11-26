@@ -200,30 +200,71 @@ const YearlyReports = () => {
     const executiveMembers = members.filter((m) => m.isExecutive).length;
     const regularMembers = totalMembers - executiveMembers;
 
-    // Calculate finances
-    let totalCoffers = 0;
+    // Calculate finances FOR THE SELECTED YEAR ONLY
+    let totalYearIncome = 0;
     let duesAmount = 0;
     let contributionsAmount = 0;
     let othersAmount = 0;
-    let budgetAmount = 0;
 
-    finances.forEach((finance) => {
+    // Filter finances by selected year (same logic as FinancialLog)
+    const yearFinances = finances.filter((finance) => {
+      let financeYear;
+
+      if (finance.type === "budget" || finance.type === "dues") {
+        financeYear =
+          typeof finance.year === "string"
+            ? parseInt(finance.year)
+            : finance.year;
+      } else {
+        const date = finance.timestamp?.toDate
+          ? finance.timestamp.toDate()
+          : new Date(finance.timestamp);
+        financeYear = date.getFullYear();
+      }
+
+      return parseInt(financeYear) === parseInt(selectedYear);
+    });
+
+    // Filter transactions by selected year for dues
+    const yearTransactions = transactions.filter((transaction) => {
+      if (transaction.type === "dues") {
+        const transactionYear =
+          typeof transaction.year === "string"
+            ? parseInt(transaction.year)
+            : transaction.year;
+        return parseInt(transactionYear) === parseInt(selectedYear);
+      }
+      return false;
+    });
+
+    // Calculate income from finances for the selected year
+    yearFinances.forEach((finance) => {
       const amount = finance.amount || 0;
-      totalCoffers += amount;
+      if (amount > 0) {
+        // Only count positive amounts as income
+        totalYearIncome += amount;
 
-      switch (finance.type) {
-        case "dues":
-          duesAmount += amount;
-          break;
-        case "contribution":
-          contributionsAmount += amount;
-          break;
-        case "other":
-          othersAmount += amount;
-          break;
-        case "budget":
-          budgetAmount += amount;
-          break;
+        switch (finance.type) {
+          case "dues":
+            duesAmount += amount;
+            break;
+          case "contribution":
+            contributionsAmount += amount;
+            break;
+          case "other":
+            othersAmount += amount;
+            break;
+          // Don't include budget in the breakdown as it's separate
+        }
+      }
+    });
+
+    // Add dues from transactions for the selected year
+    yearTransactions.forEach((transaction) => {
+      if (transaction.type === "dues") {
+        const amount = transaction.amount || 0;
+        totalYearIncome += amount;
+        duesAmount += amount;
       }
     });
 
@@ -234,12 +275,11 @@ const YearlyReports = () => {
       totalMembers,
       executiveMembers,
       regularMembers,
-      totalCoffers,
+      totalYearIncome, // Changed from totalCoffers to totalYearIncome
       duesAmount,
       contributionsAmount,
       othersAmount,
-      budgetAmount,
-      currentYearBudget,
+      budgetAmount: currentYearBudget, // This should be the budget for selected year
     };
   };
 
@@ -364,7 +404,7 @@ const YearlyReports = () => {
         >
           <View style={styles.sectionHeaderLeft}>
             <ThemedText style={styles.sectionTitle}>
-              Overview Statistics
+              Overview Statistics - {selectedYear}
             </ThemedText>
           </View>
           <MaterialIcons
@@ -438,8 +478,10 @@ const YearlyReports = () => {
             {/* Finances Overview */}
             <View style={styles.subsection}>
               <ThemedText style={styles.subsectionTitle}>
-                Financial Overview
+                Financial Overview - {selectedYear}
               </ThemedText>
+
+              {/* Total Income for the Year */}
               <View
                 style={[
                   styles.coffersCard,
@@ -453,16 +495,16 @@ const YearlyReports = () => {
                     color={theme.text}
                   />
                   <ThemedText style={styles.coffersTitle}>
-                    Total Coffers
+                    Total Income for {selectedYear}
                   </ThemedText>
                 </View>
                 <ThemedText style={styles.coffersAmount}>
-                  GH₵{stats.totalCoffers.toFixed(2)}
+                  GH₵{stats.totalYearIncome.toFixed(2)}
                 </ThemedText>
               </View>
 
               {/* Current Year Budget */}
-              {stats.currentYearBudget > 0 && (
+              {stats.budgetAmount > 0 && (
                 <View
                   style={[
                     styles.budgetCard,
@@ -480,7 +522,7 @@ const YearlyReports = () => {
                     </ThemedText>
                   </View>
                   <ThemedText style={styles.budgetAmount}>
-                    GH₵{stats.currentYearBudget.toFixed(2)}
+                    GH₵{stats.budgetAmount}
                   </ThemedText>
                 </View>
               )}
@@ -519,19 +561,6 @@ const YearlyReports = () => {
                   <ThemedText style={[styles.statLabel]}>Others</ThemedText>
                   <ThemedText style={styles.statValue}>
                     GH₵{stats.othersAmount}
-                  </ThemedText>
-                </View>
-                <View
-                  style={[
-                    styles.statCard,
-                    { backgroundColor: theme.uiBackground },
-                  ]}
-                >
-                  <ThemedText style={[styles.statLabel]}>
-                    Year Budget
-                  </ThemedText>
-                  <ThemedText style={styles.statValue}>
-                    GH₵{stats.budgetAmount}
                   </ThemedText>
                 </View>
               </View>
@@ -583,7 +612,7 @@ const YearlyReports = () => {
                 {/* Payment Summary */}
                 <View style={styles.subsection}>
                   <ThemedText style={styles.subsectionTitle}>
-                    Payment Summary
+                    Members Payment Summary
                   </ThemedText>
                   <View style={styles.statsGrid}>
                     <View
