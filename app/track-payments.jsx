@@ -955,7 +955,7 @@ const styles = StyleSheet.create({
   },
 
   membersScrollView: {
-    maxHeight: 400,
+    maxHeight: 500,
   },
 
   membersScrollContent: {
