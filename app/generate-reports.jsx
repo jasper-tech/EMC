@@ -15,7 +15,8 @@ import { collection, query, onSnapshot, orderBy } from "firebase/firestore";
 import { db } from "../firebase";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
-import * as FileSystem from "expo-file-system";
+// import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 
 const GenerateReportsPage = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -119,7 +120,6 @@ const GenerateReportsPage = () => {
     return duesAllocations.find((allocation) => allocation.year === year);
   };
 
-  // Calculate member payment summary (same as YearlyReports)
   const getMemberPaymentSummary = (member, year) => {
     const allocation = getDuesAllocationForYear(year);
     if (!allocation) {
@@ -168,42 +168,75 @@ const GenerateReportsPage = () => {
     };
   };
 
-  // Calculate financial data (same as ReportGenerator)
   const calculateFinancialData = () => {
-    // Filter transactions and finances for selected year
-    const yearTransactions = transactions.filter((t) => {
-      const transactionYear =
-        t.year ||
-        (t.timestamp?.toDate
-          ? t.timestamp.toDate().getFullYear()
-          : new Date(t.timestamp).getFullYear());
-      return transactionYear === selectedYear;
+    const filteredFinances = finances.filter(
+      (item) => item.type !== "withdrawal" && item.type !== "dues"
+    );
+
+    const combinedData = [...filteredFinances, ...transactions].sort((a, b) => {
+      const dateA = a.timestamp?.toDate
+        ? a.timestamp.toDate()
+        : new Date(a.timestamp);
+      const dateB = b.timestamp?.toDate
+        ? b.timestamp.toDate()
+        : new Date(b.timestamp);
+      return dateB - dateA;
     });
 
-    const yearFinances = finances.filter((f) => {
-      if (f.type === "budget" || f.type === "dues") {
-        return f.year === selectedYear;
+    // Now filter the combined data by year (same logic as FinancialLog)
+    let totalAdded = 0;
+    let totalWithdrawn = 0;
+
+    const filteredTransactions = combinedData.filter((transaction) => {
+      let transactionYear;
+
+      if (transaction.type === "dues" || transaction.type === "budget") {
+        transactionYear =
+          typeof transaction.year === "string"
+            ? parseInt(transaction.year)
+            : transaction.year;
+      } else if (transaction.type === "withdrawal") {
+        if (transaction.withdrawalDate) {
+          transactionYear = new Date(transaction.withdrawalDate).getFullYear();
+        } else {
+          const date = transaction.timestamp?.toDate
+            ? transaction.timestamp.toDate()
+            : new Date(transaction.timestamp);
+          transactionYear = date.getFullYear();
+        }
       } else {
-        const financeYear = f.timestamp?.toDate
-          ? f.timestamp.toDate().getFullYear()
-          : new Date(f.timestamp).getFullYear();
-        return financeYear === selectedYear;
+        const date = transaction.timestamp?.toDate
+          ? transaction.timestamp.toDate()
+          : new Date(transaction.timestamp);
+        transactionYear = date.getFullYear();
       }
+
+      const isInSelectedYear =
+        parseInt(transactionYear) === parseInt(selectedYear);
+
+      if (isInSelectedYear) {
+        const amount = transaction.amount || 0;
+        if (transaction.type === "withdrawal") {
+          totalWithdrawn += Math.abs(amount);
+        } else {
+          totalAdded += Math.abs(amount);
+        }
+      }
+
+      return isInSelectedYear;
     });
 
-    // Calculate totals
-    let totalIncome = 0;
-    let totalExpenses = 0;
+    // Calculate income breakdown from the filtered data
     let duesIncome = 0;
     let contributionsIncome = 0;
     let otherIncome = 0;
     let budgetIncome = 0;
 
-    yearFinances.forEach((finance) => {
-      const amount = finance.amount || 0;
-      if (amount > 0) {
-        totalIncome += amount;
-        switch (finance.type) {
+    filteredTransactions.forEach((transaction) => {
+      const amount = transaction.amount || 0;
+
+      if (transaction.type !== "withdrawal") {
+        switch (transaction.type) {
           case "dues":
             duesIncome += amount;
             break;
@@ -217,12 +250,10 @@ const GenerateReportsPage = () => {
             budgetIncome += amount;
             break;
         }
-      } else {
-        totalExpenses += Math.abs(amount);
       }
     });
 
-    // Calculate member payment statistics
+    // Calculate member payment statistics (using original transactions for accuracy)
     const allocation = getDuesAllocationForYear(selectedYear);
     let membersPaid = 0;
     let membersOwing = 0;
@@ -237,9 +268,24 @@ const GenerateReportsPage = () => {
         const expectedAmount = monthlyAmount * 12;
         totalDuesExpected += expectedAmount;
 
-        const memberPayments = yearTransactions.filter(
-          (t) => t.type === "dues" && t.memberId === member.id
-        );
+        // Use the original transactions filtered by year for accuracy
+        const memberPayments = transactions.filter((t) => {
+          if (t.type === "dues" && t.memberId === member.id) {
+            let paymentYear;
+            if (t.year) {
+              paymentYear =
+                typeof t.year === "string" ? parseInt(t.year) : t.year;
+            } else {
+              const date = t.timestamp?.toDate
+                ? t.timestamp.toDate()
+                : new Date(t.timestamp);
+              paymentYear = date.getFullYear();
+            }
+            return paymentYear === selectedYear;
+          }
+          return false;
+        });
+
         const paidAmount = memberPayments.reduce(
           (sum, payment) => sum + payment.amount,
           0
@@ -254,17 +300,18 @@ const GenerateReportsPage = () => {
       });
     }
 
-    // Get detailed transactions
-    const incomeTransactions = yearFinances.filter((f) => f.amount > 0);
-    const expenseTransactions = [
-      ...yearFinances.filter((f) => f.amount < 0),
-      ...yearTransactions.filter((t) => t.type === "withdrawal"),
-    ];
+    // Prepare transactions for reports
+    const incomeTransactions = filteredTransactions.filter(
+      (t) => t.type !== "withdrawal"
+    );
+    const expenseTransactions = filteredTransactions.filter(
+      (t) => t.type === "withdrawal"
+    );
 
     return {
-      totalIncome,
-      totalExpenses,
-      netIncome: totalIncome - totalExpenses,
+      totalIncome: totalAdded,
+      totalExpenses: totalWithdrawn,
+      netIncome: totalAdded - totalWithdrawn,
       duesIncome,
       contributionsIncome,
       otherIncome,
@@ -277,6 +324,11 @@ const GenerateReportsPage = () => {
       incomeTransactions,
       expenseTransactions,
       allocation,
+      totalTransactions: filteredTransactions.length,
+      collectionRate:
+        totalDuesExpected > 0
+          ? (totalDuesCollected / totalDuesExpected) * 100
+          : 0,
     };
   };
 
@@ -384,7 +436,9 @@ const GenerateReportsPage = () => {
                     <td class="positive">GH₵${Math.abs(
                       transaction.amount
                     ).toFixed(2)}</td>
-                    <td>${transaction.addedBy || "System"}</td>
+                    <td>${
+                      transaction.addedBy || transaction.recordedBy || "System"
+                    }</td>
                   </tr>
                 `
                   )
@@ -534,7 +588,7 @@ const GenerateReportsPage = () => {
         csvContent += `${date.toLocaleDateString()},${transaction.type},"${
           transaction.description
         }",GH₵${Math.abs(transaction.amount).toFixed(2)},${
-          transaction.addedBy || "System"
+          transaction.addedBy || transaction.recordedBy || "System"
         }\n`;
       });
 
@@ -553,14 +607,25 @@ const GenerateReportsPage = () => {
         }\n`;
       });
 
-      // Create and share file
+      // Create and share file using NEW FileSystem API
       const filename = `financial_report_${selectedYear}_${Date.now()}.csv`;
-      const fileUri = FileSystem.cacheDirectory + filename;
 
+      // Create a file in the cache directory
+      const fileUri = `${FileSystem.cacheDirectory}${filename}`;
+
+      // Write the file using the new API
       await FileSystem.writeAsStringAsync(fileUri, csvContent, {
         encoding: FileSystem.EncodingType.UTF8,
       });
 
+      // Check if sharing is available
+      const isSharingAvailable = await Sharing.isAvailableAsync();
+      if (!isSharingAvailable) {
+        Alert.alert("Error", "Sharing is not available on this device");
+        return;
+      }
+
+      // Share the file
       await Sharing.shareAsync(fileUri, {
         mimeType: "text/csv",
         dialogTitle: `Financial Report ${selectedYear}`,

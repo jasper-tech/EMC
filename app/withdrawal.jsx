@@ -278,15 +278,15 @@ const Withdrawal = () => {
           style={[styles.headerCard, { backgroundColor: Colors.uiBackground }]}
         >
           <View style={styles.headerContent}>
-            <MaterialIcons
+            {/* <MaterialIcons
               name="account-balance-wallet"
               size={40}
               color={Colors.blueAccent}
-            />
+            /> */}
             <View style={styles.headerText}>
-              <ThemedText style={styles.headerTitle}>Withdraw Funds</ThemedText>
+              {/* <ThemedText style={styles.headerTitle}>Withdraw Funds</ThemedText> */}
               <ThemedText style={styles.headerSubtitle}>
-                Available Coffers: {formatCurrency(totalAmount)}
+                Amount Available: {formatCurrency(totalAmount)}
               </ThemedText>
             </View>
           </View>
