@@ -65,7 +65,7 @@ const FinancialLog = () => {
                 source: "transactions",
               }));
 
-              // Filter out withdrawals AND dues from finances collection to avoid duplication
+              // Filter out withdrawals AND dues from finances collection
               const filteredFinances = financesData.filter(
                 (item) => item.type !== "withdrawal" && item.type !== "dues"
               );
@@ -86,7 +86,7 @@ const FinancialLog = () => {
 
               setAllTransactions(combinedData);
 
-              // Always show years from 2022 to current year
+              // show years from 2022 to current year
               const currentYear = new Date().getFullYear();
               const allYears = Array.from(
                 { length: currentYear - 2021 },
@@ -347,6 +347,7 @@ const FinancialLog = () => {
               size={48}
               color={Colors.yellowAccent}
             />
+
             <ThemedText style={styles.emptyStateTitle}>
               Nothing to audit for {selectedYear}
             </ThemedText>
