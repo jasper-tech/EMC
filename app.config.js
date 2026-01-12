@@ -67,14 +67,67 @@ module.exports = ({ config }) => {
       "SHELL_APP_SCHEME"
     ) || "emc";
 
+  // Preserve or inject eas.projectId so EAS CLI can read it even when using a dynamic config.
+  // Priority: 1. app.json eas.projectId, 2. EXPO_PROJECT_ID env var, 3. fallback to hardcoded projectId
+  const easProjectId =
+    config.expo?.eas?.projectId ||
+    process.env.EXPO_PROJECT_ID ||
+    "16373462-fa5d-4afc-97e1-8b789a63e962";
+
+  const easConfig = { projectId: easProjectId };
+
+  // Remove any accidental nested eas inside extra to avoid conflicts.
+  const baseExtra = { ...(config.expo?.extra ?? {}) };
+  if (baseExtra.eas) delete baseExtra.eas;
+
   return {
     ...config,
     expo: {
       ...config.expo,
       scheme,
+      eas: easConfig,
+      // EAS Update configuration
+      updates: {
+        enabled: true,
+        url: `https://u.expo.dev/${easProjectId}`,
+        fallbackToCacheTimeout: 0,
+        checkAutomatically: "ON_LOAD",
+      },
+      runtimeVersion: {
+        policy: "appVersion",
+      },
+      ios: {
+        ...config.expo?.ios,
+        supportsTablet: true,
+        bundleIdentifier: "com.jaspertech.emc",
+        buildNumber: "1",
+        infoPlist: {
+          NSCameraUsageDescription:
+            "This app needs camera access for profile pictures",
+          NSPhotoLibraryUsageDescription: "This app needs photo library access",
+        },
+      },
+      android: {
+        ...config.expo?.android,
+        package: "com.jaspertech.emc",
+        versionCode: 1,
+        permissions: [
+          "CAMERA",
+          "READ_EXTERNAL_STORAGE",
+          "WRITE_EXTERNAL_STORAGE",
+        ],
+        adaptiveIcon: {
+          foregroundImage: "./assets/adaptive-icon.png",
+          backgroundColor: "#ffffff",
+        },
+        edgeToEdgeEnabled: true,
+      },
       extra: {
-        ...(config.expo?.extra ?? {}),
+        ...baseExtra,
         ...extra,
+        eas: {
+          projectId: easProjectId,
+        },
       },
       plugins: [...(config.expo?.plugins ?? []), "expo-router"],
     },
