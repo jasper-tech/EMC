@@ -123,12 +123,13 @@ module.exports = ({ config }) => {
         },
         edgeToEdgeEnabled: true,
       },
+      web: {
+        favicon: "./assets/applogo.jpg",
+        bundler: "metro",
+      },
       extra: {
         ...baseExtra,
         ...extra,
-        eas: {
-          projectId: easProjectId,
-        },
       },
       plugins: [...(config.expo?.plugins ?? []), "expo-router"],
     },
