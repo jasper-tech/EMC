@@ -18,6 +18,7 @@ import BibleVerses from "../components/BibleVerses";
 import { useAuth } from "../context/AuthContext";
 import { collection, query, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
+import SidePanel from "../components/SidePanel";
 
 const { width, height } = Dimensions.get("window");
 const isWeb = Platform.OS === "web";
@@ -90,6 +91,7 @@ const Dashboard = () => {
   const { user, pendingVerification, loading: authLoading } = useAuth();
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [hoveredTab, setHoveredTab] = useState(null);
+  const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
   const currentUserId = user?.uid;
 
   // Subscribe to unread notifications count
@@ -254,7 +256,14 @@ const Dashboard = () => {
         </ThemedView>
       </ScrollView>
 
-      <FooterNav />
+      {/* Footer with hamburger menu functionality */}
+      <FooterNav onMenuPress={() => setIsSidePanelOpen(true)} />
+
+      {/* Side Panel */}
+      <SidePanel
+        isOpen={isSidePanelOpen}
+        onClose={() => setIsSidePanelOpen(false)}
+      />
     </ThemedView>
   );
 };

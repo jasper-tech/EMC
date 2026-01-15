@@ -1,4 +1,4 @@
-import { StyleSheet, View, TouchableOpacity } from "react-native";
+import { StyleSheet, View, TouchableOpacity, Platform } from "react-native";
 import React, { useContext } from "react";
 import { useRouter, usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -7,14 +7,16 @@ import { Colors } from "../constants/Colors";
 import ThemedText from "./ThemedText";
 import { ThemeContext } from "../context/ThemeContext";
 
-const FooterNav = () => {
+const FooterNav = ({ onMenuPress }) => {
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { scheme } = useContext(ThemeContext);
   const theme = Colors[scheme] ?? Colors.light;
+  const isWeb = Platform.OS === "web";
 
-  const tabs = [
+  // Define different tabs for web and mobile
+  const mobileTabs = [
     {
       name: "Home",
       icon: "home",
@@ -35,7 +37,38 @@ const FooterNav = () => {
     },
   ];
 
+  const webTabs = [
+    {
+      name: "Menu",
+      icon: "menu-outline",
+      iconFilled: "menu",
+      isMenu: true,
+    },
+    {
+      name: "Home",
+      icon: "home-outline",
+      iconFilled: "home",
+      route: "/dashboard",
+    },
+    {
+      name: "About",
+      icon: "information-circle-outline",
+      iconFilled: "information-circle",
+      route: "/about",
+    },
+    {
+      name: "Reports",
+      icon: "bar-chart-outline",
+      iconFilled: "bar-chart",
+      route: "/reports",
+    },
+  ];
+
+  // Use web tabs if on web, mobile tabs otherwise
+  const tabs = isWeb ? webTabs : mobileTabs;
+
   const isActive = (route) => {
+    if (!route) return false; // Menu button doesn't have a route
     if (route === "/") {
       return pathname === "/" || pathname === "/index";
     }
@@ -43,12 +76,27 @@ const FooterNav = () => {
   };
 
   // Get icon color based on theme and active state
-  const getIconColor = (active) => {
+  const getIconColor = (active, isMenu = false) => {
+    if (isMenu) {
+      // Menu button always uses the same color scheme
+      return scheme === "dark" ? "#FFFFFF" : "#000000";
+    }
+
     if (active) {
       return Colors.primary; // Active tabs use primary color
     }
     // Inactive tabs: light in dark mode, dark in light mode
     return scheme === "dark" ? "#FFFFFF" : "#000000";
+  };
+
+  const handleTabPress = (tab) => {
+    if (tab.isMenu && onMenuPress) {
+      // Call the menu press handler for hamburger icon
+      onMenuPress();
+    } else if (tab.route && !isActive(tab.route)) {
+      // Navigate to the route
+      router.push(tab.route);
+    }
   };
 
   return (
@@ -63,30 +111,41 @@ const FooterNav = () => {
     >
       {tabs.map((tab, index) => {
         const active = isActive(tab.route);
-        const iconColor = getIconColor(active);
+        const iconColor = getIconColor(active, tab.isMenu);
 
         return (
           <TouchableOpacity
             key={index}
-            style={styles.tab}
-            onPress={() => {
-              if (!active) {
-                router.push(tab.route);
-              }
-            }}
+            style={[
+              styles.tab,
+              tab.isMenu && styles.menuTab, // Optional: different styling for menu
+            ]}
+            onPress={() => handleTabPress(tab)}
             activeOpacity={0.7}
           >
             <View style={styles.iconContainer}>
               <Ionicons
                 name={active ? tab.iconFilled : tab.icon}
-                size={26}
+                size={tab.isMenu ? 28 : 26} // Slightly larger for menu icon
                 color={iconColor}
               />
-              {active && (
+              {!tab.isMenu && active && (
                 <View
                   style={[
                     styles.activeIndicator,
                     { backgroundColor: Colors.primary },
+                  ]}
+                />
+              )}
+              {/* Special indicator for menu button */}
+              {tab.isMenu && (
+                <View
+                  style={[
+                    styles.menuIndicator,
+                    {
+                      backgroundColor:
+                        scheme === "dark" ? "#FFFFFF" : "#000000",
+                    },
                   ]}
                 />
               )}
@@ -96,7 +155,8 @@ const FooterNav = () => {
                 styles.label,
                 {
                   color: iconColor,
-                  fontWeight: active ? "600" : "500",
+                  fontWeight: active || tab.isMenu ? "600" : "500",
+                  opacity: tab.isMenu ? 0.9 : 1,
                 },
               ]}
             >
@@ -130,14 +190,20 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 20,
     paddingVertical: 8,
+    flex: 1,
+  },
+  menuTab: {
+    // Optional: You can add special styling for menu tab
   },
   iconContainer: {
     position: "relative",
     marginBottom: 4,
     alignItems: "center",
+    justifyContent: "center",
   },
   label: {
     fontSize: 12,
+    marginTop: 2,
   },
   activeIndicator: {
     position: "absolute",
@@ -145,5 +211,13 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
+  },
+  menuIndicator: {
+    position: "absolute",
+    top: -6,
+    width: 6,
+    height: 2,
+    borderRadius: 1,
+    opacity: 0.7,
   },
 });

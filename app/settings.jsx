@@ -40,17 +40,13 @@ const Settings = () => {
       title: "About & Disclaimer",
       icon: "info",
       description: "App information and copyright",
+      screen: "/disclaimer",
     },
   ];
 
   const handleTabPress = (tab) => {
     if (tab.screen) {
       router.push(tab.screen);
-    } else if (tab.id === "about") {
-      Alert.alert(
-        "About & Disclaimer",
-        "This app was created by Sandy Afeawo under jasper-tech on GitHub and is to be used by Divine Victory Teshie EPSU for the management of their union.\n\nAll rights reserved.\n\nVersion: 1.0.0\n\nDisclaimer: This app is provided as-is without any warranties. The developers are not responsible for any data loss or issues arising from app usage."
-      );
     }
   };
 

@@ -55,6 +55,7 @@ const Members = () => {
     fullname: "",
     address: "",
     phone: "",
+    birthDate: "", // Added birth date field
     dateJoined: new Date().toISOString().split("T")[0],
     profileImg: "",
   });
@@ -112,7 +113,8 @@ const Members = () => {
         (member) =>
           member.fullname?.toLowerCase().includes(searchQuery.toLowerCase()) ||
           member.phone?.includes(searchQuery) ||
-          member.address?.toLowerCase().includes(searchQuery.toLowerCase())
+          member.address?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          member.birthDate?.includes(searchQuery) // Added birth date to search
       );
       setFilteredMembers(filtered);
     }
@@ -123,25 +125,63 @@ const Members = () => {
       fullname: "",
       address: "",
       phone: "",
+      birthDate: "",
       dateJoined: new Date().toISOString().split("T")[0],
       profileImg: "",
     });
   };
 
-  const validateDate = (dateString) => {
+  const validateDate = (dateString, type = "any") => {
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!dateRegex.test(dateString)) {
       return false;
     }
     const date = new Date(dateString);
     const today = new Date();
-    // Check if date is valid and not in the future
-    return date instanceof Date && !isNaN(date) && date <= today;
+
+    // Check if date is valid
+    if (!(date instanceof Date) || isNaN(date)) {
+      return false;
+    }
+
+    // For birth date: must be in the past
+    if (type === "birth") {
+      return date <= today;
+    }
+
+    // For date joined: must be in the past
+    if (type === "joined") {
+      return date <= today;
+    }
+
+    // For any date: must be valid date
+    return true;
+  };
+
+  const calculateAge = (birthDateString) => {
+    if (!birthDateString) return null;
+
+    try {
+      const birthDate = new Date(birthDateString);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+
+      if (
+        monthDiff < 0 ||
+        (monthDiff === 0 && today.getDate() < birthDate.getDate())
+      ) {
+        age--;
+      }
+
+      return age;
+    } catch (error) {
+      return null;
+    }
   };
 
   const pickImage = async () => {
     try {
-      // Request permissions
       const { status } =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
 
@@ -153,7 +193,6 @@ const Members = () => {
         return;
       }
 
-      // Launch image picker
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -187,10 +226,18 @@ const Members = () => {
       return;
     }
 
-    if (!validateDate(formData.dateJoined)) {
+    if (formData.birthDate && !validateDate(formData.birthDate, "birth")) {
       Alert.alert(
         "Error",
-        "Please enter a valid date in YYYY-MM-DD format (cannot be in the future)"
+        "Please enter a valid birth date in YYYY-MM-DD format (must be in the past)"
+      );
+      return;
+    }
+
+    if (!validateDate(formData.dateJoined, "joined")) {
+      Alert.alert(
+        "Error",
+        "Please enter a valid date joined in YYYY-MM-DD format (cannot be in the future)"
       );
       return;
     }
@@ -202,6 +249,7 @@ const Members = () => {
         ...formData,
         uid: "",
         isExecutive: false,
+        age: formData.birthDate ? calculateAge(formData.birthDate) : null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -237,10 +285,18 @@ const Members = () => {
       return;
     }
 
-    if (!validateDate(formData.dateJoined)) {
+    if (formData.birthDate && !validateDate(formData.birthDate, "birth")) {
       Alert.alert(
         "Error",
-        "Please enter a valid date in YYYY-MM-DD format (cannot be in the future)"
+        "Please enter a valid birth date in YYYY-MM-DD format (must be in the past)"
+      );
+      return;
+    }
+
+    if (!validateDate(formData.dateJoined, "joined")) {
+      Alert.alert(
+        "Error",
+        "Please enter a valid date joined in YYYY-MM-DD format (cannot be in the future)"
       );
       return;
     }
@@ -250,6 +306,7 @@ const Members = () => {
       const memberRef = doc(db, "members", selectedMember.id);
       await updateDoc(memberRef, {
         ...formData,
+        age: formData.birthDate ? calculateAge(formData.birthDate) : null,
         updatedAt: serverTimestamp(),
       });
 
@@ -260,6 +317,7 @@ const Members = () => {
           fullName: formData.fullname,
           phone: formData.phone,
           address: formData.address,
+          birthDate: formData.birthDate,
           profileImg: formData.profileImg,
           updatedAt: serverTimestamp(),
         });
@@ -272,6 +330,7 @@ const Members = () => {
             fullName: formData.fullname,
             phone: formData.phone,
             address: formData.address,
+            birthDate: formData.birthDate,
             profileImg: formData.profileImg,
           };
           await AsyncStorage.setItem(
@@ -299,6 +358,7 @@ const Members = () => {
       fullname: member.fullname || "",
       address: member.address || "",
       phone: member.phone || "",
+      birthDate: member.birthDate || "",
       dateJoined: member.dateJoined || new Date().toISOString().split("T")[0],
       profileImg: member.profileImg || "",
     });
@@ -312,17 +372,28 @@ const Members = () => {
 
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    } catch (error) {
+      return "Invalid Date";
+    }
+  };
+
+  const getAgeDisplay = (birthDateString) => {
+    if (!birthDateString) return "";
+    const age = calculateAge(birthDateString);
+    return age ? `${age} years` : "";
   };
 
   const renderMemberCard = ({ item, index }) => {
     const isExpanded = expandedMemberId === item.id;
     const isExecutive = item.isExecutive;
+    const ageDisplay = getAgeDisplay(item.birthDate);
 
     return (
       <Animated.View
@@ -381,6 +452,10 @@ const Members = () => {
                 )}
               </View>
               <ThemedText style={styles.memberPhone}>{item.phone}</ThemedText>
+              {/* Display age if available */}
+              {ageDisplay && (
+                <ThemedText style={styles.memberAge}>{ageDisplay}</ThemedText>
+              )}
               {item.email && (
                 <ThemedText style={styles.memberEmail}>{item.email}</ThemedText>
               )}
@@ -402,6 +477,26 @@ const Members = () => {
                   <ThemedText style={styles.viewImageText}>
                     Tap to view full image
                   </ThemedText>
+                </View>
+              )}
+
+              {/* Birth Date */}
+              {item.birthDate && (
+                <View style={styles.detailRow}>
+                  <Ionicons
+                    name="gift-outline"
+                    size={20}
+                    color={Colors.purpleAccent}
+                  />
+                  <View style={styles.detailTextContainer}>
+                    <ThemedText style={styles.detailLabel}>
+                      Birth Date
+                    </ThemedText>
+                    <ThemedText style={styles.detailValue}>
+                      {formatDate(item.birthDate)}
+                      {ageDisplay && ` (${ageDisplay})`}
+                    </ThemedText>
+                  </View>
                 </View>
               )}
 
@@ -645,6 +740,41 @@ const Members = () => {
                 </View>
               </View>
 
+              {/* Birth Date Field */}
+              <View style={styles.inputGroup}>
+                <ThemedText style={styles.inputLabel}>Birth Date</ThemedText>
+                <View
+                  style={[styles.inputWrapper, { backgroundColor: theme.card }]}
+                >
+                  <Ionicons
+                    name="gift-outline"
+                    size={20}
+                    color={Colors.purpleAccent}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={[styles.input]}
+                    value={formData.birthDate}
+                    onChangeText={(text) =>
+                      setFormData({ ...formData, birthDate: text })
+                    }
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor="#999"
+                    keyboardType="numbers-and-punctuation"
+                    color={theme.text}
+                  />
+                </View>
+                <ThemedText style={styles.dateHint}>
+                  Format: YYYY-MM-DD (e.g., 1990-05-15)
+                </ThemedText>
+                {formData.birthDate &&
+                  validateDate(formData.birthDate, "birth") && (
+                    <ThemedText style={styles.ageDisplay}>
+                      Age: {calculateAge(formData.birthDate)} years
+                    </ThemedText>
+                  )}
+              </View>
+
               <View style={styles.inputGroup}>
                 <ThemedText style={styles.inputLabel}>Date Joined *</ThemedText>
                 <View
@@ -860,6 +990,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     opacity: 0.6,
   },
+  memberAge: {
+    fontSize: 13,
+    opacity: 0.5,
+    fontStyle: "italic",
+  },
   expandedContent: {
     marginTop: 16,
     paddingTop: 16,
@@ -1042,6 +1177,12 @@ const styles = StyleSheet.create({
     opacity: 0.5,
     marginTop: 4,
     fontStyle: "italic",
+  },
+  ageDisplay: {
+    fontSize: 12,
+    color: Colors.greenAccent,
+    marginTop: 4,
+    fontWeight: "600",
   },
   executiveBadge: {
     position: "absolute",

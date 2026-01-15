@@ -252,6 +252,14 @@ const LayoutContent = () => {
                 // headerBackVisible: false,
               }}
             />
+            <Stack.Screen
+              name="disclaimer"
+              options={{
+                headerTitle: "Disclaimer",
+                gestureEnabled: false,
+                // headerBackVisible: false,
+              }}
+            />
           </Stack>
         </AppWrapper>
       )}

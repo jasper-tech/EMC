@@ -5,13 +5,14 @@ import {
   ScrollView,
   Animated,
 } from "react-native";
-import React, { useRef, useContext } from "react";
+import React, { useRef, useContext, useState } from "react";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import ThemedView from "../components/ThemedView";
 import ThemedText from "../components/ThemedText";
 import FooterNav from "../components/FooterNav";
+import SidePanel from "../components/SidePanel";
 import { Colors } from "../constants/Colors";
 import { ThemeContext } from "../context/ThemeContext";
 
@@ -21,6 +22,7 @@ const ReportsDashboard = () => {
   const theme = Colors[scheme] ?? Colors.light;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
+  const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
 
   React.useEffect(() => {
     Animated.parallel([
@@ -97,22 +99,6 @@ const ReportsDashboard = () => {
                 activeOpacity={0.7}
               >
                 <View style={styles.tabContent}>
-                  {/* Icon and Stats Row */}
-                  <View style={styles.tabHeader}>
-                    <View style={styles.tabIcon}>
-                      <MaterialIcons
-                        name={tab.icon}
-                        size={32}
-                        color={Colors.blueAccent}
-                      />
-                    </View>
-                    <ThemedView style={styles.statsBadge}>
-                      <ThemedText style={styles.statsText}>
-                        {tab.stats}
-                      </ThemedText>
-                    </ThemedView>
-                  </View>
-
                   {/* Title and Description */}
                   <View style={styles.tabText}>
                     <ThemedText style={styles.tabTitle}>{tab.title}</ThemedText>
@@ -121,8 +107,13 @@ const ReportsDashboard = () => {
                     </ThemedText>
                   </View>
 
-                  {/* Arrow Icon */}
+                  {/* Footer with Stats and Arrow */}
                   <View style={styles.tabFooter}>
+                    <ThemedView style={styles.statsBadge}>
+                      <ThemedText style={styles.statsText}>
+                        {tab.stats}
+                      </ThemedText>
+                    </ThemedView>
                     <Ionicons
                       name="arrow-forward-circle"
                       size={32}
@@ -136,7 +127,15 @@ const ReportsDashboard = () => {
           </View>
         </Animated.View>
       </ScrollView>
-      <FooterNav />
+
+      {/* Footer with hamburger menu functionality */}
+      <FooterNav onMenuPress={() => setIsSidePanelOpen(true)} />
+
+      {/* Side Panel */}
+      <SidePanel
+        isOpen={isSidePanelOpen}
+        onClose={() => setIsSidePanelOpen(false)}
+      />
     </ThemedView>
   );
 };
@@ -171,35 +170,16 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 4,
-    minHeight: 120,
-    borderWidth: 1, // Added border width
+    minHeight: 140,
+    borderWidth: 1,
   },
   tabContent: {
     flex: 1,
     justifyContent: "space-between",
   },
-  tabHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 16,
-  },
-
-  statsBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: Colors.border + "40",
-  },
-  statsText: {
-    fontSize: 11,
-    fontWeight: "bold",
-    letterSpacing: 0.5,
-    opacity: 0.7,
-  },
   tabText: {
     flex: 1,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   tabTitle: {
     fontSize: 18,
@@ -213,7 +193,20 @@ const styles = StyleSheet.create({
   },
   tabFooter: {
     flexDirection: "row",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  statsBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: Colors.border + "40",
+  },
+  statsText: {
+    fontSize: 11,
+    fontWeight: "bold",
+    letterSpacing: 0.5,
+    opacity: 0.7,
   },
   arrowIcon: {
     opacity: 0.8,

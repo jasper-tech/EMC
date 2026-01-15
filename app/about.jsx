@@ -5,19 +5,21 @@ import {
   ScrollView,
   Animated,
 } from "react-native";
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import ThemedView from "../components/ThemedView";
 import ThemedText from "../components/ThemedText";
 import FooterNav from "../components/FooterNav";
+import SidePanel from "../components/SidePanel";
 import { Colors } from "../constants/Colors";
 
 const About = () => {
   const insets = useSafeAreaInsets();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
+  const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
 
   React.useEffect(() => {
     Animated.parallel([
@@ -178,7 +180,15 @@ const About = () => {
           </View>
         </Animated.View>
       </ScrollView>
-      <FooterNav />
+
+      {/* Footer with hamburger menu functionality */}
+      <FooterNav onMenuPress={() => setIsSidePanelOpen(true)} />
+
+      {/* Side Panel */}
+      <SidePanel
+        isOpen={isSidePanelOpen}
+        onClose={() => setIsSidePanelOpen(false)}
+      />
     </ThemedView>
   );
 };
