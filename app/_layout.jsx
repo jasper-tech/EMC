@@ -37,7 +37,6 @@ const LayoutContent = () => {
     <>
       <StatusBar style={scheme === "dark" ? "light" : "dark"} />
       {isAuthRoute ? (
-        // Render without AppWrapper for auth routes
         <Stack
           screenOptions={{
             headerStyle: { backgroundColor: theme.navBackground },
@@ -111,6 +110,13 @@ const LayoutContent = () => {
               }}
             />
             <Stack.Screen
+              name="notifications"
+              options={{
+                headerTitle: "Notifications",
+                gestureEnabled: false,
+              }}
+            />
+            <Stack.Screen
               name="finances"
               options={{
                 headerTitle: "Finances",
@@ -164,6 +170,46 @@ const LayoutContent = () => {
               options={{
                 headerTitle: "Forgot Password",
                 gestureEnabled: false,
+              }}
+            />
+            <Stack.Screen
+              name="studentunion"
+              options={{
+                headerTitle: "EPSU ",
+                gestureEnabled: false,
+                // headerBackVisible: false,
+              }}
+            />
+            <Stack.Screen
+              name="mission"
+              options={{
+                headerTitle: "Mission Statement",
+                gestureEnabled: false,
+                // headerBackVisible: false,
+              }}
+            />
+            <Stack.Screen
+              name="vision"
+              options={{
+                headerTitle: "Vision Statement",
+                gestureEnabled: false,
+                // headerBackVisible: false,
+              }}
+            />
+            <Stack.Screen
+              name="epsuvc"
+              options={{
+                headerTitle: "EPSU Verse & Theme",
+                gestureEnabled: false,
+                // headerBackVisible: false,
+              }}
+            />
+            <Stack.Screen
+              name="anthem"
+              options={{
+                headerTitle: "EPSU Anthem and Pledge",
+                gestureEnabled: false,
+                // headerBackVisible: false,
               }}
             />
             <Stack.Screen

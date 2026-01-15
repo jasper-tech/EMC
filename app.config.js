@@ -1,4 +1,3 @@
-// app.config.js
 // Loads environment variables and maps them into Expo's `expo.extra` so Constants.expoConfig.extra is available at runtime.
 
 module.exports = ({ config }) => {
@@ -124,12 +123,15 @@ module.exports = ({ config }) => {
         edgeToEdgeEnabled: true,
       },
       web: {
-        favicon: "./assets/applogo.jpg",
+        favicon: "./assets/applogo4.png",
         bundler: "metro",
       },
       extra: {
         ...baseExtra,
         ...extra,
+        eas: {
+          projectId: easProjectId,
+        },
       },
       plugins: [...(config.expo?.plugins ?? []), "expo-router"],
     },

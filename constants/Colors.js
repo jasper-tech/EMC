@@ -11,6 +11,8 @@ export const Colors = {
   tealAccent: "#17A2B8",
   orangeAccent: "#FF7F50",
   purpleAccent: "#9B59B6",
+  malbec: "#9B0047",
+  wineAccent: "#722F37",
 
   dark: {
     text: "#d4d4d4",

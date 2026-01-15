@@ -186,9 +186,6 @@ const Index = () => {
           {/* <ThemedText type="title" style={styles.title}>
             Ready to Continue?
           </ThemedText> */}
-          <ThemedText style={styles.subtitle}>
-            Pick up where you left off
-          </ThemedText>
         </View>
 
         {savedUser ? (

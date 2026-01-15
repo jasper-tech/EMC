@@ -67,8 +67,8 @@ const About = () => {
     {
       id: 3,
       title: "Students Union",
-      description: "Union information and activities",
-      route: "/union-info",
+      description: "Union info and code of conduct",
+      route: "/studentunion",
       badge: "Info",
     },
     {

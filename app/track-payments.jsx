@@ -512,7 +512,7 @@ const TrackPayments = () => {
               GH₵{totalExpected.toFixed(2)}
             </ThemedText>
             <ThemedText style={styles.amountLeftText}>
-              Amount left to reach:{" "}
+              Amount left to reach:
               <ThemedText style={styles.amountLeftValue}>
                 GH₵{totalOwing}
               </ThemedText>
