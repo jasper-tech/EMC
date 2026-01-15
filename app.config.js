@@ -84,7 +84,7 @@ module.exports = ({ config }) => {
     ...config,
     expo: {
       ...config.expo,
-      icon: "./assets/applogo.jpg",
+      icon: "./assets/applogo4.png",
       scheme,
       eas: easConfig,
       // EAS Update configuration
