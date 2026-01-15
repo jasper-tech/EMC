@@ -1,5 +1,5 @@
 // app/studentsunion.jsx
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
   View,
@@ -13,16 +13,90 @@ import { MaterialIcons } from "@expo/vector-icons";
 import ThemedView from "../components/ThemedView";
 import ThemedText from "../components/ThemedText";
 import FooterNav from "../components/FooterNav";
+import SidePanel from "../components/SidePanel";
 import { Colors } from "../constants/Colors";
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 const isWeb = Platform.OS === "web";
 
-// Calculate responsive card width for mobile 2x2 grid
-const CARD_WIDTH = isWeb ? width * 0.22 : (width - 60) / 2; // 20 padding + 20 gap = 40
-const CARD_HEIGHT = CARD_WIDTH * 1.2;
-
 const StudentsUnion = () => {
+  const [screenWidth, setScreenWidth] = useState(width);
+  const [screenHeight, setScreenHeight] = useState(height);
+  const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
+
+  useEffect(() => {
+    const updateDimensions = () => {
+      setScreenWidth(Dimensions.get("window").width);
+      setScreenHeight(Dimensions.get("window").height);
+    };
+
+    Dimensions.addEventListener("change", updateDimensions);
+
+    return () => {
+      Dimensions.removeEventListener?.("change", updateDimensions);
+    };
+  }, []);
+
+  // For native mobile: Always use 2x2 grid
+  // For web: Determine layout based on screen size
+  const isNativeMobile = !isWeb;
+
+  // Web responsive calculations
+  const isWebSmallScreen = isWeb && screenWidth < 768;
+  const isWebMediumScreen = isWeb && screenWidth >= 768 && screenWidth < 1024;
+  const isWebLargeScreen = isWeb && screenWidth >= 1024;
+
+  // For native mobile: fixed 2x2 grid
+  // For web: responsive layout
+  const getCardWidth = () => {
+    if (isNativeMobile) {
+      // Native mobile: 2x2 grid calculation
+      return (screenWidth - 60) / 2; // 20 padding on each side + 20 gap = 60
+    } else if (isWebSmallScreen) {
+      // Web mobile: single column
+      return screenWidth - 40;
+    } else if (isWebMediumScreen) {
+      // Web tablet: 2 columns
+      return (screenWidth - 60) / 2;
+    } else {
+      // Web desktop: fixed max width
+      return Math.min(screenWidth * 0.22, 200);
+    }
+  };
+
+  const getCardHeight = () => {
+    const cardWidth = getCardWidth();
+    if (isNativeMobile) {
+      return cardWidth * 1.2; // Native mobile aspect ratio
+    } else if (isWebSmallScreen) {
+      return cardWidth * 0.8; // Web mobile: wider aspect ratio
+    } else {
+      return cardWidth * 1.2; // Web tablet/desktop
+    }
+  };
+
+  const getGridStyle = () => {
+    if (isNativeMobile) {
+      return "grid-2x2"; // Native mobile always 2x2
+    } else if (isWebSmallScreen) {
+      return "grid-1x4"; // Web mobile: single column
+    } else {
+      return "grid-2x2"; // Web tablet/desktop: 2 columns
+    }
+  };
+
+  const getFontSize = (baseSize) => {
+    if (isNativeMobile) {
+      return baseSize; // Native mobile uses base size
+    } else if (isWebSmallScreen) {
+      return baseSize * 0.9; // Web mobile slightly smaller
+    } else if (isWebMediumScreen) {
+      return baseSize; // Web tablet
+    } else {
+      return baseSize; // Web desktop
+    }
+  };
+
   const tabs = [
     {
       id: "mission",
@@ -50,6 +124,190 @@ const StudentsUnion = () => {
     router.push(tabId);
   };
 
+  const cardWidth = getCardWidth();
+  const cardHeight = getCardHeight();
+  const gridStyle = getGridStyle();
+
+  // Native mobile: Always 2x2 grid (2 rows of 2 columns)
+  // Web small: Single column (4 rows of 1 column)
+  // Web medium/large: 2x2 grid
+  const renderGrid = () => {
+    if (gridStyle === "grid-1x4") {
+      // Single column for web mobile
+      return (
+        <View style={styles.singleColumnContainer}>
+          {tabs.map((tab) => (
+            <TouchableOpacity
+              key={tab.id}
+              style={[
+                styles.tabCard,
+                styles.singleColumnCard,
+                {
+                  width: cardWidth,
+                  height: cardHeight,
+                  marginBottom: 16,
+                },
+              ]}
+              onPress={() => navigateToDetail(tab.id)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.tabIconContainer}>
+                <MaterialIcons
+                  name={tab.icon}
+                  size={36}
+                  color={Colors.malbec}
+                />
+              </View>
+              <ThemedText
+                style={[styles.tabTitle, { fontSize: getFontSize(16) }]}
+              >
+                {tab.title}
+              </ThemedText>
+              <ThemedText style={styles.tabArrow}>→</ThemedText>
+            </TouchableOpacity>
+          ))}
+        </View>
+      );
+    } else {
+      // 2x2 grid for native mobile and web tablet/desktop
+      return (
+        <View style={styles.gridContainer}>
+          {/* First Row */}
+          <View style={styles.tabsRow}>
+            <TouchableOpacity
+              style={[
+                styles.tabCard,
+                styles.gridCard,
+                {
+                  width: cardWidth,
+                  height: cardHeight,
+                  marginRight: isNativeMobile ? 20 : 10,
+                },
+              ]}
+              onPress={() => navigateToDetail(tabs[0].id)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.tabIconContainer}>
+                <MaterialIcons
+                  name={tabs[0].icon}
+                  size={isNativeMobile ? 40 : isWeb ? 48 : 40}
+                  color={Colors.malbec}
+                />
+              </View>
+              <ThemedText
+                style={[
+                  styles.tabTitle,
+                  { fontSize: getFontSize(isNativeMobile ? 14 : 18) },
+                ]}
+              >
+                {tabs[0].title}
+              </ThemedText>
+              <ThemedText style={styles.tabArrow}>→</ThemedText>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.tabCard,
+                styles.gridCard,
+                {
+                  width: cardWidth,
+                  height: cardHeight,
+                  marginLeft: isNativeMobile ? 20 : 10,
+                },
+              ]}
+              onPress={() => navigateToDetail(tabs[1].id)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.tabIconContainer}>
+                <MaterialIcons
+                  name={tabs[1].icon}
+                  size={isNativeMobile ? 40 : isWeb ? 48 : 40}
+                  color={Colors.malbec}
+                />
+              </View>
+              <ThemedText
+                style={[
+                  styles.tabTitle,
+                  { fontSize: getFontSize(isNativeMobile ? 14 : 18) },
+                ]}
+              >
+                {tabs[1].title}
+              </ThemedText>
+              <ThemedText style={styles.tabArrow}>→</ThemedText>
+            </TouchableOpacity>
+          </View>
+
+          {/* Second Row */}
+          <View
+            style={[styles.tabsRow, { marginTop: isNativeMobile ? 20 : 30 }]}
+          >
+            <TouchableOpacity
+              style={[
+                styles.tabCard,
+                styles.gridCard,
+                {
+                  width: cardWidth,
+                  height: cardHeight,
+                  marginRight: isNativeMobile ? 20 : 10,
+                },
+              ]}
+              onPress={() => navigateToDetail(tabs[2].id)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.tabIconContainer}>
+                <MaterialIcons
+                  name={tabs[2].icon}
+                  size={isNativeMobile ? 40 : isWeb ? 48 : 40}
+                  color={Colors.malbec}
+                />
+              </View>
+              <ThemedText
+                style={[
+                  styles.tabTitle,
+                  { fontSize: getFontSize(isNativeMobile ? 14 : 18) },
+                ]}
+              >
+                {tabs[2].title}
+              </ThemedText>
+              <ThemedText style={styles.tabArrow}>→</ThemedText>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.tabCard,
+                styles.gridCard,
+                {
+                  width: cardWidth,
+                  height: cardHeight,
+                  marginLeft: isNativeMobile ? 20 : 10,
+                },
+              ]}
+              onPress={() => navigateToDetail(tabs[3].id)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.tabIconContainer}>
+                <MaterialIcons
+                  name={tabs[3].icon}
+                  size={isNativeMobile ? 40 : isWeb ? 48 : 40}
+                  color={Colors.malbec}
+                />
+              </View>
+              <ThemedText
+                style={[
+                  styles.tabTitle,
+                  { fontSize: getFontSize(isNativeMobile ? 14 : 18) },
+                ]}
+              >
+                {tabs[3].title}
+              </ThemedText>
+              <ThemedText style={styles.tabArrow}>→</ThemedText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+  };
+
   return (
     <ThemedView style={styles.container}>
       <ScrollView
@@ -59,111 +317,31 @@ const StudentsUnion = () => {
       >
         <View style={styles.content}>
           <View style={styles.header}>
-            <ThemedText style={styles.subtitle}>Code of Conduct</ThemedText>
+            <ThemedText
+              style={[
+                styles.subtitle,
+                { fontSize: getFontSize(isWeb ? 18 : 16) },
+              ]}
+            >
+              Code of Conduct
+            </ThemedText>
           </View>
 
-          {/* Tabs Grid  */}
-          <View style={styles.tabsGrid}>
-            {/* First Row */}
-            <View style={styles.tabsRow}>
-              <TouchableOpacity
-                style={[
-                  styles.tabCard,
-                  {
-                    width: CARD_WIDTH,
-                    height: CARD_HEIGHT,
-                  },
-                ]}
-                onPress={() => navigateToDetail(tabs[0].id)}
-                activeOpacity={0.8}
-              >
-                <View style={styles.tabIconContainer}>
-                  <MaterialIcons
-                    name={tabs[0].icon}
-                    size={isWeb ? 48 : 40}
-                    color={Colors.malbec}
-                  />
-                </View>
-                <ThemedText style={styles.tabTitle}>{tabs[0].title}</ThemedText>
-                <ThemedText style={styles.tabArrow}>→</ThemedText>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.tabCard,
-                  {
-                    width: CARD_WIDTH,
-                    height: CARD_HEIGHT,
-                  },
-                ]}
-                onPress={() => navigateToDetail(tabs[1].id)}
-                activeOpacity={0.8}
-              >
-                <View style={styles.tabIconContainer}>
-                  <MaterialIcons
-                    name={tabs[1].icon}
-                    size={isWeb ? 48 : 40}
-                    color={Colors.malbec}
-                  />
-                </View>
-                <ThemedText style={styles.tabTitle}>{tabs[1].title}</ThemedText>
-                <ThemedText style={styles.tabArrow}>→</ThemedText>
-              </TouchableOpacity>
-            </View>
-
-            {/* Second Row */}
-            <View style={styles.tabsRow}>
-              <TouchableOpacity
-                style={[
-                  styles.tabCard,
-                  {
-                    width: CARD_WIDTH,
-                    height: CARD_HEIGHT,
-                  },
-                ]}
-                onPress={() => navigateToDetail(tabs[2].id)}
-                activeOpacity={0.8}
-              >
-                <View style={styles.tabIconContainer}>
-                  <MaterialIcons
-                    name={tabs[2].icon}
-                    size={isWeb ? 48 : 40}
-                    color={Colors.malbec}
-                  />
-                </View>
-                <ThemedText style={styles.tabTitle}>{tabs[2].title}</ThemedText>
-                <ThemedText style={styles.tabArrow}>→</ThemedText>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.tabCard,
-                  {
-                    width: CARD_WIDTH,
-                    height: CARD_HEIGHT,
-                  },
-                ]}
-                onPress={() => navigateToDetail(tabs[3].id)}
-                activeOpacity={0.8}
-              >
-                <View style={styles.tabIconContainer}>
-                  <MaterialIcons
-                    name={tabs[3].icon}
-                    size={isWeb ? 48 : 40}
-                    color={Colors.malbec}
-                  />
-                </View>
-                <ThemedText style={styles.tabTitle}>{tabs[3].title}</ThemedText>
-                <ThemedText style={styles.tabArrow}>→</ThemedText>
-              </TouchableOpacity>
-            </View>
-          </View>
+          {/* Render the appropriate grid */}
+          {renderGrid()}
 
           <View style={styles.bottomSpacer} />
         </View>
       </ScrollView>
 
-      <FooterNav />
+      {/* Footer with hamburger menu */}
+      <FooterNav onMenuPress={() => setIsSidePanelOpen(true)} />
+
+      {/* Side Panel */}
+      <SidePanel
+        isOpen={isSidePanelOpen}
+        onClose={() => setIsSidePanelOpen(false)}
+      />
     </ThemedView>
   );
 };
@@ -179,6 +357,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
+    paddingBottom: 20,
   },
   content: {
     flex: 1,
@@ -193,21 +372,33 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   subtitle: {
-    fontSize: isWeb ? 18 : 16,
     opacity: 0.7,
     textAlign: "center",
   },
-  tabsGrid: {
+  // Grid layout for native mobile and web tablet/desktop
+  gridContainer: {
     width: "100%",
     maxWidth: 800,
-    gap: isWeb ? 30 : 20,
+    alignItems: "center",
   },
   tabsRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "center",
     width: "100%",
-    gap: isWeb ? 30 : 20,
-    marginBottom: isWeb ? 30 : 20,
+  },
+  // Single column layout for web mobile
+  singleColumnContainer: {
+    width: "100%",
+    maxWidth: 400,
+    alignItems: "center",
+    paddingHorizontal: 10,
+  },
+  singleColumnCard: {
+    width: "100%",
+    maxWidth: 400,
+  },
+  gridCard: {
+    // Default grid card styles
   },
   tabCard: {
     borderRadius: 16,
@@ -228,7 +419,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   tabTitle: {
-    fontSize: isWeb ? 18 : 14,
     fontWeight: "bold",
     textAlign: "center",
     marginBottom: 8,
@@ -237,7 +427,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 12,
     right: 12,
-    fontSize: isWeb ? 18 : 16,
+    fontSize: 16,
     fontWeight: "bold",
     opacity: 0.7,
   },
