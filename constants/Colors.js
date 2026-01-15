@@ -13,6 +13,7 @@ export const Colors = {
   purpleAccent: "#9B59B6",
   malbec: "#9B0047",
   wineAccent: "#722F37",
+  whiteAccent: "#F5F5F5",
 
   dark: {
     text: "#d4d4d4",

@@ -510,7 +510,7 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
             <View style={styles.menuTextContainer}>
               <ThemedText style={styles.menuText}>Settings</ThemedText>
               <ThemedText style={styles.menuSubtext}>
-                Preferences & privacy
+                Privacy & Usage Terms
               </ThemedText>
             </View>
             <Ionicons

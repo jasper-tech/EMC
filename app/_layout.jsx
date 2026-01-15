@@ -228,6 +228,30 @@ const LayoutContent = () => {
                 // headerBackVisible: false,
               }}
             />
+            <Stack.Screen
+              name="settings"
+              options={{
+                headerTitle: "Privacy & Settings",
+                gestureEnabled: false,
+                // headerBackVisible: false,
+              }}
+            />
+            <Stack.Screen
+              name="reportbug"
+              options={{
+                headerTitle: "Send a report",
+                gestureEnabled: false,
+                // headerBackVisible: false,
+              }}
+            />
+            <Stack.Screen
+              name="viewissues"
+              options={{
+                headerTitle: "Reported Issues",
+                gestureEnabled: false,
+                // headerBackVisible: false,
+              }}
+            />
           </Stack>
         </AppWrapper>
       )}
