@@ -260,6 +260,46 @@ const LayoutContent = () => {
                 // headerBackVisible: false,
               }}
             />
+            <Stack.Screen
+              name="events"
+              options={{
+                headerTitle: "Events",
+                gestureEnabled: false,
+                // headerBackVisible: false,
+              }}
+            />
+            <Stack.Screen
+              name="birthdays"
+              options={{
+                headerTitle: "Birthdays",
+                gestureEnabled: false,
+                // headerBackVisible: false,
+              }}
+            />
+            <Stack.Screen
+              name="programs"
+              options={{
+                headerTitle: "Programs",
+                gestureEnabled: false,
+                // headerBackVisible: false,
+              }}
+            />
+            <Stack.Screen
+              name="addprogram"
+              options={{
+                headerTitle: "Add A program",
+                gestureEnabled: false,
+                // headerBackVisible: false,
+              }}
+            />
+            <Stack.Screen
+              name="viewprograms"
+              options={{
+                headerTitle: "Scheduled Programs",
+                gestureEnabled: false,
+                // headerBackVisible: false,
+              }}
+            />
           </Stack>
         </AppWrapper>
       )}

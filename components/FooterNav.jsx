@@ -15,7 +15,6 @@ const FooterNav = ({ onMenuPress }) => {
   const theme = Colors[scheme] ?? Colors.light;
   const isWeb = Platform.OS === "web";
 
-  // Define different tabs for web and mobile
   const mobileTabs = [
     {
       name: "Home",

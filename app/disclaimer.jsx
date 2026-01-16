@@ -76,9 +76,9 @@ const Disclaimer = () => {
               size={24}
               color={Colors.yellowAccent}
             />
-            <ThemedText style={styles.noticeText}>
+            {/* <ThemedText style={styles.noticeText}>
               Please read this information carefully before using the app
-            </ThemedText>
+            </ThemedText> */}
           </View>
 
           {/* Disclaimer Sections */}

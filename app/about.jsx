@@ -75,8 +75,8 @@ const About = () => {
     },
     {
       id: 4,
-      title: "Events & News",
-      description: "Upcoming events and announcements",
+      title: "Events & Birthdays",
+      description: "Upcoming events and birthdays",
       route: "/events",
       badge: "Latest",
     },

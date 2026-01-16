@@ -7,8 +7,10 @@ import {
   Platform,
   ScrollView,
   ImageBackground,
+  Animated,
+  Alert,
 } from "react-native";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { router } from "expo-router";
 import { Colors } from "../constants/Colors";
 import ThemedView from "../components/ThemedView";
@@ -16,9 +18,16 @@ import ThemedText from "../components/ThemedText";
 import FooterNav from "../components/FooterNav";
 import BibleVerses from "../components/BibleVerses";
 import { useAuth } from "../context/AuthContext";
-import { collection, query, onSnapshot } from "firebase/firestore";
+import {
+  collection,
+  query,
+  onSnapshot,
+  where,
+  orderBy,
+} from "firebase/firestore";
 import { db } from "../firebase";
 import SidePanel from "../components/SidePanel";
+import { MaterialIcons } from "@expo/vector-icons";
 
 const { width, height } = Dimensions.get("window");
 const isWeb = Platform.OS === "web";
@@ -31,6 +40,154 @@ const tabBackgrounds = {
   finances: require("../assets/dashboardtabpics/finances.jpg"),
   studentsUnion: require("../assets/dashboardtabpics/epsulogo.jpg"),
   notifications: require("../assets/dashboardtabpics/notification.jpg"),
+};
+
+// Upcoming Program Banner Component
+const UpcomingProgramBanner = ({ program, isVisible, onClose, onPress }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(-50)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (isVisible) {
+      // Pulsing animation for the info icon
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.2,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+
+      // Slide in and fade in animation
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      // Fade out and slide up animation
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: -50,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [isVisible]);
+
+  if (!program || !isVisible) return null;
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      });
+    } catch (error) {
+      return "Invalid Date";
+    }
+  };
+
+  return (
+    <Animated.View
+      style={[
+        styles.upcomingBanner,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+        },
+      ]}
+    >
+      {/* Pulsing info icon - Rounded */}
+      <Animated.View
+        style={[
+          styles.infoIconContainer,
+          {
+            transform: [{ scale: pulseAnim }],
+          },
+        ]}
+      >
+        <MaterialIcons name="info" size={20} color={Colors.blueAccent} />
+      </Animated.View>
+
+      {/* Banner content */}
+      <TouchableOpacity
+        style={styles.bannerContent}
+        onPress={onPress}
+        activeOpacity={0.8}
+      >
+        <View style={styles.bannerTextContainer}>
+          <View style={styles.bannerHeader}>
+            <ThemedText style={styles.bannerTitle}>Upcoming Program</ThemedText>
+          </View>
+          <ThemedText style={styles.programTitle} numberOfLines={1}>
+            {program.title}
+          </ThemedText>
+          <View style={styles.programDetails}>
+            {/* Date with themed text */}
+            <View style={styles.detailItem}>
+              <MaterialIcons name="calendar-today" size={14} color="#666" />
+              <ThemedText style={styles.detailText}>
+                {formatDate(program.date)}
+              </ThemedText>
+            </View>
+
+            {/* Time with themed text */}
+            {program.time && (
+              <View style={styles.detailItem}>
+                <MaterialIcons name="access-time" size={14} color="#666" />
+                <ThemedText style={styles.detailText}>
+                  {program.time}
+                </ThemedText>
+              </View>
+            )}
+
+            {/* Location with themed text */}
+            {program.location && (
+              <View style={styles.detailItem}>
+                <MaterialIcons name="location-on" size={14} color="#666" />
+                <ThemedText style={styles.detailText} numberOfLines={1}>
+                  {program.location}
+                </ThemedText>
+              </View>
+            )}
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={styles.closeButton}
+          onPress={onClose}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <MaterialIcons name="close" size={18} color="#666" />
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Animated.View>
+  );
 };
 
 const TabCard = ({
@@ -90,6 +247,8 @@ const TabCard = ({
 const Dashboard = () => {
   const { user, pendingVerification, loading: authLoading } = useAuth();
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [upcomingProgram, setUpcomingProgram] = useState(null);
+  const [showUpcomingBanner, setShowUpcomingBanner] = useState(true);
   const [hoveredTab, setHoveredTab] = useState(null);
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
   const currentUserId = user?.uid;
@@ -119,6 +278,46 @@ const Dashboard = () => {
 
     return () => unsubscribe();
   }, [currentUserId]);
+
+  useEffect(() => {
+    const programsRef = collection(db, "programs");
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const q = query(
+      programsRef,
+      where("date", ">=", today.toISOString().split("T")[0]),
+      orderBy("date", "asc")
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const upcomingPrograms = snapshot.docs
+          .map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }))
+          .filter((program) => {
+            const programDate = new Date(program.date);
+            return programDate >= today;
+          });
+
+        // Get the earliest upcoming program
+        if (upcomingPrograms.length > 0) {
+          setUpcomingProgram(upcomingPrograms[0]);
+          setShowUpcomingBanner(true);
+        } else {
+          setUpcomingProgram(null);
+        }
+      },
+      (error) => {
+        console.error("Error fetching upcoming programs:", error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
 
   // Redirect if not authenticated or not verified
   useEffect(() => {
@@ -178,6 +377,16 @@ const Dashboard = () => {
     router.push(route);
   };
 
+  const handleProgramBannerPress = () => {
+    if (upcomingProgram) {
+      router.push("/viewprograms");
+    }
+  };
+
+  const handleCloseBanner = () => {
+    setShowUpcomingBanner(false);
+  };
+
   const renderTabCard = ({ item, index }) => (
     <View
       onMouseEnter={isWeb ? () => setHoveredTab(item.id) : undefined}
@@ -223,10 +432,18 @@ const Dashboard = () => {
         bounces={true}
       >
         <ThemedView style={styles.content}>
+          {/* Upcoming Program Banner */}
+          <UpcomingProgramBanner
+            program={upcomingProgram}
+            isVisible={showUpcomingBanner && !!upcomingProgram}
+            onClose={handleCloseBanner}
+            onPress={handleProgramBannerPress}
+          />
+
           <ThemedView style={styles.header}>
-            <ThemedText style={styles.subtitle}>
+            {/* <ThemedText style={styles.subtitle}>
               What would you like to do today?
-            </ThemedText>
+            </ThemedText> */}
           </ThemedView>
           <ThemedView style={styles.tabsGridContainer}>
             <ThemedView style={styles.tabsGrid}>
@@ -306,17 +523,87 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 800,
   },
-  welcomeText: {
-    fontSize: isWeb ? 36 : 30,
-    fontWeight: "bold",
-    marginBottom: 8,
-    textAlign: "center",
-  },
   subtitle: {
     fontSize: isWeb ? 20 : 16,
     opacity: 0.7,
     textAlign: "center",
   },
+  // Upcoming Program Banner Styles
+  upcomingBanner: {
+    width: "100%",
+    maxWidth: 800,
+    marginBottom: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.blueAccent + "30",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    overflow: "hidden",
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  infoIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.blueAccent + "15",
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 12,
+    borderWidth: 1,
+    borderColor: Colors.blueAccent + "30",
+  },
+  bannerContent: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  bannerTextContainer: {
+    flex: 1,
+  },
+  bannerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+    gap: 6,
+  },
+  bannerTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: Colors.blueAccent,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  programTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 8,
+  },
+  programDetails: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    alignItems: "center",
+  },
+  detailItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  detailText: {
+    fontSize: 12,
+    color: Colors.blueAccent,
+  },
+  closeButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  // Existing styles remain the same
   tabsGridContainer: {
     width: "100%",
     alignItems: "center",
