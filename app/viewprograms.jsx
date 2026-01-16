@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useMemo } from "react";
 import {
   StyleSheet,
   View,
@@ -111,7 +111,9 @@ const TimeInputEdit = ({ value, onChange, theme, isWeb }) => {
 const ViewPrograms = () => {
   const router = useRouter();
   const [programs, setPrograms] = useState([]);
+  const [filteredPrograms, setFilteredPrograms] = useState([]);
   const [loadingPrograms, setLoadingPrograms] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
   const { scheme } = useContext(ThemeContext);
   const theme = Colors[scheme] ?? Colors.light;
   const [showActionsFor, setShowActionsFor] = useState(null);
@@ -135,6 +137,7 @@ const ViewPrograms = () => {
           (a, b) => new Date(b.date) - new Date(a.date)
         );
         setPrograms(sortedPrograms);
+        setFilteredPrograms(sortedPrograms);
         setLoadingPrograms(false);
       },
       (error) => {
@@ -145,6 +148,26 @@ const ViewPrograms = () => {
 
     return () => unsubscribe();
   }, []);
+
+  // Filter programs based on search query
+  useEffect(() => {
+    if (searchQuery.trim() === "") {
+      setFilteredPrograms(programs);
+    } else {
+      const filtered = programs.filter((program) => {
+        const searchLower = searchQuery.toLowerCase();
+        return (
+          program.title?.toLowerCase().includes(searchLower) ||
+          program.location?.toLowerCase().includes(searchLower) ||
+          program.organizer?.toLowerCase().includes(searchLower) ||
+          program.description?.toLowerCase().includes(searchLower) ||
+          program.date?.includes(searchQuery) ||
+          program.time?.toLowerCase().includes(searchLower)
+        );
+      });
+      setFilteredPrograms(filtered);
+    }
+  }, [searchQuery, programs]);
 
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
@@ -273,6 +296,40 @@ const ViewPrograms = () => {
         showsVerticalScrollIndicator={true}
       >
         <View style={styles.content}>
+          {/* Search Bar */}
+          <View
+            style={[
+              styles.searchContainer,
+              { backgroundColor: theme.uiBackground },
+            ]}
+          >
+            <MaterialIcons name="search" size={20} color={Colors.blueAccent} />
+            <TextInput
+              style={[styles.searchInput, { color: theme.text }]}
+              placeholder="Search programs by title, location, organizer..."
+              placeholderTextColor={theme.text + "60"}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery !== "" && (
+              <TouchableOpacity onPress={() => setSearchQuery("")}>
+                <MaterialIcons
+                  name="close-circle"
+                  size={20}
+                  color={theme.text}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Programs Count */}
+          <View style={styles.programCountContainer}>
+            <ThemedText style={styles.programCountText}>
+              {filteredPrograms.length} program
+              {filteredPrograms.length !== 1 ? "s" : ""} found
+            </ThemedText>
+          </View>
+
           {/* Programs List */}
           {loadingPrograms ? (
             <View style={styles.loadingContainer}>
@@ -281,7 +338,7 @@ const ViewPrograms = () => {
                 Loading programs...
               </ThemedText>
             </View>
-          ) : programs.length === 0 ? (
+          ) : filteredPrograms.length === 0 ? (
             <View style={styles.emptyContainer}>
               <MaterialIcons
                 name="event-busy"
@@ -290,21 +347,34 @@ const ViewPrograms = () => {
                 style={{ opacity: 0.3 }}
               />
               <ThemedText style={styles.emptyText}>
-                No programs scheduled yet
+                {searchQuery
+                  ? "No programs found"
+                  : "No programs scheduled yet"}
               </ThemedText>
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={() => router.push("/addprogram")}
-              >
-                <MaterialIcons name="add" size={20} color="#fff" />
-                <ThemedText style={styles.addButtonText}>
-                  Add First Program
-                </ThemedText>
-              </TouchableOpacity>
+              {searchQuery ? (
+                <TouchableOpacity
+                  style={styles.clearButton}
+                  onPress={() => setSearchQuery("")}
+                >
+                  <ThemedText style={styles.clearButtonText}>
+                    Clear Search
+                  </ThemedText>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={styles.addButton}
+                  onPress={() => router.push("/addprogram")}
+                >
+                  <MaterialIcons name="add" size={20} color="#fff" />
+                  <ThemedText style={styles.addButtonText}>
+                    Add First Program
+                  </ThemedText>
+                </TouchableOpacity>
+              )}
             </View>
           ) : (
             <View style={styles.programsList}>
-              {programs.map((program) => (
+              {filteredPrograms.map((program) => (
                 <View
                   key={program.id}
                   style={[styles.programCard, { borderColor: theme.border }]}
@@ -626,6 +696,44 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 40,
   },
+  // Search Bar Styles
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 12,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+  },
+  programCountContainer: {
+    marginBottom: 16,
+    alignItems: "flex-end",
+  },
+  programCountText: {
+    fontSize: 14,
+    fontWeight: "600",
+    opacity: 0.7,
+  },
+  clearButton: {
+    backgroundColor: Colors.blueAccent,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  clearButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  // Existing styles remain the same
   backButton: {
     flexDirection: "row",
     alignItems: "center",

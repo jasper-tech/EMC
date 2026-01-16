@@ -69,18 +69,6 @@ const Disclaimer = () => {
             </ThemedText>
           </View>
 
-          {/* Warning Notice */}
-          <View style={styles.noticeContainer}>
-            <MaterialIcons
-              name="warning"
-              size={24}
-              color={Colors.yellowAccent}
-            />
-            {/* <ThemedText style={styles.noticeText}>
-              Please read this information carefully before using the app
-            </ThemedText> */}
-          </View>
-
           {/* Disclaimer Sections */}
           <View style={styles.sectionsContainer}>
             {disclaimerSections.map((section, index) => (

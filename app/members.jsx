@@ -10,7 +10,8 @@ import {
   Alert,
   Animated,
   Image,
-} from "react-native";
+  Platform,
+} from "react-native"; // ADDED Platform import
 import React, { useState, useEffect, useRef, useContext } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../constants/Colors";
@@ -120,6 +121,17 @@ const Members = () => {
     }
   }, [searchQuery, members]);
 
+  // WEB-COMPATIBLE ALERT FUNCTION
+  const showAlert = (title, message) => {
+    if (Platform.OS === "web") {
+      // Use browser's native alert for web
+      window.alert(`${title}\n\n${message}`);
+    } else {
+      // Use React Native Alert for mobile
+      Alert.alert(title, message);
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       fullname: "",
@@ -186,7 +198,7 @@ const Members = () => {
         await ImagePicker.requestMediaLibraryPermissionsAsync();
 
       if (status !== "granted") {
-        Alert.alert(
+        showAlert(
           "Permission required",
           "Sorry, we need camera roll permissions to select an image."
         );
@@ -207,7 +219,7 @@ const Members = () => {
       }
     } catch (error) {
       console.error("Error picking image:", error);
-      Alert.alert("Error", "Failed to pick image");
+      showAlert("Error", "Failed to pick image");
     }
   };
 
@@ -217,17 +229,17 @@ const Members = () => {
 
   const handleAddMember = async () => {
     if (!formData.fullname.trim()) {
-      Alert.alert("Error", "Please enter member's full name");
+      showAlert("Error", "Please enter member's full name");
       return;
     }
 
     if (!formData.phone.trim()) {
-      Alert.alert("Error", "Please enter member's phone number");
+      showAlert("Error", "Please enter member's phone number");
       return;
     }
 
     if (formData.birthDate && !validateDate(formData.birthDate, "birth")) {
-      Alert.alert(
+      showAlert(
         "Error",
         "Please enter a valid birth date in YYYY-MM-DD format (must be in the past)"
       );
@@ -235,7 +247,7 @@ const Members = () => {
     }
 
     if (!validateDate(formData.dateJoined, "joined")) {
-      Alert.alert(
+      showAlert(
         "Error",
         "Please enter a valid date joined in YYYY-MM-DD format (cannot be in the future)"
       );
@@ -265,10 +277,10 @@ const Members = () => {
 
       resetForm();
       setShowAddModal(false);
-      Alert.alert("Success", "Member added successfully!");
+      showAlert("Success", "Member added successfully!");
     } catch (error) {
       console.error("Error adding member:", error);
-      Alert.alert("Error", "Failed to add member");
+      showAlert("Error", "Failed to add member");
     } finally {
       setSubmitting(false);
     }
@@ -276,17 +288,17 @@ const Members = () => {
 
   const handleEditMember = async () => {
     if (!formData.fullname.trim()) {
-      Alert.alert("Error", "Please enter member's full name");
+      showAlert("Error", "Please enter member's full name");
       return;
     }
 
     if (!formData.phone.trim()) {
-      Alert.alert("Error", "Please enter member's phone number");
+      showAlert("Error", "Please enter member's phone number");
       return;
     }
 
     if (formData.birthDate && !validateDate(formData.birthDate, "birth")) {
-      Alert.alert(
+      showAlert(
         "Error",
         "Please enter a valid birth date in YYYY-MM-DD format (must be in the past)"
       );
@@ -294,7 +306,7 @@ const Members = () => {
     }
 
     if (!validateDate(formData.dateJoined, "joined")) {
-      Alert.alert(
+      showAlert(
         "Error",
         "Please enter a valid date joined in YYYY-MM-DD format (cannot be in the future)"
       );
@@ -343,10 +355,10 @@ const Members = () => {
       setShowEditModal(false);
       setSelectedMember(null);
       resetForm();
-      Alert.alert("Success", "Member updated successfully!");
+      showAlert("Success", "Member updated successfully!");
     } catch (error) {
       console.error("Error updating member:", error);
-      Alert.alert("Error", "Failed to update member");
+      showAlert("Error", "Failed to update member");
     } finally {
       setSubmitting(false);
     }
@@ -673,14 +685,18 @@ const Members = () => {
                     style={styles.inputIcon}
                   />
                   <TextInput
-                    style={[styles.input]}
+                    style={[
+                      styles.input,
+                      Platform.OS === "web" && styles.webInput, // Add web-specific styles
+                    ]}
                     value={formData.fullname}
                     onChangeText={(text) =>
                       setFormData({ ...formData, fullname: text })
                     }
                     placeholder="Enter full name"
                     placeholderTextColor="#999"
-                    color={theme.text}
+                    // Use different approach for web to ensure color works
+                    color={Platform.OS === "web" ? undefined : theme.text}
                   />
                 </View>
               </View>
@@ -701,7 +717,11 @@ const Members = () => {
                     style={styles.inputIcon}
                   />
                   <TextInput
-                    style={[styles.input, styles.textArea]}
+                    style={[
+                      styles.input,
+                      styles.textArea,
+                      Platform.OS === "web" && styles.webInput,
+                    ]}
                     value={formData.address}
                     onChangeText={(text) =>
                       setFormData({ ...formData, address: text })
@@ -710,7 +730,7 @@ const Members = () => {
                     placeholderTextColor="#999"
                     multiline
                     numberOfLines={3}
-                    color={theme.text}
+                    color={Platform.OS === "web" ? undefined : theme.text}
                   />
                 </View>
               </View>
@@ -727,7 +747,10 @@ const Members = () => {
                     style={styles.inputIcon}
                   />
                   <TextInput
-                    style={[styles.input]}
+                    style={[
+                      styles.input,
+                      Platform.OS === "web" && styles.webInput,
+                    ]}
                     value={formData.phone}
                     onChangeText={(text) =>
                       setFormData({ ...formData, phone: text })
@@ -735,7 +758,7 @@ const Members = () => {
                     placeholder="Enter phone number"
                     placeholderTextColor="#999"
                     keyboardType="phone-pad"
-                    color={theme.text}
+                    color={Platform.OS === "web" ? undefined : theme.text}
                   />
                 </View>
               </View>
@@ -753,7 +776,10 @@ const Members = () => {
                     style={styles.inputIcon}
                   />
                   <TextInput
-                    style={[styles.input]}
+                    style={[
+                      styles.input,
+                      Platform.OS === "web" && styles.webInput,
+                    ]}
                     value={formData.birthDate}
                     onChangeText={(text) =>
                       setFormData({ ...formData, birthDate: text })
@@ -761,7 +787,7 @@ const Members = () => {
                     placeholder="YYYY-MM-DD"
                     placeholderTextColor="#999"
                     keyboardType="numbers-and-punctuation"
-                    color={theme.text}
+                    color={Platform.OS === "web" ? undefined : theme.text}
                   />
                 </View>
                 <ThemedText style={styles.dateHint}>
@@ -787,7 +813,10 @@ const Members = () => {
                     style={styles.inputIcon}
                   />
                   <TextInput
-                    style={[styles.input]}
+                    style={[
+                      styles.input,
+                      Platform.OS === "web" && styles.webInput,
+                    ]}
                     value={formData.dateJoined}
                     onChangeText={(text) =>
                       setFormData({ ...formData, dateJoined: text })
@@ -795,7 +824,7 @@ const Members = () => {
                     placeholder="YYYY-MM-DD"
                     placeholderTextColor="#999"
                     keyboardType="numbers-and-punctuation"
-                    color={theme.text}
+                    color={Platform.OS === "web" ? undefined : theme.text}
                   />
                 </View>
                 <ThemedText style={styles.dateHint}>
@@ -845,11 +874,13 @@ const Members = () => {
       <View style={[styles.searchContainer, { backgroundColor: theme.card }]}>
         <Ionicons name="search" size={20} color={Colors.blueAccent} />
         <TextInput
-          style={[styles.searchInput, { color: theme.text }]}
+          style={[styles.searchInput, Platform.OS === "web" && styles.webInput]}
           placeholder="Search members..."
           placeholderTextColor={theme.text + "80"}
           value={searchQuery}
           onChangeText={setSearchQuery}
+          // Use different approach for web
+          color={Platform.OS === "web" ? undefined : theme.text}
         />
         {searchQuery !== "" && (
           <TouchableOpacity onPress={() => setSearchQuery("")}>
@@ -936,6 +967,11 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
+  },
+  // WEB-SPECIFIC INPUT STYLES
+  webInput: {
+    // For web, use style-based color instead of color prop
+    color: "inherit", // This will inherit from parent or use CSS
   },
   memberCountContainer: {
     paddingHorizontal: 16,

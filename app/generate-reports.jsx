@@ -17,6 +17,7 @@ import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 // import * as FileSystem from "expo-file-system";
 import * as FileSystem from "expo-file-system/legacy";
+import { Platform } from "react-native";
 
 const GenerateReportsPage = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -332,6 +333,7 @@ const GenerateReportsPage = () => {
     };
   };
 
+  // Platform-specific PDF generation
   const generatePDFReport = async () => {
     setGenerating(true);
     setGeneratingFormat("pdf");
@@ -339,16 +341,224 @@ const GenerateReportsPage = () => {
     try {
       const financialData = calculateFinancialData();
 
+      // WEB-SPECIFIC PDF GENERATION
+      if (Platform.OS === "web") {
+        const htmlContent = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+              .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+              .section { margin-bottom: 25px; page-break-inside: avoid; }
+              .section-title { background: #f0f0f0; padding: 8px; font-weight: bold; margin-bottom: 10px; }
+              .table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 12px; }
+              .table th, .table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+              .table th { background-color: #f8f8f8; }
+              .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+              .summary-card { border: 1px solid #ddd; padding: 15px; border-radius: 5px; }
+              .positive { color: green; }
+              .negative { color: red; }
+              .stat-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
+              .page-break { page-break-before: always; }
+              @media print {
+                body { margin: 10px; }
+                .no-print { display: none; }
+                .table { font-size: 10px; }
+                .summary-grid { grid-template-columns: 1fr; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>Financial Report - ${selectedYear}</h1>
+              <p>Generated on ${new Date().toLocaleDateString()}</p>
+            </div>
+
+            <div class="section">
+              <div class="section-title">Financial Summary</div>
+              <div class="summary-grid">
+                <div class="summary-card">
+                  <h3>Income Summary</h3>
+                  <div class="stat-row"><span>Total Income:</span> <span class="positive">GH₵${financialData.totalIncome.toFixed(
+                    2
+                  )}</span></div>
+                  <div class="stat-row"><span>Dues Income:</span> <span>GH₵${financialData.duesIncome.toFixed(
+                    2
+                  )}</span></div>
+                  <div class="stat-row"><span>Contributions:</span> <span>GH₵${financialData.contributionsIncome.toFixed(
+                    2
+                  )}</span></div>
+                  <div class="stat-row"><span>Other Income:</span> <span>GH₵${financialData.otherIncome.toFixed(
+                    2
+                  )}</span></div>
+                  <div class="stat-row"><span>Budget:</span> <span>GH₵${financialData.budgetIncome.toFixed(
+                    2
+                  )}</span></div>
+                </div>
+                
+                <div class="summary-card">
+                  <h3>Expenses & Members</h3>
+                  <div class="stat-row"><span>Total Expenses:</span> <span class="negative">GH₵${financialData.totalExpenses.toFixed(
+                    2
+                  )}</span></div>
+                  <div class="stat-row"><span>Net Income:</span> <span class="${
+                    financialData.netIncome >= 0 ? "positive" : "negative"
+                  }">GH₵${financialData.netIncome.toFixed(2)}</span></div>
+                  <div class="stat-row"><span>Members Paid:</span> <span>${
+                    financialData.membersPaid
+                  }/${financialData.totalMembers}</span></div>
+                  <div class="stat-row"><span>Members Owing:</span> <span>${
+                    financialData.membersOwing
+                  }</span></div>
+                  <div class="stat-row"><span>Dues Collection:</span> <span>${(
+                    (financialData.totalDuesCollected /
+                      financialData.totalDuesExpected) *
+                      100 || 0
+                  ).toFixed(1)}%</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">Income Transactions (${
+                financialData.incomeTransactions.length
+              } records)</div>
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Description</th>
+                    <th>Amount</th>
+                    <th>Added By</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${financialData.incomeTransactions
+                    .map(
+                      (transaction) => `
+                    <tr>
+                      <td>${new Date(
+                        transaction.timestamp?.toDate
+                          ? transaction.timestamp.toDate()
+                          : transaction.timestamp
+                      ).toLocaleDateString()}</td>
+                      <td>${transaction.type}</td>
+                      <td>${transaction.description || ""}</td>
+                      <td class="positive">GH₵${Math.abs(
+                        transaction.amount
+                      ).toFixed(2)}</td>
+                      <td>${
+                        transaction.addedBy ||
+                        transaction.recordedBy ||
+                        "System"
+                      }</td>
+                    </tr>
+                  `
+                    )
+                    .join("")}
+                </tbody>
+              </table>
+            </div>
+
+            <div class="section">
+              <div class="section-title">Expense Transactions (${
+                financialData.expenseTransactions.length
+              } records)</div>
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Description</th>
+                    <th>Amount</th>
+                    <th>By</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${financialData.expenseTransactions
+                    .map(
+                      (transaction) => `
+                    <tr>
+                      <td>${new Date(
+                        transaction.timestamp?.toDate
+                          ? transaction.timestamp.toDate()
+                          : transaction.timestamp
+                      ).toLocaleDateString()}</td>
+                      <td>${transaction.type}</td>
+                      <td>${transaction.description || ""}</td>
+                      <td class="negative">GH₵${Math.abs(
+                        transaction.amount
+                      ).toFixed(2)}</td>
+                      <td>${
+                        transaction.withdrawnBy ||
+                        transaction.addedBy ||
+                        "System"
+                      }</td>
+                    </tr>
+                  `
+                    )
+                    .join("")}
+                </tbody>
+              </table>
+            </div>
+
+            ${
+              financialData.allocation
+                ? `
+            <div class="section">
+              <div class="section-title">Dues Allocation for ${selectedYear}</div>
+              <table class="table">
+                <tr><th>Member Type</th><th>Monthly Amount</th><th>Annual Amount</th></tr>
+                <tr><td>Regular Members</td><td>GH₵${financialData.allocation.regularAmount.toFixed(
+                  2
+                )}</td><td>GH₵${(
+                    financialData.allocation.regularAmount * 12
+                  ).toFixed(2)}</td></tr>
+                <tr><td>Executive Members</td><td>GH₵${financialData.allocation.executiveAmount.toFixed(
+                  2
+                )}</td><td>GH₵${(
+                    financialData.allocation.executiveAmount * 12
+                  ).toFixed(2)}</td></tr>
+              </table>
+            </div>
+            `
+                : ""
+            }
+          </body>
+          </html>
+        `;
+
+        // For web, open print dialog
+        const printWindow = window.open("", "_blank");
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+        printWindow.focus();
+
+        // Wait a moment for content to load, then print
+        setTimeout(() => {
+          printWindow.print();
+          printWindow.onafterprint = () => printWindow.close();
+        }, 500);
+
+        Alert.alert("Success", "PDF report opened for printing!");
+        setGenerating(false);
+        setGeneratingFormat(null);
+        return;
+      }
+
+      // MOBILE PDF GENERATION (existing code)
       const htmlContent = `
         <!DOCTYPE html>
         <html>
         <head>
           <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
+            body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
             .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 10px; }
-            .section { margin-bottom: 25px; }
+            .section { margin-bottom: 25px; page-break-inside: avoid; }
             .section-title { background: #f0f0f0; padding: 8px; font-weight: bold; margin-bottom: 10px; }
-            .table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+            .table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 12px; }
             .table th, .table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
             .table th { background-color: #f8f8f8; }
             .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
@@ -356,6 +566,7 @@ const GenerateReportsPage = () => {
             .positive { color: green; }
             .negative { color: red; }
             .stat-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
+            .page-break { page-break-before: always; }
           </style>
         </head>
         <body>
@@ -410,7 +621,9 @@ const GenerateReportsPage = () => {
           </div>
 
           <div class="section">
-            <div class="section-title">Income Transactions</div>
+            <div class="section-title">Income Transactions (${
+              financialData.incomeTransactions.length
+            } records)</div>
             <table class="table">
               <thead>
                 <tr>
@@ -432,7 +645,7 @@ const GenerateReportsPage = () => {
                         : transaction.timestamp
                     ).toLocaleDateString()}</td>
                     <td>${transaction.type}</td>
-                    <td>${transaction.description}</td>
+                    <td>${transaction.description || ""}</td>
                     <td class="positive">GH₵${Math.abs(
                       transaction.amount
                     ).toFixed(2)}</td>
@@ -448,7 +661,9 @@ const GenerateReportsPage = () => {
           </div>
 
           <div class="section">
-            <div class="section-title">Expense Transactions</div>
+            <div class="section-title">Expense Transactions (${
+              financialData.expenseTransactions.length
+            } records)</div>
             <table class="table">
               <thead>
                 <tr>
@@ -470,7 +685,7 @@ const GenerateReportsPage = () => {
                         : transaction.timestamp
                     ).toLocaleDateString()}</td>
                     <td>${transaction.type}</td>
-                    <td>${transaction.description}</td>
+                    <td>${transaction.description || ""}</td>
                     <td class="negative">GH₵${Math.abs(
                       transaction.amount
                     ).toFixed(2)}</td>
@@ -532,6 +747,7 @@ const GenerateReportsPage = () => {
     }
   };
 
+  // Platform-specific Excel generation
   const generateExcelReport = async () => {
     setGenerating(true);
     setGeneratingFormat("excel");
@@ -586,7 +802,7 @@ const GenerateReportsPage = () => {
             : transaction.timestamp
         );
         csvContent += `${date.toLocaleDateString()},${transaction.type},"${
-          transaction.description
+          transaction.description || ""
         }",GH₵${Math.abs(transaction.amount).toFixed(2)},${
           transaction.addedBy || transaction.recordedBy || "System"
         }\n`;
@@ -601,31 +817,50 @@ const GenerateReportsPage = () => {
             : transaction.timestamp
         );
         csvContent += `${date.toLocaleDateString()},${transaction.type},"${
-          transaction.description
+          transaction.description || ""
         }",GH₵${Math.abs(transaction.amount).toFixed(2)},${
           transaction.withdrawnBy || transaction.addedBy || "System"
         }\n`;
       });
 
-      // Create and share file using NEW FileSystem API
-      const filename = `financial_report_${selectedYear}_${Date.now()}.csv`;
+      // WEB-SPECIFIC CSV HANDLING
+      if (Platform.OS === "web") {
+        // Create a Blob and download link for web
+        const blob = new Blob([csvContent], {
+          type: "text/csv;charset=utf-8;",
+        });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute(
+          "download",
+          `financial_report_${selectedYear}_${Date.now()}.csv`
+        );
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
 
-      // Create a file in the cache directory
+        Alert.alert("Success", "Excel (CSV) report downloaded successfully!");
+        setGenerating(false);
+        setGeneratingFormat(null);
+        return;
+      }
+
+      // MOBILE CSV HANDLING (existing code)
+      const filename = `financial_report_${selectedYear}_${Date.now()}.csv`;
       const fileUri = `${FileSystem.cacheDirectory}${filename}`;
 
-      // Write the file using the new API
       await FileSystem.writeAsStringAsync(fileUri, csvContent, {
         encoding: FileSystem.EncodingType.UTF8,
       });
 
-      // Check if sharing is available
       const isSharingAvailable = await Sharing.isAvailableAsync();
       if (!isSharingAvailable) {
         Alert.alert("Error", "Sharing is not available on this device");
         return;
       }
 
-      // Share the file
       await Sharing.shareAsync(fileUri, {
         mimeType: "text/csv",
         dialogTitle: `Financial Report ${selectedYear}`,
@@ -662,19 +897,6 @@ const GenerateReportsPage = () => {
       style={[styles.container, { backgroundColor: theme.background }]}
       contentContainerStyle={styles.contentContainer}
     >
-      {/* Header */}
-      {/* <View style={styles.header}>
-        <View style={styles.headerIcon}>
-          <MaterialIcons name="download" size={32} color="#fff" />
-        </View>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>
-          Generate Reports
-        </Text>
-        <Text style={[styles.headerSubtitle, { color: theme.text }]}>
-          Download comprehensive financial reports for any year
-        </Text>
-      </View> */}
-
       {/* Year Selection */}
       <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
         <View style={styles.sectionHeader}>
@@ -852,9 +1074,10 @@ const GenerateReportsPage = () => {
             ) : (
               <>
                 <MaterialIcons name="picture-as-pdf" size={32} color="#fff" />
-                {/* <Text style={styles.downloadButtonText}>PDF Report</Text> */}
                 <Text style={styles.downloadButtonSubtext}>
-                  Formatted document with tables
+                  {Platform.OS === "web"
+                    ? "Open print dialog for formatted document"
+                    : "Formatted document with tables"}
                 </Text>
               </>
             )}
@@ -871,9 +1094,10 @@ const GenerateReportsPage = () => {
             ) : (
               <>
                 <FontAwesome5 name="file-excel" size={32} color="#fff" />
-                {/* <Text style={styles.downloadButtonText}>Excel Report</Text> */}
                 <Text style={styles.downloadButtonSubtext}>
-                  Raw data in CSV format for analysis
+                  {Platform.OS === "web"
+                    ? "Download CSV for analysis"
+                    : "Raw data in CSV format for analysis"}
                 </Text>
               </>
             )}
@@ -885,8 +1109,9 @@ const GenerateReportsPage = () => {
         >
           <MaterialIcons name="warning" size={20} color={Colors.yellowAccent} />
           <Text style={[styles.noteText, { color: theme.text }]}>
-            Reports may take a few moments to generate depending on the amount
-            of data for {selectedYear}.
+            {Platform.OS === "web"
+              ? `For web: PDF will open in print dialog, CSV will download directly.`
+              : `Reports may take a few moments to generate depending on the amount of data for ${selectedYear}.`}
           </Text>
         </View>
       </View>
@@ -911,29 +1136,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 16,
     fontWeight: "500",
-  },
-  header: {
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  headerIcon: {
-    width: 64,
-    height: 64,
-    backgroundColor: "#3b82f6",
-    borderRadius: 32,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    textAlign: "center",
   },
   section: {
     borderRadius: 16,
@@ -993,22 +1195,6 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
   },
-  //   incomeCard: {
-  //     borderLeftWidth: 4,
-  //     borderLeftColor: "#16a34a",
-  //   },
-  //   expenseCard: {
-  //     borderLeftWidth: 4,
-  //     borderLeftColor: "#dc2626",
-  //   },
-  //   netIncomeCard: {
-  //     borderLeftWidth: 4,
-  //     borderLeftColor: "#3b82f6",
-  //   },
-  //   membersCard: {
-  //     borderLeftWidth: 4,
-  //     borderLeftColor: "#7c3aed",
-  //   },
   previewCardHeader: {
     flexDirection: "row",
     alignItems: "center",
