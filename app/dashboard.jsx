@@ -10,7 +10,7 @@ import {
   Animated,
   Alert,
 } from "react-native";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { router } from "expo-router";
 import { Colors } from "../constants/Colors";
 import ThemedView from "../components/ThemedView";
@@ -42,8 +42,35 @@ const tabBackgrounds = {
   notifications: require("../assets/dashboardtabpics/notification.jpg"),
 };
 
+// Move calculateAge function outside
+const calculateAge = (birthDateString) => {
+  if (!birthDateString) return null;
+  try {
+    const birthDate = new Date(birthDateString);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+
+    if (
+      monthDiff < 0 ||
+      (monthDiff === 0 && today.getDate() < birthDate.getDate())
+    ) {
+      age--;
+    }
+    return age;
+  } catch (error) {
+    return null;
+  }
+};
+
 // Upcoming Program Banner Component
-const UpcomingProgramBanner = ({ program, isVisible, onClose, onPress }) => {
+const UpcomingProgramBanner = ({
+  program,
+  isVisible,
+  onClose,
+  onPress,
+  type = "program",
+}) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(-50)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -98,6 +125,10 @@ const UpcomingProgramBanner = ({ program, isVisible, onClose, onPress }) => {
 
   if (!program || !isVisible) return null;
 
+  const isBirthday = type === "birthday";
+  const accentColor = isBirthday ? Colors.goldAccent : Colors.blueAccent;
+  const iconName = isBirthday ? "cake" : "info";
+  const title = isBirthday ? "Upcoming Birthday" : "Upcoming Program";
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     try {
@@ -119,6 +150,7 @@ const UpcomingProgramBanner = ({ program, isVisible, onClose, onPress }) => {
         {
           opacity: fadeAnim,
           transform: [{ translateY: slideAnim }],
+          borderColor: accentColor + "30",
         },
       ]}
     >
@@ -128,10 +160,12 @@ const UpcomingProgramBanner = ({ program, isVisible, onClose, onPress }) => {
           styles.infoIconContainer,
           {
             transform: [{ scale: pulseAnim }],
+            backgroundColor: accentColor + "15",
+            borderColor: accentColor + "30",
           },
         ]}
       >
-        <MaterialIcons name="info" size={20} color={Colors.blueAccent} />
+        <MaterialIcons name={iconName} size={20} color={accentColor} />
       </Animated.View>
 
       {/* Banner content */}
@@ -142,22 +176,24 @@ const UpcomingProgramBanner = ({ program, isVisible, onClose, onPress }) => {
       >
         <View style={styles.bannerTextContainer}>
           <View style={styles.bannerHeader}>
-            <ThemedText style={styles.bannerTitle}>Upcoming Program</ThemedText>
+            <ThemedText style={[styles.bannerTitle, { color: accentColor }]}>
+              {title}
+            </ThemedText>
           </View>
           <ThemedText style={styles.programTitle} numberOfLines={1}>
-            {program.title}
+            {program.title || program.fullname}
           </ThemedText>
           <View style={styles.programDetails}>
-            {/* Date with themed text */}
+            {/* Date */}
             <View style={styles.detailItem}>
               <MaterialIcons name="calendar-today" size={14} color="#666" />
               <ThemedText style={styles.detailText}>
-                {formatDate(program.date)}
+                {formatDate(program.date || program.birthDate)}
               </ThemedText>
             </View>
 
-            {/* Time with themed text */}
-            {program.time && (
+            {/* Time (only for programs) */}
+            {!isBirthday && program.time && (
               <View style={styles.detailItem}>
                 <MaterialIcons name="access-time" size={14} color="#666" />
                 <ThemedText style={styles.detailText}>
@@ -166,12 +202,21 @@ const UpcomingProgramBanner = ({ program, isVisible, onClose, onPress }) => {
               </View>
             )}
 
-            {/* Location with themed text */}
-            {program.location && (
+            {/* Location (only for programs) */}
+            {!isBirthday && program.location && (
               <View style={styles.detailItem}>
                 <MaterialIcons name="location-on" size={14} color="#666" />
                 <ThemedText style={styles.detailText} numberOfLines={1}>
                   {program.location}
+                </ThemedText>
+              </View>
+            )}
+
+            {/* Age info for birthdays */}
+            {isBirthday && program.age && (
+              <View style={styles.detailItem}>
+                <ThemedText style={[styles.detailText]}>
+                  Turns {program.age + 1}
                 </ThemedText>
               </View>
             )}
@@ -248,9 +293,12 @@ const Dashboard = () => {
   const { user, pendingVerification, loading: authLoading } = useAuth();
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [upcomingProgram, setUpcomingProgram] = useState(null);
-  const [showUpcomingBanner, setShowUpcomingBanner] = useState(true);
+  const [upcomingBirthday, setUpcomingBirthday] = useState(null);
+  const [showProgramBanner, setShowProgramBanner] = useState(true);
+  const [showBirthdayBanner, setShowBirthdayBanner] = useState(true);
   const [hoveredTab, setHoveredTab] = useState(null);
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
+  const [members, setMembers] = useState([]);
   const currentUserId = user?.uid;
 
   // Subscribe to unread notifications count
@@ -279,6 +327,7 @@ const Dashboard = () => {
     return () => unsubscribe();
   }, [currentUserId]);
 
+  // Fetch upcoming programs
   useEffect(() => {
     const programsRef = collection(db, "programs");
     const today = new Date();
@@ -306,7 +355,7 @@ const Dashboard = () => {
         // Get the earliest upcoming program
         if (upcomingPrograms.length > 0) {
           setUpcomingProgram(upcomingPrograms[0]);
-          setShowUpcomingBanner(true);
+          setShowProgramBanner(true);
         } else {
           setUpcomingProgram(null);
         }
@@ -318,6 +367,97 @@ const Dashboard = () => {
 
     return () => unsubscribe();
   }, []);
+
+  // Fetch members with birthdays
+  useEffect(() => {
+    const membersRef = collection(db, "members");
+    const q = query(membersRef);
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const membersList = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+
+        setMembers(membersList);
+      },
+      (error) => {
+        console.error("Error fetching members:", error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  // Calculate next upcoming birthday
+  const nextBirthday = useMemo(() => {
+    const today = new Date();
+    const currentMonth = today.getMonth() + 1;
+    const currentDay = today.getDate();
+
+    const membersWithBirthdays = members.filter(
+      (member) => member.birthDate && member.birthDate.trim() !== ""
+    );
+
+    if (membersWithBirthdays.length === 0) return null;
+
+    // Find upcoming birthdays
+    const upcomingBirthdays = membersWithBirthdays
+      .map((member) => {
+        try {
+          const birthDate = new Date(member.birthDate);
+          const birthMonth = birthDate.getMonth() + 1;
+          const birthDay = birthDate.getDate();
+          const age = calculateAge(member.birthDate);
+
+          // Create date for this year's birthday
+          const thisYearBirthday = new Date(
+            today.getFullYear(),
+            birthDate.getMonth(),
+            birthDate.getDate()
+          );
+
+          // If birthday already passed this year, use next year
+          if (thisYearBirthday < today) {
+            thisYearBirthday.setFullYear(today.getFullYear() + 1);
+          }
+
+          const daysUntil = Math.ceil(
+            (thisYearBirthday - today) / (1000 * 60 * 60 * 24)
+          );
+
+          return {
+            ...member,
+            birthMonth,
+            birthDay,
+            age: age || 0,
+            daysUntil,
+            nextBirthdayDate: thisYearBirthday.toISOString().split("T")[0],
+          };
+        } catch (error) {
+          return null;
+        }
+      })
+      .filter((bday) => bday !== null);
+
+    // Sort by days until birthday (soonest first)
+    upcomingBirthdays.sort((a, b) => a.daysUntil - b.daysUntil);
+
+    // Return the next birthday (closest one)
+    return upcomingBirthdays.length > 0 ? upcomingBirthdays[0] : null;
+  }, [members]);
+
+  // Set upcoming birthday when nextBirthday changes
+  useEffect(() => {
+    if (nextBirthday) {
+      setUpcomingBirthday(nextBirthday);
+      setShowBirthdayBanner(true);
+    } else {
+      setUpcomingBirthday(null);
+    }
+  }, [nextBirthday]);
 
   // Redirect if not authenticated or not verified
   useEffect(() => {
@@ -383,8 +523,18 @@ const Dashboard = () => {
     }
   };
 
-  const handleCloseBanner = () => {
-    setShowUpcomingBanner(false);
+  const handleBirthdayBannerPress = () => {
+    if (upcomingBirthday) {
+      router.push("/birthdays");
+    }
+  };
+
+  const handleCloseProgramBanner = () => {
+    setShowProgramBanner(false);
+  };
+
+  const handleCloseBirthdayBanner = () => {
+    setShowBirthdayBanner(false);
   };
 
   const renderTabCard = ({ item, index }) => (
@@ -432,18 +582,26 @@ const Dashboard = () => {
         bounces={true}
       >
         <ThemedView style={styles.content}>
+          {/* Upcoming Birthday Banner */}
+          <UpcomingProgramBanner
+            program={upcomingBirthday}
+            isVisible={showBirthdayBanner && !!upcomingBirthday}
+            onClose={handleCloseBirthdayBanner}
+            onPress={handleBirthdayBannerPress}
+            type="birthday"
+          />
+
           {/* Upcoming Program Banner */}
           <UpcomingProgramBanner
             program={upcomingProgram}
-            isVisible={showUpcomingBanner && !!upcomingProgram}
-            onClose={handleCloseBanner}
+            isVisible={showProgramBanner && !!upcomingProgram}
+            onClose={handleCloseProgramBanner}
             onPress={handleProgramBannerPress}
+            type="program"
           />
 
           <ThemedView style={styles.header}>
-            {/* <ThemedText style={styles.subtitle}>
-              What would you like to do today?
-            </ThemedText> */}
+            {/* Optional: You can add a title here if needed */}
           </ThemedView>
           <ThemedView style={styles.tabsGridContainer}>
             <ThemedView style={styles.tabsGrid}>
@@ -528,14 +686,13 @@ const styles = StyleSheet.create({
     opacity: 0.7,
     textAlign: "center",
   },
-  // Upcoming Program Banner Styles
+  // Upcoming Banner Styles
   upcomingBanner: {
     width: "100%",
     maxWidth: 800,
-    marginBottom: 20,
+    marginBottom: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.blueAccent + "30",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
@@ -549,12 +706,10 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.blueAccent + "15",
     justifyContent: "center",
     alignItems: "center",
     marginLeft: 12,
     borderWidth: 1,
-    borderColor: Colors.blueAccent + "30",
   },
   bannerContent: {
     flex: 1,
@@ -575,7 +730,6 @@ const styles = StyleSheet.create({
   bannerTitle: {
     fontSize: 12,
     fontWeight: "600",
-    color: Colors.blueAccent,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
@@ -597,7 +751,7 @@ const styles = StyleSheet.create({
   },
   detailText: {
     fontSize: 12,
-    color: Colors.blueAccent,
+    opacity: 0.8,
   },
   closeButton: {
     padding: 4,

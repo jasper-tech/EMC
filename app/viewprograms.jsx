@@ -7,6 +7,8 @@ import {
   ActivityIndicator,
   Dimensions,
   Platform,
+  Alert,
+  TextInput,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -15,11 +17,96 @@ import ThemedText from "../components/ThemedText";
 import FooterNav from "../components/FooterNav";
 import { Colors } from "../constants/Colors";
 import { ThemeContext } from "../context/ThemeContext";
-import { collection, query, onSnapshot } from "firebase/firestore";
+import {
+  collection,
+  query,
+  onSnapshot,
+  deleteDoc,
+  doc,
+  updateDoc,
+} from "firebase/firestore";
 import { db } from "../firebase";
 
 const { width } = Dimensions.get("window");
 const isWeb = Platform.OS === "web";
+
+// Platform-specific Date Input Component for editing
+const DateInputEdit = ({ value, onChange, theme, isWeb }) => {
+  if (isWeb) {
+    return (
+      <input
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={{
+          borderWidth: 1,
+          borderRadius: 12,
+          borderColor: Colors.border,
+          borderStyle: "solid",
+          padding: "8px 12px",
+          fontSize: 14,
+          backgroundColor: Colors.uiBackground,
+          color: theme.text,
+          width: "100%",
+          fontFamily: "inherit",
+          boxSizing: "border-box",
+        }}
+      />
+    );
+  }
+
+  return (
+    <TextInput
+      style={[
+        styles.editInput,
+        { color: theme.text, borderColor: theme.border },
+      ]}
+      placeholder="YYYY-MM-DD"
+      placeholderTextColor={theme.text + "60"}
+      value={value}
+      onChangeText={onChange}
+    />
+  );
+};
+
+// Platform-specific Time Input Component for editing
+const TimeInputEdit = ({ value, onChange, theme, isWeb }) => {
+  if (isWeb) {
+    return (
+      <input
+        type="time"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={{
+          borderWidth: 1,
+          borderRadius: 12,
+          borderColor: Colors.border,
+          borderStyle: "solid",
+          padding: "8px 12px",
+          fontSize: 14,
+          backgroundColor: Colors.uiBackground,
+          color: theme.text,
+          width: "100%",
+          fontFamily: "inherit",
+          boxSizing: "border-box",
+        }}
+      />
+    );
+  }
+
+  return (
+    <TextInput
+      style={[
+        styles.editInput,
+        { color: theme.text, borderColor: theme.border },
+      ]}
+      placeholder="e.g., 2:00 PM"
+      placeholderTextColor={theme.text + "60"}
+      value={value}
+      onChangeText={onChange}
+    />
+  );
+};
 
 const ViewPrograms = () => {
   const router = useRouter();
@@ -27,6 +114,10 @@ const ViewPrograms = () => {
   const [loadingPrograms, setLoadingPrograms] = useState(true);
   const { scheme } = useContext(ThemeContext);
   const theme = Colors[scheme] ?? Colors.light;
+  const [showActionsFor, setShowActionsFor] = useState(null);
+  const [editingProgramId, setEditingProgramId] = useState(null);
+  const [editFormData, setEditFormData] = useState({});
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
     const programsRef = collection(db, "programs");
@@ -70,6 +161,106 @@ const ViewPrograms = () => {
     }
   };
 
+  const handleEditClick = (program) => {
+    setEditingProgramId(program.id);
+    setEditFormData({
+      title: program.title || "",
+      date: program.date || "",
+      time: program.time || "",
+      location: program.location || "",
+      organizer: program.organizer || "",
+      description: program.description || "",
+    });
+    setShowActionsFor(null); // Close actions menu
+  };
+
+  const handleSaveEdit = async (programId) => {
+    // Validation
+    if (!editFormData.title.trim()) {
+      Alert.alert("Error", "Please enter program title");
+      return;
+    }
+
+    if (!editFormData.date.trim()) {
+      Alert.alert("Error", "Please enter program date");
+      return;
+    }
+
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(editFormData.date)) {
+      Alert.alert("Error", "Please enter date in YYYY-MM-DD format");
+      return;
+    }
+
+    try {
+      setSavingEdit(true);
+      const programRef = doc(db, "programs", programId);
+
+      await updateDoc(programRef, {
+        ...editFormData,
+        updatedAt: new Date(),
+      });
+
+      // Update local state
+      setPrograms(
+        programs.map((program) =>
+          program.id === programId ? { ...program, ...editFormData } : program
+        )
+      );
+
+      setEditingProgramId(null);
+      setEditFormData({});
+      Alert.alert("Success", "Program updated successfully!");
+    } catch (error) {
+      console.error("Error updating program:", error);
+      Alert.alert("Error", "Failed to update program. Please try again.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingProgramId(null);
+    setEditFormData({});
+  };
+
+  const handleDelete = async (programId, programTitle) => {
+    Alert.alert(
+      "Delete Program",
+      `Are you sure you want to delete "${programTitle}"?`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteDoc(doc(db, "programs", programId));
+              // Remove from local state
+              setPrograms(
+                programs.filter((program) => program.id !== programId)
+              );
+              Alert.alert("Success", "Program deleted successfully!");
+            } catch (error) {
+              console.error("Error deleting program:", error);
+              Alert.alert(
+                "Error",
+                "Failed to delete program. Please try again."
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const toggleActions = (programId) => {
+    setShowActionsFor(showActionsFor === programId ? null : programId);
+  };
+
   const handleBack = () => {
     router.back();
   };
@@ -82,11 +273,6 @@ const ViewPrograms = () => {
         showsVerticalScrollIndicator={true}
       >
         <View style={styles.content}>
-          {/* Header */}
-          <View style={styles.header}>
-            <ThemedText style={styles.subtitle}>Scheduled programs</ThemedText>
-          </View>
-
           {/* Programs List */}
           {loadingPrograms ? (
             <View style={styles.loadingContainer}>
@@ -123,60 +309,289 @@ const ViewPrograms = () => {
                   key={program.id}
                   style={[styles.programCard, { borderColor: theme.border }]}
                 >
-                  <View style={styles.programHeader}>
-                    <View style={styles.dateBadge}>
-                      <MaterialIcons
-                        name="calendar-today"
-                        size={14}
-                        color="#fff"
-                      />
-                      <ThemedText style={styles.dateBadgeText}>
-                        {formatDate(program.date)}
-                      </ThemedText>
+                  {editingProgramId === program.id ? (
+                    // EDIT MODE
+                    <View style={styles.editForm}>
+                      {/* Edit Header */}
+                      <View style={styles.editHeader}>
+                        <ThemedText style={styles.editModeLabel}>
+                          Editing Program
+                        </ThemedText>
+                        <View style={styles.editButtons}>
+                          <TouchableOpacity
+                            style={[styles.editActionButton, styles.saveButton]}
+                            onPress={() => handleSaveEdit(program.id)}
+                            disabled={savingEdit}
+                          >
+                            {savingEdit ? (
+                              <ActivityIndicator size="small" color="#fff" />
+                            ) : (
+                              <>
+                                <MaterialIcons
+                                  name="check"
+                                  size={16}
+                                  color="#fff"
+                                />
+                                <ThemedText style={styles.saveButtonText}>
+                                  Save
+                                </ThemedText>
+                              </>
+                            )}
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[
+                              styles.editActionButton,
+                              styles.cancelEditButton,
+                            ]}
+                            onPress={handleCancelEdit}
+                          >
+                            <MaterialIcons
+                              name="close"
+                              size={16}
+                              color={Colors.redAccent}
+                            />
+                            <ThemedText style={styles.cancelEditButtonText}>
+                              Cancel
+                            </ThemedText>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+
+                      {/* Edit Form Fields */}
+                      <View style={styles.editFormGroup}>
+                        <ThemedText style={styles.editLabel}>
+                          Title *
+                        </ThemedText>
+                        <TextInput
+                          style={[
+                            styles.editInput,
+                            { color: theme.text, borderColor: theme.border },
+                          ]}
+                          value={editFormData.title}
+                          onChangeText={(text) =>
+                            setEditFormData({ ...editFormData, title: text })
+                          }
+                        />
+                      </View>
+
+                      <View style={styles.editRow}>
+                        <View style={[styles.editFormGroup, { flex: 1 }]}>
+                          <ThemedText style={styles.editLabel}>
+                            Date *
+                          </ThemedText>
+                          <DateInputEdit
+                            value={editFormData.date}
+                            onChange={(text) =>
+                              setEditFormData({ ...editFormData, date: text })
+                            }
+                            theme={theme}
+                            isWeb={isWeb}
+                          />
+                        </View>
+                        <View style={[styles.editFormGroup, { flex: 1 }]}>
+                          <ThemedText style={styles.editLabel}>Time</ThemedText>
+                          <TimeInputEdit
+                            value={editFormData.time}
+                            onChange={(text) =>
+                              setEditFormData({ ...editFormData, time: text })
+                            }
+                            theme={theme}
+                            isWeb={isWeb}
+                          />
+                        </View>
+                      </View>
+
+                      <View style={styles.editFormGroup}>
+                        <ThemedText style={styles.editLabel}>
+                          Location
+                        </ThemedText>
+                        <TextInput
+                          style={[
+                            styles.editInput,
+                            { color: theme.text, borderColor: theme.border },
+                          ]}
+                          value={editFormData.location}
+                          onChangeText={(text) =>
+                            setEditFormData({ ...editFormData, location: text })
+                          }
+                        />
+                      </View>
+
+                      <View style={styles.editFormGroup}>
+                        <ThemedText style={styles.editLabel}>
+                          Organizer
+                        </ThemedText>
+                        <TextInput
+                          style={[
+                            styles.editInput,
+                            { color: theme.text, borderColor: theme.border },
+                          ]}
+                          value={editFormData.organizer}
+                          onChangeText={(text) =>
+                            setEditFormData({
+                              ...editFormData,
+                              organizer: text,
+                            })
+                          }
+                        />
+                      </View>
+
+                      <View style={styles.editFormGroup}>
+                        <ThemedText style={styles.editLabel}>
+                          Description
+                        </ThemedText>
+                        <TextInput
+                          style={[
+                            styles.editInput,
+                            styles.editTextArea,
+                            { color: theme.text, borderColor: theme.border },
+                          ]}
+                          value={editFormData.description}
+                          onChangeText={(text) =>
+                            setEditFormData({
+                              ...editFormData,
+                              description: text,
+                            })
+                          }
+                          multiline
+                          numberOfLines={3}
+                          textAlignVertical="top"
+                        />
+                      </View>
                     </View>
-                    {program.time && (
-                      <ThemedText style={styles.timeText}>
-                        {program.time}
+                  ) : (
+                    // VIEW MODE
+                    <>
+                      <View style={styles.programHeader}>
+                        <View style={styles.dateBadge}>
+                          <MaterialIcons
+                            name="calendar-today"
+                            size={14}
+                            color="#fff"
+                          />
+                          <ThemedText style={styles.dateBadgeText}>
+                            {formatDate(program.date)}
+                          </ThemedText>
+                        </View>
+
+                        <View style={styles.headerRight}>
+                          {program.time && (
+                            <ThemedText style={styles.timeText}>
+                              {program.time}
+                            </ThemedText>
+                          )}
+
+                          {/* Actions Button (Three Dots) */}
+                          <TouchableOpacity
+                            style={styles.actionsButton}
+                            onPress={() => toggleActions(program.id)}
+                            hitSlop={{
+                              top: 10,
+                              bottom: 10,
+                              left: 10,
+                              right: 10,
+                            }}
+                          >
+                            <MaterialIcons
+                              name="more-vert"
+                              size={24}
+                              color={theme.text}
+                              style={{ opacity: 0.6 }}
+                            />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+
+                      {/* Actions Menu (Edit/Delete) */}
+                      {showActionsFor === program.id && (
+                        <View
+                          style={[
+                            styles.actionsMenu,
+                            { backgroundColor: theme.uiBackground },
+                          ]}
+                        >
+                          <TouchableOpacity
+                            style={styles.actionButton}
+                            onPress={() => handleEditClick(program)}
+                          >
+                            <MaterialIcons
+                              name="edit"
+                              size={18}
+                              color={Colors.blueAccent}
+                            />
+                            <ThemedText
+                              style={[
+                                styles.actionText,
+                                { color: Colors.blueAccent },
+                              ]}
+                            >
+                              Edit
+                            </ThemedText>
+                          </TouchableOpacity>
+
+                          <View style={styles.actionDivider} />
+
+                          <TouchableOpacity
+                            style={styles.actionButton}
+                            onPress={() =>
+                              handleDelete(program.id, program.title)
+                            }
+                          >
+                            <MaterialIcons
+                              name="delete"
+                              size={18}
+                              color={Colors.redAccent}
+                            />
+                            <ThemedText
+                              style={[
+                                styles.actionText,
+                                { color: Colors.redAccent },
+                              ]}
+                            >
+                              Delete
+                            </ThemedText>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+
+                      <ThemedText style={styles.programTitle}>
+                        {program.title}
                       </ThemedText>
-                    )}
-                  </View>
 
-                  <ThemedText style={styles.programTitle}>
-                    {program.title}
-                  </ThemedText>
+                      {program.location && (
+                        <View style={styles.detailRow}>
+                          <MaterialIcons
+                            name="location-on"
+                            size={16}
+                            color={theme.text}
+                            style={{ opacity: 0.6 }}
+                          />
+                          <ThemedText style={styles.detailText}>
+                            {program.location}
+                          </ThemedText>
+                        </View>
+                      )}
 
-                  {program.location && (
-                    <View style={styles.detailRow}>
-                      <MaterialIcons
-                        name="location-on"
-                        size={16}
-                        color={theme.text}
-                        style={{ opacity: 0.6 }}
-                      />
-                      <ThemedText style={styles.detailText}>
-                        {program.location}
-                      </ThemedText>
-                    </View>
-                  )}
+                      {program.organizer && (
+                        <View style={styles.detailRow}>
+                          <MaterialIcons
+                            name="person"
+                            size={16}
+                            color={theme.text}
+                            style={{ opacity: 0.6 }}
+                          />
+                          <ThemedText style={styles.detailText}>
+                            Organized by: {program.organizer}
+                          </ThemedText>
+                        </View>
+                      )}
 
-                  {program.organizer && (
-                    <View style={styles.detailRow}>
-                      <MaterialIcons
-                        name="person"
-                        size={16}
-                        color={theme.text}
-                        style={{ opacity: 0.6 }}
-                      />
-                      <ThemedText style={styles.detailText}>
-                        Organized by: {program.organizer}
-                      </ThemedText>
-                    </View>
-                  )}
-
-                  {program.description && (
-                    <ThemedText style={styles.description}>
-                      {program.description}
-                    </ThemedText>
+                      {program.description && (
+                        <ThemedText style={styles.description}>
+                          {program.description}
+                        </ThemedText>
+                      )}
+                    </>
                   )}
                 </View>
               ))}
@@ -278,12 +693,18 @@ const styles = StyleSheet.create({
     padding: 20,
     marginBottom: 16,
     borderWidth: 1,
+    position: "relative",
   },
   programHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 12,
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
   },
   dateBadge: {
     flexDirection: "row",
@@ -303,10 +724,47 @@ const styles = StyleSheet.create({
     fontSize: 14,
     opacity: 0.7,
   },
+  actionsButton: {
+    padding: 4,
+  },
+  actionsMenu: {
+    position: "absolute",
+    top: 50,
+    right: 20,
+    borderRadius: 8,
+    paddingVertical: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    zIndex: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    minWidth: 120,
+  },
+  actionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 10,
+  },
+  actionText: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  actionDivider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginHorizontal: 8,
+    marginVertical: 4,
+  },
   programTitle: {
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 12,
+    marginTop: 8,
   },
   detailRow: {
     flexDirection: "row",
@@ -323,6 +781,76 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     opacity: 0.7,
     marginTop: 8,
+  },
+  // Edit Mode Styles
+  editForm: {
+    gap: 16,
+  },
+  editHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  editModeLabel: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: Colors.blueAccent,
+  },
+  editButtons: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  editActionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 6,
+  },
+  saveButton: {
+    backgroundColor: Colors.blueAccent,
+  },
+  saveButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  cancelEditButton: {
+    backgroundColor: Colors.border + "40",
+  },
+  cancelEditButtonText: {
+    color: Colors.redAccent,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  editFormGroup: {
+    gap: 6,
+  },
+  editRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  editLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    opacity: 0.8,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  editInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    backgroundColor: Colors.uiBackground,
+    minHeight: 40,
+  },
+  editTextArea: {
+    minHeight: 80,
+    textAlignVertical: "top",
   },
   bottomSpacer: {
     height: 40,
