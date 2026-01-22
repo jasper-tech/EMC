@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Animated,
   ScrollView,
+  Dimensions,
 } from "react-native";
 import React, { useState, useEffect, useRef, useContext } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,9 +22,14 @@ import { auth } from "../firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ThemeContext } from "../context/ThemeContext";
 
+const { width, height } = Dimensions.get("window");
+const isWeb = Platform.OS === "web";
+const isTablet = width >= 768;
+
 const ForgotPassword = () => {
   const { scheme } = useContext(ThemeContext);
   const theme = Colors[scheme] ?? Colors.light;
+  const accentColors = Colors;
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
@@ -145,16 +151,37 @@ const ForgotPassword = () => {
   };
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView
+      style={[styles.container, { backgroundColor: theme.background }]}
+    >
       <View style={styles.backgroundGraphics}>
-        <View style={[styles.circle, styles.circle1]} />
-        <View style={[styles.circle, styles.circle2]} />
-        <View style={[styles.circle, styles.circle3]} />
+        <View
+          style={[
+            styles.circle,
+            styles.circle1,
+            { backgroundColor: `${accentColors.blueAccent}08` },
+          ]}
+        />
+        <View
+          style={[
+            styles.circle,
+            styles.circle2,
+            { backgroundColor: `${accentColors.blueAccent}05` },
+          ]}
+        />
+        <View
+          style={[
+            styles.circle,
+            styles.circle3,
+            { backgroundColor: `${accentColors.blueAccent}03` },
+          ]}
+        />
       </View>
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardView}
+        enabled={!isWeb}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -166,6 +193,9 @@ const ForgotPassword = () => {
               {
                 opacity: fadeAnim,
                 transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
+                maxWidth: isWeb ? 600 : "100%",
+                alignSelf: "center",
+                width: "100%",
               },
             ]}
           >
@@ -184,11 +214,18 @@ const ForgotPassword = () => {
             <View style={styles.form}>
               {/* Email Input */}
               <View style={styles.inputContainer}>
-                <ThemedText style={styles.label}>Email Address</ThemedText>
+                <ThemedText
+                  style={[styles.label, { color: accentColors.blueAccent }]}
+                >
+                  Email Address
+                </ThemedText>
                 <Animated.View
                   style={[
                     styles.inputWrapper,
                     {
+                      backgroundColor: theme.uiBackground,
+                      borderColor: `${accentColors.blueAccent}20`,
+                      shadowColor: accentColors.blueAccent,
                       transform: [
                         {
                           scale: inputFocusAnim.interpolate({
@@ -203,13 +240,13 @@ const ForgotPassword = () => {
                   <Ionicons
                     name="mail-outline"
                     size={20}
-                    color={Colors.blueAccent}
+                    color={accentColors.blueAccent}
                     style={styles.inputIcon}
                   />
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { color: theme.text }]}
                     placeholder="Enter your email"
-                    placeholderTextColor="#999"
+                    placeholderTextColor={theme.iconColor}
                     keyboardType="email-address"
                     autoCapitalize="none"
                     value={email}
@@ -217,7 +254,6 @@ const ForgotPassword = () => {
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
                     editable={!loading && !emailSent}
-                    color={theme.text}
                   />
                 </Animated.View>
               </View>
@@ -227,6 +263,10 @@ const ForgotPassword = () => {
                 style={[
                   styles.resetButton,
                   (loading || emailSent) && styles.resetButtonDisabled,
+                  {
+                    backgroundColor: accentColors.blueAccent,
+                    shadowColor: accentColors.blueAccent,
+                  },
                 ]}
                 onPress={handleSendResetEmail}
                 disabled={loading || emailSent}
@@ -247,13 +287,16 @@ const ForgotPassword = () => {
               <View
                 style={[
                   styles.infoBox,
-                  { backgroundColor: theme.uiBackground },
+                  {
+                    backgroundColor: theme.uiBackground,
+                    borderLeftColor: accentColors.yellowAccent,
+                  },
                 ]}
               >
                 <Ionicons
                   name="information-circle"
                   size={20}
-                  color={Colors.yellowAccent}
+                  color={accentColors.yellowAccent}
                 />
                 <View style={styles.infoTextContainer}>
                   <ThemedText style={styles.infoTitle}>
@@ -269,21 +312,28 @@ const ForgotPassword = () => {
 
               {/* Back to Login Link */}
               <View style={styles.loginContainer}>
-                <ThemedText style={styles.loginText}>
+                <ThemedText style={[styles.loginText, { opacity: 0.7 }]}>
                   Remember your password?{" "}
                 </ThemedText>
                 <TouchableOpacity
                   onPress={() => router.replace("/login")}
                   disabled={loading}
                 >
-                  <ThemedText style={styles.loginLink}>Sign In</ThemedText>
+                  <ThemedText
+                    style={[
+                      styles.loginLink,
+                      { color: accentColors.blueAccent },
+                    ]}
+                  >
+                    Sign In
+                  </ThemedText>
                 </TouchableOpacity>
               </View>
             </View>
 
             {/* Footer */}
             <View style={styles.footer}>
-              <ThemedText style={styles.footerText}>
+              <ThemedText style={[styles.footerText, { opacity: 0.5 }]}>
                 Secure • Encrypted • Trusted
               </ThemedText>
             </View>
@@ -306,39 +356,37 @@ const styles = StyleSheet.create({
   circle: {
     position: "absolute",
     borderRadius: 500,
-    backgroundColor: `${Colors.blueAccent}08`,
   },
   circle1: {
-    width: 250,
-    height: 250,
+    width: isWeb ? 400 : 250,
+    height: isWeb ? 400 : 250,
     top: -100,
-    right: -80,
+    right: isWeb ? -100 : -80,
   },
   circle2: {
-    width: 180,
-    height: 180,
-    bottom: 80,
-    left: -40,
-    backgroundColor: `${Colors.blueAccent}05`,
+    width: isWeb ? 300 : 180,
+    height: isWeb ? 300 : 180,
+    bottom: isWeb ? 120 : 80,
+    left: isWeb ? -80 : -40,
   },
   circle3: {
-    width: 120,
-    height: 120,
+    width: isWeb ? 200 : 120,
+    height: isWeb ? 200 : 120,
     bottom: -30,
-    right: 40,
-    backgroundColor: `${Colors.blueAccent}03`,
+    right: isWeb ? 80 : 40,
   },
   keyboardView: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
+    paddingVertical: isWeb ? 40 : 0,
   },
   content: {
     flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 60,
-    paddingBottom: 40,
+    paddingHorizontal: isWeb ? 40 : 24,
+    paddingTop: isWeb ? 80 : 60,
+    paddingBottom: isWeb ? 80 : 40,
     justifyContent: "space-between",
   },
   backButton: {
@@ -356,7 +404,7 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: "center",
-    marginBottom: 40,
+    marginBottom: isWeb ? 50 : 40,
   },
   iconContainer: {
     width: 100,
@@ -367,40 +415,36 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   title: {
-    fontSize: 32,
+    fontSize: isWeb ? 40 : 32,
     fontWeight: "bold",
     textAlign: "center",
-    marginBottom: 12,
-    lineHeight: 38,
+    marginBottom: isWeb ? 16 : 12,
+    lineHeight: isWeb ? 48 : 38,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: isWeb ? 18 : 16,
     opacity: 0.7,
     textAlign: "center",
-    lineHeight: 24,
-    paddingHorizontal: 10,
+    lineHeight: isWeb ? 28 : 24,
+    paddingHorizontal: isWeb ? 20 : 10,
   },
   form: {
     width: "100%",
   },
   inputContainer: {
-    marginBottom: 24,
+    marginBottom: isWeb ? 32 : 24,
   },
   label: {
-    fontSize: 14,
+    fontSize: isWeb ? 16 : 14,
     fontWeight: "600",
-    marginBottom: 8,
-    color: Colors.blueAccent,
+    marginBottom: isWeb ? 12 : 8,
   },
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.uiBackground,
-    borderRadius: 16,
-    paddingHorizontal: 16,
+    borderRadius: isWeb ? 12 : 16,
+    paddingHorizontal: isWeb ? 20 : 16,
     borderWidth: 2,
-    borderColor: `${Colors.blueAccent}20`,
-    shadowColor: Colors.blueAccent,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -411,54 +455,50 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    paddingVertical: 16,
-    fontSize: 16,
-    color: Colors.text,
+    paddingVertical: isWeb ? 18 : 16,
+    fontSize: isWeb ? 18 : 16,
   },
   resetButton: {
-    backgroundColor: Colors.blueAccent,
-    borderRadius: 16,
-    padding: 18,
+    borderRadius: isWeb ? 12 : 16,
+    padding: isWeb ? 22 : 18,
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "center",
-    gap: 8,
-    shadowColor: Colors.blueAccent,
+    gap: isWeb ? 12 : 8,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
-    marginBottom: 24,
+    marginBottom: isWeb ? 32 : 24,
   },
   resetButtonDisabled: {
     opacity: 0.7,
   },
   resetButtonText: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: isWeb ? 18 : 16,
     fontWeight: "bold",
   },
   infoBox: {
     flexDirection: "row",
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 24,
+    padding: isWeb ? 20 : 16,
+    borderRadius: isWeb ? 12 : 12,
+    marginBottom: isWeb ? 32 : 24,
     borderLeftWidth: 4,
-    borderLeftColor: Colors.yellowAccent,
-    gap: 12,
+    gap: isWeb ? 16 : 12,
   },
   infoTextContainer: {
     flex: 1,
   },
   infoTitle: {
-    fontSize: 14,
+    fontSize: isWeb ? 16 : 14,
     fontWeight: "600",
-    marginBottom: 8,
+    marginBottom: isWeb ? 12 : 8,
   },
   infoText: {
-    fontSize: 13,
+    fontSize: isWeb ? 15 : 13,
     opacity: 0.7,
-    lineHeight: 20,
+    lineHeight: isWeb ? 24 : 20,
   },
   loginContainer: {
     flexDirection: "row",
@@ -466,21 +506,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   loginText: {
-    fontSize: 14,
-    opacity: 0.7,
+    fontSize: isWeb ? 16 : 14,
   },
   loginLink: {
-    fontSize: 14,
+    fontSize: isWeb ? 16 : 14,
     fontWeight: "bold",
-    color: Colors.blueAccent,
   },
   footer: {
     alignItems: "center",
-    marginTop: 40,
+    marginTop: isWeb ? 60 : 40,
   },
   footerText: {
-    fontSize: 12,
-    opacity: 0.5,
+    fontSize: isWeb ? 14 : 12,
     letterSpacing: 1,
   },
 });

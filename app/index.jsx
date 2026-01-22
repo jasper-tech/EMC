@@ -303,9 +303,9 @@ const Index = () => {
         )}
 
         <View style={styles.footer}>
-          <ThemedText style={styles.footerText}>
+          {/* <ThemedText style={styles.footerText}>
             Secure • Reliable • Fast
-          </ThemedText>
+          </ThemedText> */}
         </View>
       </Animated.View>
     </ThemedView>

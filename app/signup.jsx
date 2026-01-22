@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Modal,
   Animated,
+  Dimensions,
 } from "react-native";
 
 import { Picker } from "@react-native-picker/picker";
@@ -31,6 +32,10 @@ import { auth, db } from "../firebase";
 import { doc, setDoc, collection, addDoc } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+const { width, height } = Dimensions.get("window");
+const isWeb = Platform.OS === "web";
+const isTablet = width >= 768;
+
 const Signup = () => {
   const [formData, setFormData] = useState({
     fullName: "",
@@ -50,6 +55,7 @@ const Signup = () => {
 
   const { scheme } = useContext(ThemeContext);
   const theme = Colors[scheme] ?? Colors.light;
+  const accentColors = Colors;
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -250,16 +256,37 @@ const Signup = () => {
   };
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView
+      style={[styles.container, { backgroundColor: theme.background }]}
+    >
       <View style={styles.backgroundGraphics}>
-        <View style={[styles.circle, styles.circle1]} />
-        <View style={[styles.circle, styles.circle2]} />
-        <View style={[styles.circle, styles.circle3]} />
+        <View
+          style={[
+            styles.circle,
+            styles.circle1,
+            { backgroundColor: `${accentColors.blueAccent}08` },
+          ]}
+        />
+        <View
+          style={[
+            styles.circle,
+            styles.circle2,
+            { backgroundColor: `${accentColors.blueAccent}05` },
+          ]}
+        />
+        <View
+          style={[
+            styles.circle,
+            styles.circle3,
+            { backgroundColor: `${accentColors.blueAccent}03` },
+          ]}
+        />
       </View>
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardView}
+        enabled={!isWeb}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -271,6 +298,9 @@ const Signup = () => {
               {
                 opacity: fadeAnim,
                 transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
+                maxWidth: isWeb ? 600 : "100%",
+                alignSelf: "center",
+                width: "100%",
               },
             ]}
           >
@@ -285,11 +315,18 @@ const Signup = () => {
             <View style={styles.form}>
               {/* Full Name Input */}
               <View style={styles.inputContainer}>
-                <ThemedText style={styles.label}>Full Name</ThemedText>
+                <ThemedText
+                  style={[styles.label, { color: accentColors.blueAccent }]}
+                >
+                  Full Name
+                </ThemedText>
                 <Animated.View
                   style={[
                     styles.inputWrapper,
                     {
+                      backgroundColor: theme.uiBackground,
+                      borderColor: `${accentColors.blueAccent}20`,
+                      shadowColor: accentColors.blueAccent,
                       transform: [
                         {
                           scale: inputFocusAnim.interpolate({
@@ -304,13 +341,13 @@ const Signup = () => {
                   <Ionicons
                     name="person-outline"
                     size={20}
-                    color={Colors.blueAccent}
+                    color={accentColors.blueAccent}
                     style={styles.inputIcon}
                   />
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { color: theme.text }]}
                     placeholder="Enter your full name"
-                    placeholderTextColor="#999"
+                    placeholderTextColor={theme.iconColor}
                     value={formData.fullName}
                     onChangeText={(text) =>
                       setFormData({ ...formData, fullName: text })
@@ -318,18 +355,24 @@ const Signup = () => {
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
                     editable={!loading}
-                    color={theme.text}
                   />
                 </Animated.View>
               </View>
 
               {/* Email Input */}
               <View style={styles.inputContainer}>
-                <ThemedText style={styles.label}>Email Address</ThemedText>
+                <ThemedText
+                  style={[styles.label, { color: accentColors.blueAccent }]}
+                >
+                  Email Address
+                </ThemedText>
                 <Animated.View
                   style={[
                     styles.inputWrapper,
                     {
+                      backgroundColor: theme.uiBackground,
+                      borderColor: `${accentColors.blueAccent}20`,
+                      shadowColor: accentColors.blueAccent,
                       transform: [
                         {
                           scale: inputFocusAnim.interpolate({
@@ -344,13 +387,13 @@ const Signup = () => {
                   <Ionicons
                     name="mail-outline"
                     size={20}
-                    color={Colors.blueAccent}
+                    color={accentColors.blueAccent}
                     style={styles.inputIcon}
                   />
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { color: theme.text }]}
                     placeholder="Enter your email"
-                    placeholderTextColor="#999"
+                    placeholderTextColor={theme.iconColor}
                     keyboardType="email-address"
                     autoCapitalize="none"
                     value={formData.email}
@@ -360,18 +403,24 @@ const Signup = () => {
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
                     editable={!loading}
-                    color={theme.text}
                   />
                 </Animated.View>
               </View>
 
               {/* Phone Input */}
               <View style={styles.inputContainer}>
-                <ThemedText style={styles.label}>Phone Number</ThemedText>
+                <ThemedText
+                  style={[styles.label, { color: accentColors.blueAccent }]}
+                >
+                  Phone Number
+                </ThemedText>
                 <Animated.View
                   style={[
                     styles.inputWrapper,
                     {
+                      backgroundColor: theme.uiBackground,
+                      borderColor: `${accentColors.blueAccent}20`,
+                      shadowColor: accentColors.blueAccent,
                       transform: [
                         {
                           scale: inputFocusAnim.interpolate({
@@ -386,13 +435,13 @@ const Signup = () => {
                   <Ionicons
                     name="call-outline"
                     size={20}
-                    color={Colors.blueAccent}
+                    color={accentColors.blueAccent}
                     style={styles.inputIcon}
                   />
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { color: theme.text }]}
                     placeholder="Enter your phone number"
-                    placeholderTextColor="#999"
+                    placeholderTextColor={theme.iconColor}
                     keyboardType="phone-pad"
                     value={formData.phone}
                     onChangeText={(text) =>
@@ -401,19 +450,25 @@ const Signup = () => {
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
                     editable={!loading}
-                    color={theme.text}
                   />
                 </Animated.View>
               </View>
 
               {/* Address Input */}
               <View style={styles.inputContainer}>
-                <ThemedText style={styles.label}>Address</ThemedText>
+                <ThemedText
+                  style={[styles.label, { color: accentColors.blueAccent }]}
+                >
+                  Address
+                </ThemedText>
                 <Animated.View
                   style={[
                     styles.inputWrapper,
                     styles.textAreaWrapper,
                     {
+                      backgroundColor: theme.uiBackground,
+                      borderColor: `${accentColors.blueAccent}20`,
+                      shadowColor: accentColors.blueAccent,
                       transform: [
                         {
                           scale: inputFocusAnim.interpolate({
@@ -428,13 +483,17 @@ const Signup = () => {
                   <Ionicons
                     name="home-outline"
                     size={20}
-                    color={Colors.blueAccent}
+                    color={accentColors.blueAccent}
                     style={styles.inputIcon}
                   />
                   <TextInput
-                    style={[styles.input, styles.textArea]}
+                    style={[
+                      styles.input,
+                      styles.textArea,
+                      { color: theme.text },
+                    ]}
                     placeholder="Enter your address"
-                    placeholderTextColor="#999"
+                    placeholderTextColor={theme.iconColor}
                     value={formData.address}
                     onChangeText={(text) =>
                       setFormData({ ...formData, address: text })
@@ -444,19 +503,26 @@ const Signup = () => {
                     multiline
                     numberOfLines={3}
                     editable={!loading}
-                    color={theme.text}
                   />
                 </Animated.View>
               </View>
 
               {/* Role Selection */}
               <View style={styles.inputContainer}>
-                <ThemedText style={styles.label}>Union Role</ThemedText>
+                <ThemedText
+                  style={[styles.label, { color: accentColors.blueAccent }]}
+                >
+                  Union Role
+                </ThemedText>
                 {Platform.OS === "ios" ? (
                   <TouchableOpacity
                     style={[
                       styles.pickerTouchable,
-                      { backgroundColor: theme.uiBackground },
+                      {
+                        backgroundColor: theme.uiBackground,
+                        borderColor: `${accentColors.blueAccent}20`,
+                        shadowColor: accentColors.blueAccent,
+                      },
                     ]}
                     onPress={openRolePicker}
                     disabled={loading}
@@ -464,13 +530,14 @@ const Signup = () => {
                     <Ionicons
                       name="person-circle-outline"
                       size={20}
-                      color={Colors.blueAccent}
+                      color={accentColors.blueAccent}
                       style={styles.inputIcon}
                     />
                     <ThemedText
                       style={[
                         styles.pickerText,
                         !formData.role && styles.pickerPlaceholder,
+                        { color: formData.role ? theme.text : theme.iconColor },
                       ]}
                     >
                       {formData.role || "Select your union role"}
@@ -478,32 +545,46 @@ const Signup = () => {
                     <Ionicons
                       name="chevron-down"
                       size={20}
-                      color={Colors.blueAccent}
+                      color={accentColors.blueAccent}
                     />
                   </TouchableOpacity>
                 ) : (
                   <View
                     style={[
                       styles.pickerContainer,
-                      { backgroundColor: theme.uiBackground },
+                      {
+                        backgroundColor: theme.uiBackground,
+                        borderColor: `${accentColors.blueAccent}20`,
+                        shadowColor: accentColors.blueAccent,
+                      },
                     ]}
                   >
                     <RNPickerSelect
                       placeholder={{
                         label: "Select your union role",
                         value: null,
-                        color: "#9EA0A4",
+                        color: theme.iconColor,
                       }}
-                      items={roleOptions}
+                      items={roleOptions.map((option) => ({
+                        ...option,
+                        color: theme.text,
+                      }))}
                       onValueChange={(value) =>
                         setFormData({ ...formData, role: value })
                       }
                       value={formData.role}
                       disabled={loading}
                       style={{
-                        inputAndroid: styles.pickerInputAndroid,
+                        inputAndroid: [
+                          styles.pickerInputAndroid,
+                          { color: theme.text },
+                        ],
+                        inputIOS: [
+                          styles.pickerInputAndroid,
+                          { color: theme.text },
+                        ],
                         placeholder: {
-                          color: "#9EA0A4",
+                          color: theme.iconColor,
                         },
                       }}
                       useNativeAndroidPickerStyle={false}
@@ -511,7 +592,7 @@ const Signup = () => {
                         <Ionicons
                           name="chevron-down"
                           size={20}
-                          color={Colors.blueAccent}
+                          color={accentColors.blueAccent}
                         />
                       )}
                     />
@@ -521,11 +602,18 @@ const Signup = () => {
 
               {/* Password Input */}
               <View style={styles.inputContainer}>
-                <ThemedText style={styles.label}>Password</ThemedText>
+                <ThemedText
+                  style={[styles.label, { color: accentColors.blueAccent }]}
+                >
+                  Password
+                </ThemedText>
                 <Animated.View
                   style={[
                     styles.inputWrapper,
                     {
+                      backgroundColor: theme.uiBackground,
+                      borderColor: `${accentColors.blueAccent}20`,
+                      shadowColor: accentColors.blueAccent,
                       transform: [
                         {
                           scale: inputFocusAnim.interpolate({
@@ -540,13 +628,13 @@ const Signup = () => {
                   <Ionicons
                     name="lock-closed-outline"
                     size={20}
-                    color={Colors.blueAccent}
+                    color={accentColors.blueAccent}
                     style={styles.inputIcon}
                   />
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { color: theme.text }]}
                     placeholder="Create a password (min 6 characters)"
-                    placeholderTextColor="#999"
+                    placeholderTextColor={theme.iconColor}
                     secureTextEntry={!isPasswordVisible}
                     value={formData.password}
                     onChangeText={(text) =>
@@ -555,7 +643,6 @@ const Signup = () => {
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
                     editable={!loading}
-                    color={theme.text}
                   />
                   <TouchableOpacity
                     style={styles.visibilityToggle}
@@ -566,7 +653,7 @@ const Signup = () => {
                         isPasswordVisible ? "eye-off-outline" : "eye-outline"
                       }
                       size={20}
-                      color={Colors.blueAccent}
+                      color={accentColors.blueAccent}
                     />
                   </TouchableOpacity>
                 </Animated.View>
@@ -574,11 +661,18 @@ const Signup = () => {
 
               {/* Confirm Password Input */}
               <View style={styles.inputContainer}>
-                <ThemedText style={styles.label}>Confirm Password</ThemedText>
+                <ThemedText
+                  style={[styles.label, { color: accentColors.blueAccent }]}
+                >
+                  Confirm Password
+                </ThemedText>
                 <Animated.View
                   style={[
                     styles.inputWrapper,
                     {
+                      backgroundColor: theme.uiBackground,
+                      borderColor: `${accentColors.blueAccent}20`,
+                      shadowColor: accentColors.blueAccent,
                       transform: [
                         {
                           scale: inputFocusAnim.interpolate({
@@ -593,13 +687,13 @@ const Signup = () => {
                   <Ionicons
                     name="lock-closed-outline"
                     size={20}
-                    color={Colors.blueAccent}
+                    color={accentColors.blueAccent}
                     style={styles.inputIcon}
                   />
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { color: theme.text }]}
                     placeholder="Confirm your password"
-                    placeholderTextColor="#999"
+                    placeholderTextColor={theme.iconColor}
                     secureTextEntry={!isConfirmPasswordVisible}
                     value={formData.confirmPassword}
                     onChangeText={(text) =>
@@ -608,7 +702,6 @@ const Signup = () => {
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
                     editable={!loading}
-                    color={theme.text}
                   />
                   <TouchableOpacity
                     style={styles.visibilityToggle}
@@ -623,7 +716,7 @@ const Signup = () => {
                           : "eye-outline"
                       }
                       size={20}
-                      color={Colors.blueAccent}
+                      color={accentColors.blueAccent}
                     />
                   </TouchableOpacity>
                 </Animated.View>
@@ -634,6 +727,10 @@ const Signup = () => {
                 style={[
                   styles.signupButton,
                   loading && styles.signupButtonDisabled,
+                  {
+                    backgroundColor: accentColors.blueAccent,
+                    shadowColor: accentColors.blueAccent,
+                  },
                 ]}
                 onPress={handleSignup}
                 disabled={loading}
@@ -656,21 +753,28 @@ const Signup = () => {
 
               {/* Login Link */}
               <View style={styles.loginContainer}>
-                <ThemedText style={styles.loginText}>
+                <ThemedText style={[styles.loginText, { opacity: 0.7 }]}>
                   Already have an account?{" "}
                 </ThemedText>
                 <TouchableOpacity
                   onPress={() => router.push("/login")}
                   disabled={loading}
                 >
-                  <ThemedText style={styles.loginLink}>Sign In</ThemedText>
+                  <ThemedText
+                    style={[
+                      styles.loginLink,
+                      { color: accentColors.blueAccent },
+                    ]}
+                  >
+                    Sign In
+                  </ThemedText>
                 </TouchableOpacity>
               </View>
             </View>
 
             {/* Footer */}
             <View style={styles.footer}>
-              <ThemedText style={styles.footerText}>
+              <ThemedText style={[styles.footerText, { opacity: 0.5 }]}>
                 Secure • Community • Trusted
               </ThemedText>
             </View>
@@ -694,19 +798,33 @@ const Signup = () => {
           <View
             style={[
               styles.modalContent,
-              { backgroundColor: theme.uiBackground },
+              {
+                backgroundColor: theme.uiBackground,
+                maxHeight: height * 0.6,
+              },
             ]}
           >
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={handleRoleCancel}>
-                <ThemedText style={styles.modalButton}>Cancel</ThemedText>
+                <ThemedText
+                  style={[
+                    styles.modalButton,
+                    { color: accentColors.blueAccent },
+                  ]}
+                >
+                  Cancel
+                </ThemedText>
               </TouchableOpacity>
               <ThemedText style={styles.modalTitle}>
                 Select Union Role
               </ThemedText>
               <TouchableOpacity onPress={handleRoleConfirm}>
                 <ThemedText
-                  style={[styles.modalButton, styles.modalButtonDone]}
+                  style={[
+                    styles.modalButton,
+                    styles.modalButtonDone,
+                    { color: accentColors.blueAccent },
+                  ]}
                 >
                   Done
                 </ThemedText>
@@ -715,13 +833,15 @@ const Signup = () => {
             <Picker
               selectedValue={tempRole}
               onValueChange={(itemValue) => setTempRole(itemValue)}
-              style={styles.picker}
+              style={[styles.picker, { color: theme.text }]}
+              dropdownIconColor={accentColors.blueAccent}
             >
               {roleOptions.map((option) => (
                 <Picker.Item
                   key={option.value}
                   label={option.label}
                   value={option.value}
+                  color={theme.text}
                 />
               ))}
             </Picker>
@@ -790,6 +910,7 @@ export const saveUserToFirestore = async (user) => {
     throw error;
   }
 };
+
 export default Signup;
 
 const styles = StyleSheet.create({
@@ -802,73 +923,67 @@ const styles = StyleSheet.create({
   circle: {
     position: "absolute",
     borderRadius: 500,
-    backgroundColor: `${Colors.blueAccent}08`,
   },
   circle1: {
-    width: 250,
-    height: 250,
+    width: isWeb ? 400 : 250,
+    height: isWeb ? 400 : 250,
     top: -100,
-    right: -80,
+    right: isWeb ? -100 : -80,
   },
   circle2: {
-    width: 180,
-    height: 180,
-    bottom: 80,
-    left: -40,
-    backgroundColor: `${Colors.blueAccent}05`,
+    width: isWeb ? 300 : 180,
+    height: isWeb ? 300 : 180,
+    bottom: isWeb ? 120 : 80,
+    left: isWeb ? -80 : -40,
   },
   circle3: {
-    width: 120,
-    height: 120,
+    width: isWeb ? 200 : 120,
+    height: isWeb ? 200 : 120,
     bottom: -30,
-    right: 40,
-    backgroundColor: `${Colors.blueAccent}03`,
+    right: isWeb ? 80 : 40,
   },
   keyboardView: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
+    paddingVertical: isWeb ? 40 : 0,
   },
   content: {
     flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 60,
-    paddingBottom: 40,
+    paddingHorizontal: isWeb ? 40 : 24,
+    paddingTop: isWeb ? 80 : 60,
+    paddingBottom: isWeb ? 80 : 40,
     justifyContent: "space-between",
   },
   header: {
     alignItems: "center",
-    marginBottom: 40,
+    marginBottom: isWeb ? 50 : 40,
   },
   title: {
-    fontSize: 32,
+    fontSize: isWeb ? 40 : 32,
     fontWeight: "bold",
     textAlign: "center",
     marginBottom: 12,
-    lineHeight: 38,
+    lineHeight: isWeb ? 48 : 38,
   },
   form: {
     width: "100%",
   },
   inputContainer: {
-    marginBottom: 24,
+    marginBottom: isWeb ? 28 : 24,
   },
   label: {
-    fontSize: 14,
+    fontSize: isWeb ? 16 : 14,
     fontWeight: "600",
-    marginBottom: 8,
-    color: Colors.blueAccent,
+    marginBottom: 10,
   },
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.uiBackground,
-    borderRadius: 16,
-    paddingHorizontal: 16,
+    borderRadius: isWeb ? 12 : 16,
+    paddingHorizontal: isWeb ? 20 : 16,
     borderWidth: 2,
-    borderColor: `${Colors.blueAccent}20`,
-    shadowColor: Colors.blueAccent,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -876,33 +991,31 @@ const styles = StyleSheet.create({
   },
   textAreaWrapper: {
     alignItems: "flex-start",
-    paddingVertical: 12,
+    paddingVertical: isWeb ? 16 : 12,
   },
   inputIcon: {
     marginRight: 12,
   },
   input: {
     flex: 1,
-    paddingVertical: 16,
-    fontSize: 16,
-    color: Colors.text,
+    paddingVertical: isWeb ? 18 : 16,
+    fontSize: isWeb ? 18 : 16,
   },
   textArea: {
-    height: 80,
+    height: isWeb ? 100 : 80,
     textAlignVertical: "top",
   },
   visibilityToggle: {
     padding: 4,
+    marginLeft: 4,
   },
   pickerTouchable: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    borderRadius: isWeb ? 12 : 16,
+    paddingHorizontal: isWeb ? 20 : 16,
+    paddingVertical: isWeb ? 18 : 16,
     borderWidth: 2,
-    borderColor: `${Colors.blueAccent}20`,
-    shadowColor: Colors.blueAccent,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -910,49 +1023,44 @@ const styles = StyleSheet.create({
   },
   pickerText: {
     flex: 1,
-    fontSize: 16,
-    color: Colors.text,
+    fontSize: isWeb ? 18 : 16,
   },
   pickerPlaceholder: {
-    color: "#9EA0A4",
+    opacity: 0.7,
   },
   pickerContainer: {
-    borderRadius: 16,
+    borderRadius: isWeb ? 12 : 16,
     borderWidth: 2,
-    borderColor: `${Colors.blueAccent}20`,
-    shadowColor: Colors.blueAccent,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
+    overflow: "hidden",
   },
   pickerInputAndroid: {
-    fontSize: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    color: Colors.text,
+    fontSize: isWeb ? 18 : 16,
+    paddingVertical: isWeb ? 18 : 16,
+    paddingHorizontal: isWeb ? 20 : 16,
   },
   signupButton: {
-    backgroundColor: Colors.blueAccent,
-    borderRadius: 16,
-    padding: 18,
+    borderRadius: isWeb ? 12 : 16,
+    padding: isWeb ? 22 : 18,
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "center",
-    gap: 8,
-    shadowColor: Colors.blueAccent,
+    gap: 12,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
-    marginBottom: 24,
+    marginBottom: isWeb ? 32 : 24,
   },
   signupButtonDisabled: {
     opacity: 0.7,
   },
   signupButtonText: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: isWeb ? 18 : 16,
     fontWeight: "bold",
   },
   loginContainer: {
@@ -961,21 +1069,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   loginText: {
-    fontSize: 14,
-    opacity: 0.7,
+    fontSize: isWeb ? 16 : 14,
   },
   loginLink: {
-    fontSize: 14,
+    fontSize: isWeb ? 16 : 14,
     fontWeight: "bold",
-    color: Colors.blueAccent,
   },
   footer: {
     alignItems: "center",
-    marginTop: 40,
+    marginTop: isWeb ? 60 : 40,
   },
   footerText: {
-    fontSize: 12,
-    opacity: 0.5,
+    fontSize: isWeb ? 14 : 12,
     letterSpacing: 1,
   },
   // Modal styles
@@ -990,7 +1095,7 @@ const styles = StyleSheet.create({
   modalContent: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    paddingBottom: 34,
+    paddingBottom: isWeb ? 40 : 34,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.25,
@@ -1001,24 +1106,23 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: isWeb ? 30 : 20,
+    paddingVertical: isWeb ? 20 : 16,
     borderBottomWidth: 1,
     borderBottomColor: `${Colors.blueAccent}20`,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: isWeb ? 20 : 18,
     fontWeight: "600",
   },
   modalButton: {
-    fontSize: 16,
-    color: Colors.blueAccent,
+    fontSize: isWeb ? 18 : 16,
   },
   modalButtonDone: {
     fontWeight: "600",
   },
   picker: {
     width: "100%",
-    height: 216,
+    height: isWeb ? 240 : 216,
   },
 });
