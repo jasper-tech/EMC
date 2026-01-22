@@ -304,8 +304,7 @@ const Login = () => {
                     Authentication Required
                   </ThemedText>
                   <ThemedText style={styles.securitySubtitle}>
-                    Make sure no one else is around when you enter your
-                    password.
+                    Make sure you're in a secure location
                   </ThemedText>
                 </View>
               </View>
