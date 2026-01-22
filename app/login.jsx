@@ -34,6 +34,7 @@ const Login = () => {
   const { scheme } = useContext(ThemeContext);
   // const { user } = useAuth();
   const theme = Colors[scheme] ?? Colors.light;
+  const accentColors = Colors; // For non-nested accent colors
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -222,11 +223,31 @@ const Login = () => {
   };
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView
+      style={[styles.container, { backgroundColor: theme.background }]}
+    >
       <View style={styles.backgroundGraphics}>
-        <View style={[styles.circle, styles.circle1]} />
-        <View style={[styles.circle, styles.circle2]} />
-        <View style={[styles.circle, styles.circle3]} />
+        <View
+          style={[
+            styles.circle,
+            styles.circle1,
+            { backgroundColor: `${accentColors.blueAccent}08` },
+          ]}
+        />
+        <View
+          style={[
+            styles.circle,
+            styles.circle2,
+            { backgroundColor: `${accentColors.blueAccent}05` },
+          ]}
+        />
+        <View
+          style={[
+            styles.circle,
+            styles.circle3,
+            { backgroundColor: `${accentColors.blueAccent}03` },
+          ]}
+        />
       </View>
 
       <KeyboardAvoidingView
@@ -248,11 +269,16 @@ const Login = () => {
           >
             {/* Security Notice */}
             {securityMessage && (
-              <View style={styles.securityNoticeShield}>
+              <View
+                style={[
+                  styles.securityNoticeShield,
+                  { backgroundColor: theme.uiBackground },
+                ]}
+              >
                 <Ionicons
                   name="shield-checkmark"
                   size={20}
-                  color={Colors.greenAccent}
+                  color={accentColors.greenAccent}
                 />
                 <ThemedText style={styles.securityText}>
                   {securityMessage}
@@ -262,11 +288,16 @@ const Login = () => {
 
             {/* Default Security Message */}
             {!securityMessage && (
-              <View style={styles.securityNotice}>
+              <View
+                style={[
+                  styles.securityNotice,
+                  { backgroundColor: theme.uiBackground },
+                ]}
+              >
                 <Ionicons
                   name="warning"
                   size={20}
-                  color={Colors.yellowAccent}
+                  color={accentColors.yellowAccent}
                 />
                 <View>
                   <ThemedText style={styles.securityTitle}>
@@ -284,11 +315,18 @@ const Login = () => {
             <View style={styles.form}>
               {/* Email Input */}
               <View style={styles.inputContainer}>
-                <ThemedText style={styles.label}>Email Address</ThemedText>
+                <ThemedText
+                  style={[styles.label, { color: accentColors.blueAccent }]}
+                >
+                  Email Address
+                </ThemedText>
                 <Animated.View
                   style={[
                     styles.inputWrapper,
                     {
+                      backgroundColor: theme.uiBackground,
+                      borderColor: `${accentColors.blueAccent}20`,
+                      shadowColor: accentColors.blueAccent,
                       transform: [
                         {
                           scale: inputFocusAnim.interpolate({
@@ -303,13 +341,13 @@ const Login = () => {
                   <Ionicons
                     name="mail-outline"
                     size={20}
-                    color={Colors.blueAccent}
+                    color={accentColors.blueAccent}
                     style={styles.inputIcon}
                   />
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { color: theme.text }]}
                     placeholder="Enter your email"
-                    placeholderTextColor="#999"
+                    placeholderTextColor={theme.iconColor}
                     keyboardType="email-address"
                     autoCapitalize="none"
                     value={formData.email}
@@ -319,18 +357,24 @@ const Login = () => {
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
                     editable={!loading}
-                    color={theme.text}
                   />
                 </Animated.View>
               </View>
 
               {/* Password Input */}
               <View style={styles.inputContainer}>
-                <ThemedText style={styles.label}>Password</ThemedText>
+                <ThemedText
+                  style={[styles.label, { color: accentColors.blueAccent }]}
+                >
+                  Password
+                </ThemedText>
                 <Animated.View
                   style={[
                     styles.inputWrapper,
                     {
+                      backgroundColor: theme.uiBackground,
+                      borderColor: `${accentColors.blueAccent}20`,
+                      shadowColor: accentColors.blueAccent,
                       transform: [
                         {
                           scale: inputFocusAnim.interpolate({
@@ -345,13 +389,13 @@ const Login = () => {
                   <Ionicons
                     name="lock-closed-outline"
                     size={20}
-                    color={Colors.blueAccent}
+                    color={accentColors.blueAccent}
                     style={styles.inputIcon}
                   />
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { color: theme.text }]}
                     placeholder="Enter your password"
-                    placeholderTextColor="#999"
+                    placeholderTextColor={theme.iconColor}
                     secureTextEntry={!isPasswordVisible}
                     value={formData.password}
                     onChangeText={(text) =>
@@ -360,7 +404,6 @@ const Login = () => {
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
                     editable={!loading}
-                    color={theme.text}
                   />
                   <TouchableOpacity
                     style={styles.visibilityToggle}
@@ -371,7 +414,7 @@ const Login = () => {
                         isPasswordVisible ? "eye-off-outline" : "eye-outline"
                       }
                       size={20}
-                      color={Colors.blueAccent}
+                      color={accentColors.blueAccent}
                     />
                   </TouchableOpacity>
                 </Animated.View>
@@ -388,7 +431,12 @@ const Login = () => {
                 }
                 disabled={loading}
               >
-                <ThemedText style={styles.forgotPasswordText}>
+                <ThemedText
+                  style={[
+                    styles.forgotPasswordText,
+                    { color: accentColors.blueAccent },
+                  ]}
+                >
                   Forgot Password?
                 </ThemedText>
               </TouchableOpacity>
@@ -398,6 +446,10 @@ const Login = () => {
                 style={[
                   styles.loginButton,
                   loading && styles.loginButtonDisabled,
+                  {
+                    backgroundColor: accentColors.blueAccent,
+                    shadowColor: accentColors.blueAccent,
+                  },
                 ]}
                 onPress={handleLogin}
                 disabled={loading}
@@ -416,14 +468,19 @@ const Login = () => {
 
               {/* Sign Up Link */}
               <View style={styles.signupContainer}>
-                <ThemedText style={styles.signupText}>
+                <ThemedText style={[styles.signupText, { opacity: 0.7 }]}>
                   Don't have an account?{" "}
                 </ThemedText>
                 <TouchableOpacity
                   onPress={() => router.push("/signup")}
                   disabled={loading}
                 >
-                  <ThemedText style={styles.signupLink}>
+                  <ThemedText
+                    style={[
+                      styles.signupLink,
+                      { color: accentColors.blueAccent },
+                    ]}
+                  >
                     Create Account
                   </ThemedText>
                 </TouchableOpacity>
@@ -432,9 +489,9 @@ const Login = () => {
 
             {/* Footer */}
             <View style={styles.footer}>
-              <ThemedText style={styles.footerText}>
+              {/* <ThemedText style={[styles.footerText, { opacity: 0.5 }]}>
                 Secure • Encrypted • Trusted
-              </ThemedText>
+              </ThemedText> */}
             </View>
           </Animated.View>
         </ScrollView>
@@ -455,7 +512,6 @@ const styles = StyleSheet.create({
   circle: {
     position: "absolute",
     borderRadius: 500,
-    backgroundColor: `${Colors.blueAccent}08`,
   },
   circle1: {
     width: 250,
@@ -468,14 +524,12 @@ const styles = StyleSheet.create({
     height: 180,
     bottom: 80,
     left: -40,
-    backgroundColor: `${Colors.blueAccent}05`,
   },
   circle3: {
     width: 120,
     height: 120,
     bottom: -30,
     right: 40,
-    backgroundColor: `${Colors.blueAccent}03`,
   },
   keyboardView: {
     flex: 1,
@@ -504,7 +558,6 @@ const styles = StyleSheet.create({
   securityNotice: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.uiBackground,
     padding: 16,
     borderRadius: 12,
     marginBottom: 24,
@@ -515,7 +568,6 @@ const styles = StyleSheet.create({
   securityNoticeShield: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.uiBackground,
     padding: 16,
     borderRadius: 12,
     marginBottom: 24,
@@ -526,17 +578,14 @@ const styles = StyleSheet.create({
   securityTitle: {
     fontSize: 16,
     fontWeight: "600",
-    // color: "#0C4D6B",
     marginBottom: 4,
   },
   securitySubtitle: {
     fontSize: 14,
-    // color: "#0C4D6B",
     opacity: 0.8,
   },
   securityText: {
     fontSize: 14,
-    // color: "#0C4D6B",
     fontWeight: "500",
     flex: 1,
   },
@@ -550,17 +599,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     marginBottom: 8,
-    color: Colors.blueAccent,
   },
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.uiBackground,
     borderRadius: 16,
     paddingHorizontal: 16,
     borderWidth: 2,
-    borderColor: `${Colors.blueAccent}20`,
-    shadowColor: Colors.blueAccent,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -573,7 +618,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 16,
     fontSize: 16,
-    color: Colors.text,
   },
   visibilityToggle: {
     padding: 4,
@@ -591,17 +635,14 @@ const styles = StyleSheet.create({
   forgotPasswordText: {
     fontSize: 14,
     fontWeight: "600",
-    color: Colors.blueAccent,
   },
   loginButton: {
-    backgroundColor: Colors.blueAccent,
     borderRadius: 16,
     padding: 18,
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "center",
     gap: 8,
-    shadowColor: Colors.blueAccent,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -623,12 +664,10 @@ const styles = StyleSheet.create({
   },
   signupText: {
     fontSize: 14,
-    opacity: 0.7,
   },
   signupLink: {
     fontSize: 14,
     fontWeight: "bold",
-    color: Colors.blueAccent,
   },
   footer: {
     alignItems: "center",
@@ -636,7 +675,6 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 12,
-    opacity: 0.5,
     letterSpacing: 1,
   },
 });
