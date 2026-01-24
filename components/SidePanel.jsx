@@ -7,6 +7,7 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
+  Platform,
 } from "react-native";
 import React, { useContext, useMemo, useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,7 +19,7 @@ import Animated, {
 } from "react-native-reanimated";
 
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system/legacy";
+import * as FileSystem from "expo-file-system";
 import ThemedText from "./ThemedText";
 import { Colors } from "../constants/Colors";
 import { ThemeContext } from "../context/ThemeContext";
@@ -223,6 +224,16 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
     }
   };
 
+  // Helper function to convert file/Blob to Base64
+  const toBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
   const saveImageAsBase64 = async (uri) => {
     if (!auth.currentUser) {
       Alert.alert(
@@ -235,24 +246,34 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
     setUploading(true);
 
     try {
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
+      let base64Image;
 
-      const fileExtension = uri.split(".").pop().toLowerCase();
-      let mimeType = "image/jpeg";
+      if (Platform.OS === "web") {
+        // For web, we need to fetch the image and convert it
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        base64Image = await toBase64(blob);
+      } else {
+        // For mobile (iOS/Android)
+        const base64 = await FileSystem.readAsStringAsync(uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
 
-      if (fileExtension === "png") {
-        mimeType = "image/png";
-      } else if (fileExtension === "jpg" || fileExtension === "jpeg") {
-        mimeType = "image/jpeg";
-      } else if (fileExtension === "gif") {
-        mimeType = "image/gif";
-      } else if (fileExtension === "webp") {
-        mimeType = "image/webp";
+        const fileExtension = uri.split(".").pop().toLowerCase();
+        let mimeType = "image/jpeg";
+
+        if (fileExtension === "png") {
+          mimeType = "image/png";
+        } else if (fileExtension === "jpg" || fileExtension === "jpeg") {
+          mimeType = "image/jpeg";
+        } else if (fileExtension === "gif") {
+          mimeType = "image/gif";
+        } else if (fileExtension === "webp") {
+          mimeType = "image/webp";
+        }
+
+        base64Image = `data:${mimeType};base64,${base64}`;
       }
-
-      const base64Image = `data:${mimeType};base64,${base64}`;
 
       // Update Firestore user document
       const userRef = doc(db, "users", auth.currentUser.uid);
@@ -277,7 +298,7 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
         });
       }
 
-      // ✅ Save with multiple keys for different use cases
+      // Save with multiple keys for different use cases
       // 1. User-specific key (for SidePanel)
       await AsyncStorage.setItem(
         `savedProfileImg_${auth.currentUser.uid}`,
