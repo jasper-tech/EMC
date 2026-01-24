@@ -36,7 +36,7 @@ const CARD_WIDTH = isWeb ? Math.min(width * 0.42, 350) : (width - 48) / 2;
 const CARD_HEIGHT = CARD_WIDTH * 1.1;
 
 const tabBackgrounds = {
-  members: require("../assets/dashboardtabpics/unionmembers.jpg"),
+  members: require("../assets/dashboardtabpics/teshieunion.jpg"),
   finances: require("../assets/dashboardtabpics/finances.jpg"),
   studentsUnion: require("../assets/dashboardtabpics/epsulogo.jpg"),
   notifications: require("../assets/dashboardtabpics/notification.jpg"),
