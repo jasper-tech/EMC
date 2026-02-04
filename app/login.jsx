@@ -27,6 +27,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { ThemeContext } from "../context/ThemeContext";
 // import { useAuth } from "../context/AuthContext";
 import { saveUserToFirestore } from "./signup";
+import CustomAlert from "../components/CustomAlert";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -34,7 +35,7 @@ const Login = () => {
   const { scheme } = useContext(ThemeContext);
   // const { user } = useAuth();
   const theme = Colors[scheme] ?? Colors.light;
-  const accentColors = Colors; // For non-nested accent colors
+  const accentColors = Colors;
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -43,6 +44,15 @@ const Login = () => {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const params = useLocalSearchParams();
   const [securityMessage, setSecurityMessage] = useState("");
+
+  // Custom Alert States
+  const [showLoginAlert, setShowLoginAlert] = useState(false);
+  const [alertType, setAlertType] = useState("info");
+  const [alertTitle, setAlertTitle] = useState("");
+  const [alertMessage, setAlertMessage] = useState("");
+  const [showEmailVerificationAlert, setShowEmailVerificationAlert] =
+    useState(false);
+  const [pendingUserEmail, setPendingUserEmail] = useState("");
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -96,9 +106,45 @@ const Login = () => {
     }).start();
   };
 
+  const showCustomAlert = (title, message, type = "info") => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertType(type);
+    setShowLoginAlert(true);
+  };
+
+  const handleResendVerification = async () => {
+    try {
+      const user = auth.currentUser;
+      if (user) {
+        await sendEmailVerification(user);
+        showCustomAlert(
+          "✅ Verification Email Sent",
+          "A new verification email has been sent to your inbox. Please check and verify your email.",
+          "success"
+        );
+      }
+    } catch (error) {
+      showCustomAlert(
+        "❌ Failed to Send",
+        "Could not resend verification email. Please try again later.",
+        "failed"
+      );
+    }
+  };
+
+  const handleEmailVerificationAlertConfirm = () => {
+    setShowEmailVerificationAlert(false);
+    handleResendVerification();
+  };
+
   const handleLogin = async () => {
     if (!formData.email || !formData.password) {
-      Alert.alert("Error", "Please fill in all fields");
+      showCustomAlert(
+        "⚠️ Missing Information",
+        "Please fill in all fields",
+        "info"
+      );
       return;
     }
 
@@ -115,24 +161,8 @@ const Login = () => {
       await user.reload();
 
       if (!user.emailVerified) {
-        Alert.alert(
-          "Email Not Verified",
-          "Please verify your email before signing in.",
-          [
-            {
-              text: "Resend Verification",
-              onPress: async () => {
-                try {
-                  await sendEmailVerification(user);
-                  Alert.alert("Success", "Verification email sent!");
-                } catch (error) {
-                  Alert.alert("Error", "Failed to send verification email");
-                }
-              },
-            },
-            { text: "OK" },
-          ]
-        );
+        setPendingUserEmail(user.email);
+        setShowEmailVerificationAlert(true);
         setLoading(false);
         return;
       }
@@ -150,7 +180,7 @@ const Login = () => {
         await saveUserToFirestore(user);
       }
 
-      // ✅ Fetch user profile from Firestore and save profile image
+      //  Fetch user profile from Firestore and save profile image
       const userDoc = await getDoc(doc(db, "users", user.uid));
       if (userDoc.exists()) {
         const userData = userDoc.data();
@@ -163,7 +193,7 @@ const Login = () => {
             userData.profileImg
           );
 
-          // ✅ Email-based key (for Index page quick login)
+          //  Email-based key (for Index page quick login)
           const emailKey = user.email.replace(/[@.]/g, "_");
           await AsyncStorage.setItem(
             `savedProfileImg_${emailKey}`,
@@ -190,8 +220,18 @@ const Login = () => {
         });
       }
 
-      console.log("Login successful, navigating to dashboard");
-      router.replace("/dashboard");
+      // Show success alert
+      showCustomAlert(
+        "Login Successful",
+        "Welcome back! Redirecting to dashboard...",
+        "success"
+      );
+
+      // Navigate after short delay
+      setTimeout(() => {
+        console.log("Login successful, navigating to dashboard");
+        router.replace("/dashboard");
+      }, 1500);
     } catch (error) {
       console.error("Login error:", error);
       let errorMessage = "An error occurred during login";
@@ -216,7 +256,7 @@ const Login = () => {
           errorMessage = error.message;
       }
 
-      Alert.alert("Login Failed", errorMessage);
+      showCustomAlert("❌ Login Failed", errorMessage, "failed");
     } finally {
       setLoading(false);
     }
@@ -495,6 +535,29 @@ const Login = () => {
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Custom Login Alert */}
+      <CustomAlert
+        visible={showLoginAlert}
+        type={alertType}
+        title={alertTitle}
+        message={alertMessage}
+        autoClose={alertType === "success" || alertType === "failed"}
+        onConfirm={() => setShowLoginAlert(false)}
+      />
+
+      {/* Email Verification Alert */}
+      <CustomAlert
+        visible={showEmailVerificationAlert}
+        type="danger"
+        title=" Email Not Verified"
+        message={`Please verify your email (${pendingUserEmail}) before signing in.`}
+        confirmText="Resend Verification"
+        cancelText="Cancel"
+        onConfirm={handleEmailVerificationAlertConfirm}
+        onCancel={() => setShowEmailVerificationAlert(false)}
+        autoClose={false}
+      />
     </ThemedView>
   );
 };
