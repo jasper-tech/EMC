@@ -31,6 +31,7 @@ import {
 import { auth, db } from "../firebase";
 import { doc, setDoc, collection, addDoc } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import CustomAlert from "../components/CustomAlert"; // Import CustomAlert
 
 const { width, height } = Dimensions.get("window");
 const isWeb = Platform.OS === "web";
@@ -52,6 +53,8 @@ const Signup = () => {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] =
     useState(false);
+  const [showVerificationAlert, setShowVerificationAlert] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState("");
 
   const { scheme } = useContext(ThemeContext);
   const theme = Colors[scheme] ?? Colors.light;
@@ -127,6 +130,19 @@ const Signup = () => {
     return true;
   };
 
+  const handleVerificationAlertConfirm = () => {
+    setShowVerificationAlert(false);
+    // Redirect to login with email pre-filled
+    router.replace({
+      pathname: "/login",
+      params: {
+        prefillEmail: verificationEmail,
+        message:
+          "Please verify your email and sign in to continue. Check spam if you don't see the email.",
+      },
+    });
+  };
+
   const handleSignup = async () => {
     if (!validateForm()) return;
 
@@ -164,26 +180,6 @@ const Signup = () => {
       // 5. Sign out immediately (user cannot access app until verified)
       await signOut(auth);
 
-      Alert.alert(
-        "Verification Required",
-        `We've sent a verification link to ${formData.email}. Please check your inbox and verify your email to continue.`,
-        [
-          {
-            text: "Continue to Login",
-            onPress: () => {
-              // Redirect to login with email pre-filled
-              router.replace({
-                pathname: "/login",
-                params: {
-                  prefillEmail: formData.email,
-                  message: "Please verify your email and sign in to continue",
-                },
-              });
-            },
-          },
-        ]
-      );
-
       // Clear form
       setFormData({
         fullName: "",
@@ -194,6 +190,10 @@ const Signup = () => {
         confirmPassword: "",
         address: "",
       });
+
+      // Show custom verification alert
+      setVerificationEmail(userData.email);
+      setShowVerificationAlert(true);
     } catch (error) {
       console.error("Signup error:", error);
       let errorMessage = "An error occurred during signup";
@@ -773,11 +773,11 @@ const Signup = () => {
             </View>
 
             {/* Footer */}
-            <View style={styles.footer}>
+            {/* <View style={styles.footer}>
               <ThemedText style={[styles.footerText, { opacity: 0.5 }]}>
                 Secure • Community • Trusted
               </ThemedText>
-            </View>
+            </View> */}
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -848,6 +848,17 @@ const Signup = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Custom Verification Alert */}
+      <CustomAlert
+        visible={showVerificationAlert}
+        type="info"
+        title=" Check Your Email"
+        message={`We've sent a verification link to: ${verificationEmail}\n\nImportant:\n• Check your INBOX\n• Also check SPAM/JUNK folder\n• Click the link to verify your account`}
+        confirmText="Continue to Login"
+        onConfirm={handleVerificationAlertConfirm}
+        autoClose={false}
+      />
     </ThemedView>
   );
 };
@@ -888,7 +899,7 @@ export const saveUserToFirestore = async (user) => {
       updatedAt: new Date().toISOString(),
     });
 
-    // ✅ CREATE NOTIFICATION FOR NEW EXECUTIVE
+    //  CREATE NOTIFICATION FOR NEW EXECUTIVE
     await addDoc(collection(db, "notifications"), {
       type: "user_created",
       title: "New Executive Member",
@@ -899,7 +910,7 @@ export const saveUserToFirestore = async (user) => {
       userRole: userData.role,
     });
 
-    console.log("✅ New executive notification created");
+    // console.log(" New executive notification created");
 
     // Clear pending data
     await AsyncStorage.removeItem("pendingUserData");

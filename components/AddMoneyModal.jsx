@@ -235,12 +235,12 @@ const AddMoneyModal = ({
                   ]}
                   placeholder="0.00"
                   placeholderTextColor="#999"
-                  keyboardType="decimal-pad" // Better for decimal input
+                  keyboardType="decimal-pad"
                   returnKeyType="next"
                   value={formData.amount}
                   onChangeText={handleAmountChange}
                   editable={!isLoading}
-                  maxLength={15} // Reasonable limit for amount
+                  maxLength={15}
                 />
               </View>
               <ThemedText style={styles.amountHint}>

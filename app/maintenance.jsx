@@ -378,7 +378,7 @@ const Maintenance = () => {
 
             <TouchableOpacity
               style={[styles.quickButton, styles.resetButton]}
-              onPress={resetToDefault} // This should call resetToDefault
+              onPress={resetToDefault}
               activeOpacity={0.7}
             >
               <Ionicons name="refresh" size={18} color="#fff" />

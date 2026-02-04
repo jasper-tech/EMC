@@ -124,7 +124,7 @@ const Members = () => {
             const userData = userDoc.data();
             const userRole = userData.role || "member";
             setCurrentUserRole(userRole);
-            setIsAdmin(userRole === "admin");
+            setIsAdmin(userRole?.toLowerCase() === "admin");
 
             // Check permissions for non-admin users
             if (userRole !== "admin") {
@@ -540,7 +540,6 @@ const Members = () => {
 
       let errorMessage = "Failed to update member. ";
 
-      // User-friendly error messages
       if (error.code === "permission-denied") {
         errorMessage += "You don't have permission to update members.";
       } else if (error.code === "not-found") {

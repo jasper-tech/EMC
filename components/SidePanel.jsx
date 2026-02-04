@@ -664,9 +664,7 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
                 size={32}
                 color={Colors.redAccent}
               />
-              <ThemedText style={styles.confirmTitle}>
-                Confirm Sign Out
-              </ThemedText>
+              <ThemedText style={styles.confirmTitle}>Confirm</ThemedText>
               <ThemedText style={styles.confirmMessage}>
                 Are you sure you want to sign out?
               </ThemedText>
@@ -678,9 +676,7 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
                 onPress={handleCancelSignOut}
                 activeOpacity={0.7}
               >
-                <ThemedText style={styles.cancelButtonText}>
-                  No, Stay
-                </ThemedText>
+                <ThemedText style={styles.cancelButtonText}>Stay</ThemedText>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -690,7 +686,7 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
               >
                 <Ionicons name="log-out-outline" size={18} color="#fff" />
                 <ThemedText style={styles.signOutConfirmButtonText}>
-                  Yes, Sign Out
+                  Yes
                 </ThemedText>
               </TouchableOpacity>
             </View>
