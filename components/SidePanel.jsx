@@ -511,6 +511,35 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
               opacity={0.3}
             />
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              onClose();
+              router.push("/memberinfo");
+            }}
+            activeOpacity={0.7}
+          >
+            <View
+              style={[
+                styles.menuIconContainer,
+                { backgroundColor: theme.uiBackground },
+              ]}
+            >
+              <Ionicons name="person-outline" size={20} color={theme.text} />
+            </View>
+            <View style={styles.menuTextContainer}>
+              <ThemedText style={styles.menuText}>View Profile</ThemedText>
+              <ThemedText style={styles.menuSubtext}>
+                Personal information
+              </ThemedText>
+            </View>
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color={theme.text}
+              opacity={0.3}
+            />
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.menuItem}

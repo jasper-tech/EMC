@@ -1,4 +1,4 @@
-import { StyleSheet } from "react-native";
+import { Platform, StyleSheet } from "react-native";
 import React, { useContext } from "react";
 import { Stack, usePathname } from "expo-router";
 import { Colors } from "../constants/Colors";
@@ -10,32 +10,34 @@ import { SidePanelProvider } from "../context/SidepanelContext";
 import { SplashProvider } from "../context/SplashContext";
 import AppWrapper from "../components/AppWrapper";
 
-// Create a separate component that uses hooks
 const LayoutContent = () => {
   const { scheme } = useContext(ThemeContext);
   const { user, loading: authLoading } = useAuth();
   const pathname = usePathname();
   const theme = Colors[scheme] ?? Colors.light;
 
-  // Define routes that should NOT have the AppWrapper (auth screens)
+  //  AppWrapper (auth screens)
   const authRoutes = ["/", "/login", "/signup", "/verification-required"];
   const isAuthRoute = authRoutes.includes(pathname);
 
-  // Show loading while auth is initializing
   if (authLoading) {
     return (
       <GestureHandlerRootView
         style={{ flex: 1, backgroundColor: theme.background }}
       >
-        <StatusBar style={scheme === "dark" ? "light" : "dark"} />
-        {/* You can add a loading spinner here if needed */}
+        {Platform.OS !== "web" && (
+          <StatusBar style={scheme === "dark" ? "light" : "dark"} />
+        )}
       </GestureHandlerRootView>
     );
   }
 
   return (
     <>
-      <StatusBar style={scheme === "dark" ? "light" : "dark"} />
+      {Platform.OS !== "web" && (
+        <StatusBar style={scheme === "dark" ? "light" : "dark"} />
+      )}
+
       {isAuthRoute ? (
         <Stack
           screenOptions={{
@@ -60,7 +62,6 @@ const LayoutContent = () => {
               headerTitle: "Login",
             }}
           />
-
           <Stack.Screen
             name="signup"
             options={{
@@ -177,7 +178,6 @@ const LayoutContent = () => {
               options={{
                 headerTitle: "EPSU ",
                 gestureEnabled: false,
-                // headerBackVisible: false,
               }}
             />
             <Stack.Screen
@@ -185,7 +185,6 @@ const LayoutContent = () => {
               options={{
                 headerTitle: "Mission Statement",
                 gestureEnabled: false,
-                // headerBackVisible: false,
               }}
             />
             <Stack.Screen
@@ -193,7 +192,6 @@ const LayoutContent = () => {
               options={{
                 headerTitle: "Vision Statement",
                 gestureEnabled: false,
-                // headerBackVisible: false,
               }}
             />
             <Stack.Screen
@@ -201,7 +199,6 @@ const LayoutContent = () => {
               options={{
                 headerTitle: "EPSU Verse & Theme",
                 gestureEnabled: false,
-                // headerBackVisible: false,
               }}
             />
             <Stack.Screen
@@ -209,7 +206,6 @@ const LayoutContent = () => {
               options={{
                 headerTitle: "EPSU Anthem and Pledge",
                 gestureEnabled: false,
-                // headerBackVisible: false,
               }}
             />
             <Stack.Screen
@@ -225,7 +221,6 @@ const LayoutContent = () => {
               options={{
                 headerTitle: "Generate Reports",
                 gestureEnabled: false,
-                // headerBackVisible: false,
               }}
             />
             <Stack.Screen
@@ -233,7 +228,6 @@ const LayoutContent = () => {
               options={{
                 headerTitle: "Privacy & Settings",
                 gestureEnabled: false,
-                // headerBackVisible: false,
               }}
             />
             <Stack.Screen
@@ -241,7 +235,6 @@ const LayoutContent = () => {
               options={{
                 headerTitle: "Send a report",
                 gestureEnabled: false,
-                // headerBackVisible: false,
               }}
             />
             <Stack.Screen
@@ -249,7 +242,6 @@ const LayoutContent = () => {
               options={{
                 headerTitle: "Reported Issues",
                 gestureEnabled: false,
-                // headerBackVisible: false,
               }}
             />
             <Stack.Screen
@@ -257,7 +249,6 @@ const LayoutContent = () => {
               options={{
                 headerTitle: "Disclaimer",
                 gestureEnabled: false,
-                // headerBackVisible: false,
               }}
             />
             <Stack.Screen
@@ -265,7 +256,6 @@ const LayoutContent = () => {
               options={{
                 headerTitle: "Events",
                 gestureEnabled: false,
-                // headerBackVisible: false,
               }}
             />
             <Stack.Screen
@@ -273,7 +263,6 @@ const LayoutContent = () => {
               options={{
                 headerTitle: "Birthdays",
                 gestureEnabled: false,
-                // headerBackVisible: false,
               }}
             />
             <Stack.Screen
@@ -281,7 +270,6 @@ const LayoutContent = () => {
               options={{
                 headerTitle: "Programs",
                 gestureEnabled: false,
-                // headerBackVisible: false,
               }}
             />
             <Stack.Screen
@@ -289,7 +277,6 @@ const LayoutContent = () => {
               options={{
                 headerTitle: "Add A program",
                 gestureEnabled: false,
-                // headerBackVisible: false,
               }}
             />
             <Stack.Screen
@@ -297,7 +284,13 @@ const LayoutContent = () => {
               options={{
                 headerTitle: "Scheduled Programs",
                 gestureEnabled: false,
-                // headerBackVisible: false,
+              }}
+            />
+            <Stack.Screen
+              name="memberinfo"
+              options={{
+                headerTitle: "Your Info",
+                gestureEnabled: false,
               }}
             />
           </Stack>
@@ -314,9 +307,7 @@ const RootLayout = () => {
         <AuthProvider>
           <SplashProvider>
             <SidePanelProvider>
-              {/* <ProfileProvider> */}
               <LayoutContent />
-              {/* </ProfileProvider> */}
             </SidePanelProvider>
           </SplashProvider>
         </AuthProvider>
