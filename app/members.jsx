@@ -50,7 +50,6 @@ const Members = () => {
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
 
-  // User states
   const [currentUserRole, setCurrentUserRole] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -59,7 +58,6 @@ const Members = () => {
     canEdit: false,
   });
 
-  // Alert states
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertType, setAlertType] = useState("success");
   const [alertTitle, setAlertTitle] = useState("");
@@ -587,19 +585,12 @@ const Members = () => {
     return age ? `${age} years` : "";
   };
 
-  // Function to check if user can edit a specific member
   const canUserEditMember = (member) => {
-    // Admins can always edit
     if (isAdmin) return true;
 
-    // Check if user has edit permission
     if (!userPermissions.canEdit) return false;
 
-    // Optional: Add additional checks here
-    // For example: Can only edit their own profile? Or all members?
-    // return member.uid === currentUserId; // If you want users to only edit their own profile
-
-    return true; // If user has edit permission, they can edit any member
+    return true;
   };
 
   const renderMemberCard = ({ item, index }) => {
@@ -648,12 +639,6 @@ const Members = () => {
                     color={theme.text}
                     style={{ opacity: 0.3 }}
                   />
-                )}
-                {/* Show admin badge if user is admin and it's their own profile */}
-                {isAdmin && isOwnProfile && (
-                  <View style={styles.adminBadge}>
-                    <Ionicons name="shield-checkmark" size={12} color="#fff" />
-                  </View>
                 )}
               </View>
             </TouchableOpacity>
