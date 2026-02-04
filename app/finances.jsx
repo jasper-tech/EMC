@@ -581,19 +581,14 @@ const Finances = () => {
             description: "",
             year: "",
           });
-          // Reopen the add money modal if user cancels
           setShowAddModal(true);
         }}
         onConfirm={executeAddMoney}
         type="info"
-        title={`Confirm ${getTypeLabel(pendingAddition.type)} Addition`}
+        title={`Confirm `}
         message={`Are you sure you want to add GH₵${pendingAddition.amount.toFixed(
           2
-        )} to ${getTypeLabel(pendingAddition.type)}?\n\n${
-          pendingAddition.description
-            ? `Description: ${pendingAddition.description}`
-            : ""
-        }`}
+        )} to ${getTypeLabel(pendingAddition.type)}?`}
         confirmText={`Add GH₵${pendingAddition.amount.toFixed(2)}`}
         cancelText="Cancel"
         isLoading={addLoading}

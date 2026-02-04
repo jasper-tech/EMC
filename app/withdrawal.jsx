@@ -429,21 +429,14 @@ const Withdrawal = () => {
             description: "",
             details: {},
           });
-          // Reopen the withdrawal modal if user cancels
           setShowWithdrawalModal(true);
         }}
         onConfirm={executeWithdrawal}
         type="info"
-        title="Confirm Withdrawal"
+        title="Confirm "
         message={`Are you sure you want to withdraw GH₵${pendingWithdrawal.amount.toFixed(
           2
-        )}?\n\nDetails: ${pendingWithdrawal.description}\n\nYear: ${
-          pendingWithdrawal.details.year || formData.year
-        }\nDate: ${
-          pendingWithdrawal.details.withdrawalDate || formData.withdrawalDate
-        }\nWithdrawn By: ${
-          pendingWithdrawal.details.withdrawnBy || userFullName
-        }`}
+        )} from the coffers?`}
         confirmText={`Withdraw GH₵${pendingWithdrawal.amount.toFixed(2)}`}
         cancelText="Cancel"
         isLoading={withdrawalLoading}
@@ -521,7 +514,7 @@ const Withdrawal = () => {
                   />
                 </View>
                 <ThemedText style={styles.amountHint}>
-                  Enter numbers only (e.g., 100.50)
+                  Enter valid amount
                 </ThemedText>
               </View>
 
