@@ -1,16 +1,11 @@
+import React, { useState, useEffect, useContext } from "react";
 import {
   StyleSheet,
   View,
   TouchableOpacity,
-  TextInput,
-  Modal,
-  Alert,
-  ActivityIndicator,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
+  ActivityIndicator,
 } from "react-native";
-import React, { useState, useEffect, useContext } from "react";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Colors } from "../constants/Colors";
 import ThemedView from "../components/ThemedView";
@@ -23,10 +18,14 @@ import {
   onSnapshot,
   doc,
   getDoc,
+  getDocs,
+  writeBatch,
 } from "firebase/firestore";
-import { Picker } from "@react-native-picker/picker";
 import { db, auth } from "../firebase";
 import { router } from "expo-router";
+import { CustomAlert } from "../components/CustomAlert";
+import AddMoneyModal from "../components/AddMoneyModal";
+import ConfirmationModal from "../components/ConfirmationModal";
 
 const Finances = () => {
   const { scheme } = useContext(ThemeContext);
@@ -38,13 +37,37 @@ const Finances = () => {
   const [othersAmount, setOthersAmount] = useState(0);
   const [budgetAmount, setBudgetAmount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [userFullName, setUserFullName] = useState("");
+  const [withdrawalsAmount, setWithdrawalsAmount] = useState(0);
+  const [withdrawalsTimeSpan, setWithdrawalsTimeSpan] = useState("");
+  const [totalMoneyFlow, setTotalMoneyFlow] = useState(0);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [existingBudgetYears, setExistingBudgetYears] = useState([]);
+
+  // State for modals - ensure only one modal is visible at a time
   const [showAddModal, setShowAddModal] = useState(false);
-  const [addLoading, setAddLoading] = useState(false);
+  const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
+  const [showAddConfirmationModal, setShowAddConfirmationModal] =
+    useState(false);
+
+  // State for alerts
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({
+    type: "info",
+    title: "",
+    message: "",
+    confirmText: "OK",
+    cancelText: null,
+    onConfirm: () => {},
+    autoClose: true,
+    dismissOnBackdrop: true,
+  });
+
+  // State for form data
   const [selectedType, setSelectedType] = useState(null);
   const [selectedYear, setSelectedYear] = useState(
     new Date().getFullYear().toString()
   );
-  const [existingBudgetYears, setExistingBudgetYears] = useState([]);
   const [formData, setFormData] = useState({
     amount: "",
     description: "",
@@ -52,11 +75,19 @@ const Finances = () => {
     type: "",
   });
 
-  const [userFullName, setUserFullName] = useState("");
-  const [withdrawalsAmount, setWithdrawalsAmount] = useState(0);
-  const [withdrawalsTimeSpan, setWithdrawalsTimeSpan] = useState("");
-  const [totalMoneyFlow, setTotalMoneyFlow] = useState(0);
+  // State for pending addition (to confirm)
+  const [pendingAddition, setPendingAddition] = useState({
+    amount: 0,
+    type: "",
+    description: "",
+    year: "",
+  });
 
+  // Loading states
+  const [addLoading, setAddLoading] = useState(false);
+  const [clearLoading, setClearLoading] = useState(false);
+
+  // Fetch user data and finances
   useEffect(() => {
     const fetchUserData = async () => {
       const user = auth.currentUser;
@@ -64,7 +95,9 @@ const Finances = () => {
         try {
           const userDoc = await getDoc(doc(db, "users", user.uid));
           if (userDoc.exists()) {
-            setUserFullName(userDoc.data().fullName || "");
+            const userData = userDoc.data();
+            setUserFullName(userData.fullName || "");
+            setIsAdmin(userData.role === "admin" || userData.isAdmin === true);
           }
         } catch (error) {
           console.error("Error fetching user data:", error);
@@ -87,7 +120,6 @@ const Finances = () => {
         let budget = 0;
         let withdrawals = 0;
         const budgetYears = [];
-        const withdrawalDates = [];
 
         snapshot.docs.forEach((doc) => {
           const data = doc.data();
@@ -113,9 +145,6 @@ const Finances = () => {
               break;
             case "withdrawal":
               withdrawals += Math.abs(amount);
-              if (data.timestamp) {
-                withdrawalDates.push(new Date(data.timestamp));
-              }
               break;
           }
         });
@@ -146,14 +175,93 @@ const Finances = () => {
 
     return () => unsubscribe();
   }, []);
+
+  // Helper functions
+  const formatCurrency = (amount) => {
+    return `GH₵${amount.toFixed(2)}`;
+  };
+
+  const getTypeColor = (type) => {
+    switch (type) {
+      case "dues":
+        return Colors.blueAccent;
+      case "contribution":
+        return Colors.greenAccent;
+      case "other":
+        return Colors.orangeAccent;
+      case "budget":
+        return Colors.purpleAccent;
+      default:
+        return Colors.primary;
+    }
+  };
+
+  const getTypeLabel = (type) => {
+    switch (type) {
+      case "dues":
+        return "Dues";
+      case "contribution":
+        return "Contributions";
+      case "other":
+        return "Miscellaneous";
+      case "budget":
+        return "Budget";
+      default:
+        return "";
+    }
+  };
+
+  // Helper to format amount with 2 decimal places
+  const formatAmount = (value) => {
+    // Remove any non-numeric characters except decimal point
+    let cleaned = value.replace(/[^0-9.]/g, "");
+
+    // Ensure only one decimal point
+    const decimalParts = cleaned.split(".");
+    if (decimalParts.length > 2) {
+      cleaned = decimalParts[0] + "." + decimalParts.slice(1).join("");
+    }
+
+    // Limit to 2 decimal places
+    if (decimalParts.length > 1) {
+      cleaned = decimalParts[0] + "." + decimalParts[1].substring(0, 2);
+    }
+
+    return cleaned;
+  };
+
+  // Alert helper - close all modals before showing alert
+  const showAlert = (config) => {
+    // Close all modals before showing alert
+    setShowAddModal(false);
+    setShowAddConfirmationModal(false);
+    setShowClearConfirmModal(false);
+
+    setAlertConfig({
+      ...alertConfig,
+      ...config,
+      onConfirm: () => {
+        setAlertVisible(false);
+        if (config.onConfirm) config.onConfirm();
+      },
+      onCancel: () => {
+        setAlertVisible(false);
+        if (config.onCancel) config.onCancel();
+      },
+    });
+    setAlertVisible(true);
+  };
+
+  // Add money modal functions
   const openAddModal = (type) => {
     if (type === "budget") {
       const currentYear = new Date().getFullYear().toString();
       if (existingBudgetYears.includes(currentYear)) {
-        Alert.alert(
-          "Error",
-          `Budget for ${currentYear} has already been added`
-        );
+        showAlert({
+          type: "danger",
+          title: "Error",
+          message: `Budget for ${currentYear} has already been added`,
+        });
         return;
       }
       setSelectedYear(currentYear);
@@ -184,9 +292,14 @@ const Finances = () => {
     setShowAddModal(true);
   };
 
-  const handleAddMoney = async () => {
+  // Handle form submission from AddMoneyModal
+  const handleAddMoneySubmit = () => {
     if (!formData.amount || !formData.addedBy) {
-      Alert.alert("Error", "Please fill in all fields");
+      showAlert({
+        type: "danger",
+        title: "Error",
+        message: "Please fill in all fields",
+      });
       return;
     }
 
@@ -194,47 +307,73 @@ const Finances = () => {
       formData.type === "budget" &&
       existingBudgetYears.includes(selectedYear)
     ) {
-      Alert.alert("Error", `Budget for ${selectedYear} has already been added`);
+      showAlert({
+        type: "danger",
+        title: "Error",
+        message: `Budget for ${selectedYear} has already been added`,
+      });
       return;
     }
 
     const amount = parseFloat(formData.amount);
     if (isNaN(amount) || amount <= 0) {
-      Alert.alert("Error", "Please enter a valid amount");
+      showAlert({
+        type: "danger",
+        title: "Error",
+        message: "Please enter a valid amount greater than 0",
+      });
       return;
     }
 
+    // Store pending addition for confirmation
+    setPendingAddition({
+      amount: amount,
+      type: formData.type,
+      description: formData.description || formData.type,
+      year: selectedYear,
+    });
+
+    // Show confirmation modal
+    setShowAddConfirmationModal(true);
+    // Close the add money modal first
+    setShowAddModal(false);
+  };
+
+  // Execute the actual addition after confirmation
+  const executeAddMoney = async () => {
     setAddLoading(true);
+
     try {
       const user = auth.currentUser;
+      const { amount, type, description, year } = pendingAddition;
 
       const financeData = {
         amount: amount,
-        description: formData.description,
-        addedBy: formData.addedBy,
+        description: description,
+        addedBy: userFullName,
         userId: user?.uid || "unknown",
         timestamp: new Date(),
-        type: formData.type,
+        type: type,
       };
 
       // Add year field for budget and dues
-      if (formData.type === "budget" || formData.type === "dues") {
-        financeData.year = selectedYear;
+      if (type === "budget" || type === "dues") {
+        financeData.year = year;
       }
 
       // Save to finances collection
       await addDoc(collection(db, "finances"), financeData);
 
       // If it's dues, also save to transactions collection
-      if (formData.type === "dues") {
+      if (type === "dues") {
         const transactionData = {
           amount: amount,
-          description: formData.description,
-          recordedBy: formData.addedBy,
+          description: description,
+          recordedBy: userFullName,
           recordedById: user?.uid || "unknown",
           timestamp: new Date(),
           type: "dues",
-          year: selectedYear,
+          year: year,
           status: "completed",
         };
 
@@ -242,20 +381,18 @@ const Finances = () => {
       }
 
       const typeLabel =
-        formData.type === "dues"
+        type === "dues"
           ? "Dues"
-          : formData.type === "contribution"
+          : type === "contribution"
           ? "Contribution"
-          : formData.type === "budget"
-          ? `Budget for ${selectedYear}`
+          : type === "budget"
+          ? `Budget for ${year}`
           : "Miscellaneous";
 
       const notificationMessage =
-        formData.type === "budget"
-          ? `${formData.addedBy} set budget of GH₵${amount.toFixed(
-              2
-            )} for ${selectedYear}`
-          : `${formData.addedBy} added GH₵${amount.toFixed(
+        type === "budget"
+          ? `${userFullName} set budget of GH₵${amount.toFixed(2)} for ${year}`
+          : `${userFullName} added GH₵${amount.toFixed(
               2
             )} to ${typeLabel.toLowerCase()}`;
 
@@ -267,65 +404,136 @@ const Finances = () => {
         read: false,
       });
 
-      Alert.alert("Success", "Money added successfully!");
-      setShowAddModal(false);
+      // Close confirmation modal
+      setShowAddConfirmationModal(false);
+
+      // Clear form data
       setFormData({ amount: "", description: "", addedBy: "", type: "" });
       setSelectedType(null);
       setSelectedYear(new Date().getFullYear().toString());
+
+      // Show success alert
+      showAlert({
+        type: "success",
+        title: "Success",
+        message: `GH₵${amount.toFixed(2)} added to ${typeLabel} successfully!`,
+      });
     } catch (error) {
       console.error("Error adding money:", error);
-      Alert.alert("Error", "Failed to add money. Please try again.");
+
+      // Close confirmation modal
+      setShowAddConfirmationModal(false);
+
+      // Show error alert
+      showAlert({
+        type: "failed",
+        title: "Error",
+        message: "Failed to add money. Please try again.",
+      });
     } finally {
       setAddLoading(false);
+      setPendingAddition({
+        amount: 0,
+        type: "",
+        description: "",
+        year: "",
+      });
     }
   };
 
-  const formatCurrency = (amount) => {
-    return `GH₵${amount.toFixed(2)}`;
-  };
-
-  const getTypeLabel = (type) => {
-    switch (type) {
-      case "dues":
-        return "Dues";
-      case "contribution":
-        return "Contributions";
-      case "other":
-        return "Others";
-      case "budget":
-        return "Budget";
-      default:
-        return "";
+  // Clear finances functions
+  const handleClearAllFinances = () => {
+    if (!isAdmin) {
+      showAlert({
+        type: "danger",
+        title: "Permission Denied",
+        message: "Only administrators can perform this action.",
+      });
+      return;
     }
+
+    setShowClearConfirmModal(true);
   };
 
-  const getTypeIcon = (type) => {
-    switch (type) {
-      case "dues":
-        return "receipt";
-      case "contribution":
-        return "volunteer-activism";
-      case "other":
-        return "payments";
-      case "budget":
-        return "account-balance-wallet";
-      default:
-        return "attach-money";
-    }
-  };
+  const executeClearAllFinances = async () => {
+    setClearLoading(true);
 
-  const getTypeColor = (type) => {
-    switch (type) {
-      case "dues":
-        return Colors.blueAccent;
-      case "contribution":
-        return Colors.greenAccent;
-      case "other":
-        return Colors.orangeAccent;
-      case "budget":
-        return Colors.purpleAccent;
-      default:
-        return Colors.primary;
+    try {
+      // Step 1: Get document counts
+      const financesSnapshot = await getDocs(collection(db, "finances"));
+      const transactionsSnapshot = await getDocs(
+        collection(db, "transactions")
+      );
+
+      const financesCount = financesSnapshot.size;
+      const transactionsCount = transactionsSnapshot.size;
+
+      if (financesCount === 0 && transactionsCount === 0) {
+        setShowClearConfirmModal(false);
+        showAlert({
+          type: "info",
+          title: "No Data to Clear",
+          message: "There are no financial records or transactions to delete.",
+        });
+        return;
+      }
+
+      //  Delete finances
+      if (financesCount > 0) {
+        const batch1 = writeBatch(db);
+        financesSnapshot.docs.forEach((doc) => batch1.delete(doc.ref));
+        await batch1.commit();
+        console.log(`Deleted ${financesCount} finance records`);
+      }
+
+      // Delete transactions
+      if (transactionsCount > 0) {
+        const batch2 = writeBatch(db);
+        transactionsSnapshot.docs.forEach((doc) => batch2.delete(doc.ref));
+        await batch2.commit();
+        console.log(`Deleted ${transactionsCount} transaction records`);
+      }
+
+      // Create audit log
+      try {
+        const user = auth.currentUser;
+        await addDoc(collection(db, "audit_logs"), {
+          action: "clear_all_finances",
+          performedBy: userFullName,
+          performedById: user?.uid,
+          timestamp: new Date(),
+          details: {
+            totalAmountCleared: totalAmount,
+            financesCount: financesCount,
+            transactionsCount: transactionsCount,
+          },
+        });
+      } catch (logError) {
+        console.warn("Audit log creation failed (non-critical):", logError);
+      }
+
+      // Step 5: Success
+      setShowClearConfirmModal(false);
+
+      showAlert({
+        type: "success",
+        title: "Success",
+        message: `All financial data has been cleared successfully!\n\n• Finances: ${financesCount} records deleted\n• Transactions: ${transactionsCount} records deleted\n• Total amount cleared: GH₵${totalAmount.toFixed(
+          2
+        )}`,
+      });
+    } catch (error) {
+      console.error("Error clearing finances:", error);
+
+      setShowClearConfirmModal(false);
+
+      showAlert({
+        type: "failed",
+        title: "Error",
+        message: `Failed to clear financial data: ${error.message}`,
+      });
+    } finally {
+      setClearLoading(false);
     }
   };
 
@@ -344,6 +552,92 @@ const Finances = () => {
 
   return (
     <ThemedView style={styles.container}>
+      {/* Custom Alert - Should be on top of everything */}
+      <CustomAlert {...alertConfig} visible={alertVisible} />
+
+      {/* Clear Confirmation Modal */}
+      <ConfirmationModal
+        visible={showClearConfirmModal}
+        onClose={() => setShowClearConfirmModal(false)}
+        onConfirm={executeClearAllFinances}
+        type="danger"
+        title="Clear All Financial Data"
+        message={`This will permanently delete ALL financial data (GH₵${totalAmount.toFixed(
+          2
+        )}) and transactions . This action cannot be undone!\n\nAre you absolutely sure?`}
+        confirmText="YES, DELETE EVERYTHING"
+        cancelText="Cancel"
+        isLoading={clearLoading}
+      />
+
+      {/* Add Money Confirmation Modal */}
+      <ConfirmationModal
+        visible={showAddConfirmationModal}
+        onClose={() => {
+          setShowAddConfirmationModal(false);
+          setPendingAddition({
+            amount: 0,
+            type: "",
+            description: "",
+            year: "",
+          });
+          // Reopen the add money modal if user cancels
+          setShowAddModal(true);
+        }}
+        onConfirm={executeAddMoney}
+        type="info"
+        title={`Confirm ${getTypeLabel(pendingAddition.type)} Addition`}
+        message={`Are you sure you want to add GH₵${pendingAddition.amount.toFixed(
+          2
+        )} to ${getTypeLabel(pendingAddition.type)}?\n\n${
+          pendingAddition.description
+            ? `Description: ${pendingAddition.description}`
+            : ""
+        }`}
+        confirmText={`Add GH₵${pendingAddition.amount.toFixed(2)}`}
+        cancelText="Cancel"
+        isLoading={addLoading}
+      />
+
+      {/* Add Money Modal - Should close before showing confirmation modal */}
+      <AddMoneyModal
+        visible={showAddModal && !showAddConfirmationModal && !alertVisible}
+        onClose={() => {
+          setShowAddModal(false);
+          setSelectedType(null);
+          setFormData({ amount: "", description: "", addedBy: "", type: "" });
+        }}
+        onSubmit={handleAddMoneySubmit}
+        isLoading={addLoading}
+        selectedType={selectedType}
+        setSelectedType={setSelectedType}
+        selectedYear={selectedYear}
+        setSelectedYear={setSelectedYear}
+        existingBudgetYears={existingBudgetYears}
+        formData={formData}
+        setFormData={setFormData}
+        userFullName={userFullName}
+        formatAmount={formatAmount}
+      />
+
+      {/* Admin Clear Button */}
+      {isAdmin && (
+        <View style={styles.adminControls}>
+          <TouchableOpacity
+            style={styles.clearButton}
+            onPress={handleClearAllFinances}
+          >
+            <MaterialIcons name="delete-sweep" size={20} color="#fff" />
+            <ThemedText style={styles.clearButtonText}>
+              Clear All Financial Data
+            </ThemedText>
+          </TouchableOpacity>
+          <ThemedText style={styles.adminNote}>
+            ⚠️ Admin: This will delete ALL finances and transactions
+          </ThemedText>
+        </View>
+      )}
+
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Tracking Notice */}
         <View style={styles.trackingNotice}>
@@ -389,6 +683,7 @@ const Finances = () => {
             </View>
           </View>
         </View>
+
         {/* Coffers Card */}
         <View
           style={[styles.coffersCard, { backgroundColor: Colors.uiBackground }]}
@@ -419,124 +714,65 @@ const Finances = () => {
 
         {/* Finance Types Grid */}
         <View style={styles.typesGrid}>
-          {/* Dues Card */}
-          <TouchableOpacity
-            style={[styles.typeCard, { backgroundColor: theme.uiBackground }]}
-            onPress={() => openAddModal("dues")}
-            activeOpacity={0.7}
-          >
-            <View
-              style={[
-                styles.typeIconContainer,
-                { backgroundColor: Colors.blueAccent + "20" },
-              ]}
+          {[
+            {
+              type: "dues",
+              label: "Dues",
+              icon: "receipt",
+              color: Colors.blueAccent,
+            },
+            {
+              type: "contribution",
+              label: "Contributions",
+              icon: "volunteer-activism",
+              color: Colors.greenAccent,
+            },
+            {
+              type: "other",
+              label: "Misc/Others",
+              icon: "payments",
+              color: Colors.orangeAccent,
+            },
+            {
+              type: "budget",
+              label: "Budget",
+              icon: "account-balance-wallet",
+              color: Colors.purpleAccent,
+            },
+          ].map((item) => (
+            <TouchableOpacity
+              key={item.type}
+              style={[styles.typeCard, { backgroundColor: theme.uiBackground }]}
+              onPress={() => openAddModal(item.type)}
+              activeOpacity={0.7}
             >
-              <MaterialIcons
-                name="receipt"
-                size={28}
-                color={Colors.blueAccent}
-              />
-            </View>
-            <ThemedText style={styles.typeLabel}>Dues</ThemedText>
-            <ThemedText style={styles.typeAmount}>GH₵{duesAmount}</ThemedText>
-            <View style={styles.addIconContainer}>
-              <MaterialIcons
-                name="add-circle"
-                size={20}
-                color={Colors.blueAccent}
-              />
-            </View>
-          </TouchableOpacity>
-
-          {/* Contributions Card */}
-          <TouchableOpacity
-            style={[styles.typeCard, { backgroundColor: theme.uiBackground }]}
-            onPress={() => openAddModal("contribution")}
-            activeOpacity={0.7}
-          >
-            <View
-              style={[
-                styles.typeIconContainer,
-                { backgroundColor: Colors.greenAccent + "20" },
-              ]}
-            >
-              <MaterialIcons
-                name="volunteer-activism"
-                size={28}
-                color={Colors.greenAccent}
-              />
-            </View>
-            <ThemedText style={styles.typeLabel}>Contributions</ThemedText>
-            <ThemedText style={styles.typeAmount}>
-              GH₵{contributionsAmount}
-            </ThemedText>
-            <View style={styles.addIconContainer}>
-              <MaterialIcons
-                name="add-circle"
-                size={20}
-                color={Colors.greenAccent}
-              />
-            </View>
-          </TouchableOpacity>
-
-          {/* Others Card */}
-          <TouchableOpacity
-            style={[styles.typeCard, { backgroundColor: theme.uiBackground }]}
-            onPress={() => openAddModal("other")}
-            activeOpacity={0.7}
-          >
-            <View
-              style={[
-                styles.typeIconContainer,
-                { backgroundColor: Colors.orangeAccent + "20" },
-              ]}
-            >
-              <MaterialIcons
-                name="payments"
-                size={28}
-                color={Colors.orangeAccent}
-              />
-            </View>
-            <ThemedText style={styles.typeLabel}>Misc/Others</ThemedText>
-            <ThemedText style={styles.typeAmount}>GH₵{othersAmount}</ThemedText>
-            <View style={styles.addIconContainer}>
-              <MaterialIcons
-                name="add-circle"
-                size={20}
-                color={Colors.orangeAccent}
-              />
-            </View>
-          </TouchableOpacity>
-
-          {/* Budget Card */}
-          <TouchableOpacity
-            style={[styles.typeCard, { backgroundColor: theme.uiBackground }]}
-            onPress={() => openAddModal("budget")}
-            activeOpacity={0.7}
-          >
-            <View
-              style={[
-                styles.typeIconContainer,
-                { backgroundColor: Colors.purpleAccent + "20" },
-              ]}
-            >
-              <MaterialIcons
-                name="account-balance-wallet"
-                size={28}
-                color={Colors.purpleAccent}
-              />
-            </View>
-            <ThemedText style={styles.typeLabel}>Budget</ThemedText>
-            <ThemedText style={styles.typeAmount}>GH₵{budgetAmount}</ThemedText>
-            <View style={styles.addIconContainer}>
-              <MaterialIcons
-                name="add-circle"
-                size={20}
-                color={Colors.purpleAccent}
-              />
-            </View>
-          </TouchableOpacity>
+              <View
+                style={[
+                  styles.typeIconContainer,
+                  { backgroundColor: item.color + "20" },
+                ]}
+              >
+                <MaterialIcons name={item.icon} size={28} color={item.color} />
+              </View>
+              <ThemedText style={styles.typeLabel}>{item.label}</ThemedText>
+              <ThemedText style={styles.typeAmount}>
+                GH₵
+                {item.type === "dues"
+                  ? duesAmount
+                  : item.type === "contribution"
+                  ? contributionsAmount
+                  : item.type === "other"
+                  ? othersAmount
+                  : budgetAmount}
+              </ThemedText>
+              <View style={styles.addIconContainer}>
+                <MaterialIcons name="add-circle" size={20} color={item.color} />
+              </View>
+            </TouchableOpacity>
+          ))}
         </View>
+
+        {/* Withdrawal Button */}
         <TouchableOpacity
           style={[
             styles.withdrawalButton,
@@ -551,206 +787,9 @@ const Finances = () => {
           </ThemedText>
         </TouchableOpacity>
       </ScrollView>
-
-      {/* Add Money Modal */}
-      <Modal
-        visible={showAddModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowAddModal(false)}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.modalOverlay}
-        >
-          <TouchableOpacity
-            style={styles.modalBackdrop}
-            activeOpacity={1}
-            onPress={() => {
-              setShowAddModal(false);
-              setSelectedType(null);
-            }}
-          />
-          <View
-            style={[
-              styles.modalContent,
-              { backgroundColor: theme.navBackground },
-            ]}
-          >
-            <View style={styles.modalHeader}>
-              <View style={styles.modalHeaderLeft}>
-                {selectedType && (
-                  <View
-                    style={[
-                      styles.modalTypeIcon,
-                      { backgroundColor: getTypeColor(selectedType) + "20" },
-                    ]}
-                  >
-                    <MaterialIcons
-                      name={getTypeIcon(selectedType)}
-                      size={24}
-                      color={getTypeColor(selectedType)}
-                    />
-                  </View>
-                )}
-                <ThemedText style={styles.modalTitle}>
-                  Add {getTypeLabel(selectedType)}
-                </ThemedText>
-              </View>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowAddModal(false);
-                  setSelectedType(null);
-                }}
-              >
-                <MaterialIcons name="close" size={24} color={theme.text} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              style={styles.modalBody}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              {(selectedType === "budget" || selectedType === "dues") && (
-                <View style={styles.yearPickerContainer}>
-                  <ThemedText style={styles.label}>Select Year</ThemedText>
-                  <View
-                    style={[
-                      styles.pickerWrapper,
-                      { backgroundColor: theme.uiBackground },
-                    ]}
-                  >
-                    <Picker
-                      selectedValue={selectedYear}
-                      onValueChange={(itemValue) => {
-                        if (
-                          selectedType === "budget" &&
-                          existingBudgetYears.includes(itemValue)
-                        ) {
-                          Alert.alert(
-                            "Error",
-                            `Budget for ${itemValue} has already been added`
-                          );
-                          return;
-                        }
-                        setSelectedYear(itemValue);
-                        setFormData({
-                          ...formData,
-                          description:
-                            selectedType === "budget"
-                              ? `Budget for ${itemValue}`
-                              : `Dues payment for ${itemValue}`,
-                        });
-                      }}
-                      style={{ color: theme.text }}
-                    >
-                      {Array.from(
-                        { length: new Date().getFullYear() - 2021 },
-                        (_, i) => {
-                          const year = (
-                            new Date().getFullYear() - i
-                          ).toString();
-                          return (
-                            <Picker.Item
-                              key={year}
-                              label={year}
-                              value={year}
-                              enabled={
-                                selectedType === "dues" ||
-                                !existingBudgetYears.includes(year)
-                              }
-                            />
-                          );
-                        }
-                      )}
-                    </Picker>
-                  </View>
-                </View>
-              )}
-
-              <View style={styles.inputContainer}>
-                <ThemedText style={styles.label}>Amount (GH₵)</ThemedText>
-                <TextInput
-                  style={[
-                    styles.input,
-                    { color: theme.text, backgroundColor: theme.uiBackground },
-                  ]}
-                  placeholder="0.00"
-                  placeholderTextColor="#999"
-                  keyboardType="numeric"
-                  returnKeyType="next"
-                  value={formData.amount}
-                  onChangeText={(text) =>
-                    setFormData({ ...formData, amount: text })
-                  }
-                  editable={!addLoading}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <ThemedText style={styles.label}>Description</ThemedText>
-                <TextInput
-                  style={[
-                    styles.input,
-                    { color: theme.text, backgroundColor: theme.uiBackground },
-                  ]}
-                  placeholder="e.g., Monthly dues payment"
-                  placeholderTextColor="#999"
-                  value={formData.description}
-                  onChangeText={(text) =>
-                    setFormData({ ...formData, description: text })
-                  }
-                  editable={!addLoading && formData.type !== "budget"}
-                />
-              </View>
-              <View style={styles.inputContainer}>
-                <ThemedText style={styles.label}>Added By</ThemedText>
-                <TextInput
-                  style={[
-                    styles.input,
-                    { color: theme.text, backgroundColor: theme.uiBackground },
-                  ]}
-                  placeholder="Your name"
-                  placeholderTextColor="#999"
-                  value={formData.addedBy}
-                  onChangeText={(text) =>
-                    setFormData({ ...formData, addedBy: text })
-                  }
-                  editable={false} // This makes it non-editable
-                />
-              </View>
-
-              <TouchableOpacity
-                style={[
-                  styles.addButton,
-                  {
-                    backgroundColor: selectedType
-                      ? getTypeColor(selectedType)
-                      : Colors.primary,
-                  },
-                  addLoading && styles.addButtonDisabled,
-                ]}
-                onPress={handleAddMoney}
-                disabled={addLoading}
-              >
-                {addLoading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <ThemedText style={styles.addButtonText}>
-                    Add Money
-                  </ThemedText>
-                )}
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
     </ThemedView>
   );
 };
-
-export default Finances;
 
 const styles = StyleSheet.create({
   container: {
@@ -766,6 +805,39 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 16,
     opacity: 0.7,
+  },
+  adminControls: {
+    marginBottom: 16,
+    alignItems: "center",
+  },
+  clearButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.redAccent,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    gap: 10,
+    width: "100%",
+    marginBottom: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  clearButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  adminNote: {
+    fontSize: 12,
+    opacity: 0.8,
+    fontStyle: "italic",
+    textAlign: "center",
+    color: Colors.redAccent,
   },
   coffersCard: {
     borderRadius: 20,
@@ -853,88 +925,6 @@ const styles = StyleSheet.create({
     top: 12,
     right: 12,
   },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  modalContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 34,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
-  },
-  modalHeaderLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  modalTypeIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-  },
-  modalBody: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 20,
-    maxHeight: "70%",
-  },
-  yearPickerContainer: {
-    marginBottom: 20,
-  },
-  pickerWrapper: {
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-    marginTop: 8,
-  },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 8,
-  },
-  input: {
-    borderRadius: 8,
-    padding: 14,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-  },
-  addButton: {
-    borderRadius: 8,
-    padding: 16,
-    alignItems: "center",
-    marginTop: 10,
-  },
-  addButtonDisabled: {
-    opacity: 0.7,
-  },
-  addButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
   withdrawalButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -942,7 +932,6 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     marginTop: 20,
-
     gap: 8,
   },
   withdrawalButtonText: {
@@ -963,7 +952,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     lineHeight: 20,
-    // color: Colors.orangeAccent,
   },
   withdrawalsSummary: {
     backgroundColor: Colors.uiBackground,
@@ -985,7 +973,6 @@ const styles = StyleSheet.create({
   withdrawalsTitle: {
     fontSize: 16,
     fontWeight: "600",
-    // color: Colors.redAccent,
   },
   withdrawalsDetails: {
     flexDirection: "row",
@@ -995,7 +982,6 @@ const styles = StyleSheet.create({
   withdrawalsAmount: {
     fontSize: 20,
     fontWeight: "bold",
-    // color: Colors.redAccent,
   },
   withdrawalsTimeSpan: {
     fontSize: 14,
@@ -1029,9 +1015,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: Colors.greenAccent,
   },
-  moneyFlowSubtext: {
-    fontSize: 12,
-    opacity: 0.6,
-    fontStyle: "italic",
-  },
 });
+
+export default Finances;

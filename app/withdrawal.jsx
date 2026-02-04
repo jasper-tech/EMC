@@ -4,7 +4,6 @@ import {
   TouchableOpacity,
   TextInput,
   Modal,
-  Alert,
   ActivityIndicator,
   ScrollView,
   KeyboardAvoidingView,
@@ -27,6 +26,8 @@ import {
 } from "firebase/firestore";
 import { Picker } from "@react-native-picker/picker";
 import { db, auth } from "../firebase";
+import { CustomAlert } from "../components/CustomAlert";
+import ConfirmationModal from "../components/ConfirmationModal";
 
 const Withdrawal = () => {
   const { scheme } = useContext(ThemeContext);
@@ -36,8 +37,22 @@ const Withdrawal = () => {
   const [loading, setLoading] = useState(true);
   const [withdrawalLoading, setWithdrawalLoading] = useState(false);
   const [showWithdrawalModal, setShowWithdrawalModal] = useState(false);
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [withdrawals, setWithdrawals] = useState([]);
   const [userFullName, setUserFullName] = useState("");
+
+  // State for alerts
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({
+    type: "info",
+    title: "",
+    message: "",
+    confirmText: "OK",
+    cancelText: null,
+    onConfirm: () => {},
+    autoClose: true,
+    dismissOnBackdrop: true,
+  });
 
   const [formData, setFormData] = useState({
     amount: "",
@@ -50,6 +65,13 @@ const Withdrawal = () => {
     withdrawalDate: new Date().toISOString().split("T")[0],
   });
   const [showAllWithdrawals, setShowAllWithdrawals] = useState(false);
+
+  // Pending withdrawal for confirmation
+  const [pendingWithdrawal, setPendingWithdrawal] = useState({
+    amount: 0,
+    description: "",
+    details: {},
+  });
 
   const displayedWithdrawals = showAllWithdrawals
     ? withdrawals
@@ -125,81 +147,155 @@ const Withdrawal = () => {
     }
   };
 
-  const handleWithdrawal = async () => {
+  // Alert helper
+  const showAlert = (config) => {
+    // Close all modals before showing alert
+    setShowWithdrawalModal(false);
+    setShowConfirmationModal(false);
+
+    setAlertConfig({
+      ...alertConfig,
+      ...config,
+      onConfirm: () => {
+        setAlertVisible(false);
+        if (config.onConfirm) config.onConfirm();
+      },
+      onCancel: () => {
+        setAlertVisible(false);
+        if (config.onCancel) config.onCancel();
+      },
+    });
+    setAlertVisible(true);
+  };
+
+  const validateWithdrawal = () => {
     if (!formData.amount || !formData.withdrawnBy) {
-      Alert.alert("Error", "Please fill in all required fields");
-      return;
+      showAlert({
+        type: "danger",
+        title: "Error",
+        message: "Please fill in all required fields",
+      });
+      return false;
     }
 
     // Validation for different reason types
     if (formData.reasonType === "event" && !formData.eventName) {
-      Alert.alert("Error", "Please enter the event name");
-      return;
+      showAlert({
+        type: "danger",
+        title: "Error",
+        message: "Please enter the event name",
+      });
+      return false;
     }
 
     if (formData.reasonType === "camp" && !formData.campName) {
-      Alert.alert("Error", "Please select a camp");
-      return;
+      showAlert({
+        type: "danger",
+        title: "Error",
+        message: "Please select a camp",
+      });
+      return false;
     }
 
     if (formData.reasonType === "others" && !formData.otherReason) {
-      Alert.alert("Error", "Please enter the reason for withdrawal");
-      return;
+      showAlert({
+        type: "danger",
+        title: "Error",
+        message: "Please enter the reason for withdrawal",
+      });
+      return false;
     }
 
     const amount = parseFloat(formData.amount);
     if (isNaN(amount) || amount <= 0) {
-      Alert.alert("Error", "Please enter a valid amount");
-      return;
+      showAlert({
+        type: "danger",
+        title: "Error",
+        message: "Please enter a valid amount",
+      });
+      return false;
     }
 
     if (amount > totalAmount) {
-      Alert.alert("Error", "Insufficient funds in the coffers");
+      showAlert({
+        type: "danger",
+        title: "Error",
+        message: "Insufficient funds in the coffers",
+      });
+      return false;
+    }
+
+    return true;
+  };
+
+  const prepareWithdrawalConfirmation = () => {
+    if (!validateWithdrawal()) {
       return;
     }
 
+    const amount = parseFloat(formData.amount);
+
+    // Build the description based on reason type
+    let description = "";
+    let details = {};
+
+    if (formData.reasonType === "event") {
+      description = `Withdrawal for event: ${formData.eventName}`;
+      details = { eventName: formData.eventName };
+    } else if (formData.reasonType === "camp") {
+      description = `Withdrawal for camp: ${formData.campName}`;
+      details = { campName: formData.campName };
+    } else {
+      description = `Withdrawal: ${formData.otherReason}`;
+      details = { otherReason: formData.otherReason };
+    }
+
+    // Store pending withdrawal for confirmation
+    setPendingWithdrawal({
+      amount: amount,
+      description: description,
+      details: {
+        reasonType: formData.reasonType,
+        ...details,
+        year: formData.year,
+        withdrawalDate: formData.withdrawalDate,
+        withdrawnBy: formData.withdrawnBy,
+      },
+    });
+
+    // Show confirmation modal
+    setShowWithdrawalModal(false);
+    setShowConfirmationModal(true);
+  };
+
+  const executeWithdrawal = async () => {
     setWithdrawalLoading(true);
+
     try {
       const user = auth.currentUser;
-
-      // Build the description based on reason type
-      let description = "";
-      if (formData.reasonType === "event") {
-        description = `Withdrawal for event: ${formData.eventName}`;
-      } else if (formData.reasonType === "camp") {
-        description = `Withdrawal for camp: ${formData.campName}`;
-      } else {
-        description = `Withdrawal: ${formData.otherReason}`;
-      }
+      const { amount, description, details } = pendingWithdrawal;
 
       const transactionData = {
         amount: amount,
         description: description,
-        withdrawnBy: formData.withdrawnBy,
+        withdrawnBy: details.withdrawnBy,
         userId: user?.uid || "unknown",
-        year: formData.year,
-        withdrawalDate: formData.withdrawalDate,
+        year: details.year,
+        withdrawalDate: details.withdrawalDate,
         type: "withdrawal",
         status: "completed",
         timestamp: new Date(),
-        reasonType: formData.reasonType,
+        reasonType: details.reasonType,
       };
 
       const financeData = {
         amount: -amount,
         description: description,
-        addedBy: formData.withdrawnBy,
+        addedBy: details.withdrawnBy,
         userId: user?.uid || "unknown",
         timestamp: new Date(),
         type: "withdrawal",
-        withdrawalDetails: {
-          reasonType: formData.reasonType,
-          eventName: formData.eventName,
-          campName: formData.campName,
-          otherReason: formData.otherReason,
-          year: formData.year,
-          withdrawalDate: formData.withdrawalDate,
-        },
+        withdrawalDetails: details,
       };
 
       // Save to transactions collection
@@ -212,16 +308,17 @@ const Withdrawal = () => {
       await addDoc(collection(db, "notifications"), {
         type: "withdrawal_made",
         title: "Funds Withdrawn",
-        message: `${formData.withdrawnBy} withdrew GH₵${amount.toFixed(
+        message: `${details.withdrawnBy} withdrew GH₵${amount.toFixed(
           2
         )} - ${description}`,
         timestamp: new Date(),
         read: false,
       });
 
-      Alert.alert("Success", "Withdrawal completed successfully!");
+      // Close confirmation modal
+      setShowConfirmationModal(false);
 
-      setShowWithdrawalModal(false);
+      // Reset form data
       setFormData({
         amount: "",
         reasonType: "event",
@@ -232,11 +329,34 @@ const Withdrawal = () => {
         year: new Date().getFullYear().toString(),
         withdrawalDate: new Date().toISOString().split("T")[0],
       });
+
+      // Show success alert
+      showAlert({
+        type: "success",
+        title: "Success",
+        message: `Withdrawal of GH₵${amount.toFixed(
+          2
+        )} completed successfully!`,
+      });
     } catch (error) {
       console.error("Error processing withdrawal:", error);
-      Alert.alert("Error", "Failed to process withdrawal. Please try again.");
+
+      // Close confirmation modal
+      setShowConfirmationModal(false);
+
+      // Show error alert
+      showAlert({
+        type: "failed",
+        title: "Error",
+        message: "Failed to process withdrawal. Please try again.",
+      });
     } finally {
       setWithdrawalLoading(false);
+      setPendingWithdrawal({
+        amount: 0,
+        description: "",
+        details: {},
+      });
     }
   };
 
@@ -257,6 +377,30 @@ const Withdrawal = () => {
     });
   };
 
+  // Helper to format amount with 2 decimal places
+  const formatAmount = (value) => {
+    // Remove any non-numeric characters except decimal point
+    let cleaned = value.replace(/[^0-9.]/g, "");
+
+    // Ensure only one decimal point
+    const decimalParts = cleaned.split(".");
+    if (decimalParts.length > 2) {
+      cleaned = decimalParts[0] + "." + decimalParts.slice(1).join("");
+    }
+
+    // Limit to 2 decimal places
+    if (decimalParts.length > 1) {
+      cleaned = decimalParts[0] + "." + decimalParts[1].substring(0, 2);
+    }
+
+    return cleaned;
+  };
+
+  const handleAmountChange = (text) => {
+    const formattedAmount = formatAmount(text);
+    setFormData({ ...formData, amount: formattedAmount });
+  };
+
   if (loading) {
     return (
       <ThemedView style={styles.container}>
@@ -272,19 +416,296 @@ const Withdrawal = () => {
 
   return (
     <ThemedView style={styles.container}>
+      {/* Custom Alert */}
+      <CustomAlert {...alertConfig} visible={alertVisible} />
+
+      {/* Withdrawal Confirmation Modal */}
+      <ConfirmationModal
+        visible={showConfirmationModal}
+        onClose={() => {
+          setShowConfirmationModal(false);
+          setPendingWithdrawal({
+            amount: 0,
+            description: "",
+            details: {},
+          });
+          // Reopen the withdrawal modal if user cancels
+          setShowWithdrawalModal(true);
+        }}
+        onConfirm={executeWithdrawal}
+        type="info"
+        title="Confirm Withdrawal"
+        message={`Are you sure you want to withdraw GH₵${pendingWithdrawal.amount.toFixed(
+          2
+        )}?\n\nDetails: ${pendingWithdrawal.description}\n\nYear: ${
+          pendingWithdrawal.details.year || formData.year
+        }\nDate: ${
+          pendingWithdrawal.details.withdrawalDate || formData.withdrawalDate
+        }\nWithdrawn By: ${
+          pendingWithdrawal.details.withdrawnBy || userFullName
+        }`}
+        confirmText={`Withdraw GH₵${pendingWithdrawal.amount.toFixed(2)}`}
+        cancelText="Cancel"
+        isLoading={withdrawalLoading}
+      />
+
+      {/* Withdrawal Modal */}
+      <Modal
+        visible={showWithdrawalModal && !showConfirmationModal && !alertVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowWithdrawalModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalOverlay}
+        >
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowWithdrawalModal(false)}
+          />
+          <View
+            style={[
+              styles.modalContent,
+              { backgroundColor: theme.navBackground },
+            ]}
+          >
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderLeft}>
+                <ThemedText style={styles.modalTitle}>
+                  Withdraw Funds
+                </ThemedText>
+              </View>
+              <TouchableOpacity onPress={() => setShowWithdrawalModal(false)}>
+                <MaterialIcons name="close" size={24} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={styles.modalBody}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Available Balance */}
+              <View style={styles.balanceContainer}>
+                <ThemedText style={styles.balanceLabel}>
+                  Available Coffers
+                </ThemedText>
+                <ThemedText style={styles.balanceAmount}>
+                  {formatCurrency(totalAmount)}
+                </ThemedText>
+              </View>
+
+              <View style={styles.inputContainer}>
+                <ThemedText style={styles.label}>
+                  Amount to Withdraw (GH₵) *
+                </ThemedText>
+                <View style={styles.amountInputContainer}>
+                  <ThemedText style={styles.currencySymbol}>GH₵</ThemedText>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        color: theme.text,
+                        backgroundColor: theme.uiBackground,
+                      },
+                    ]}
+                    placeholder="0.00"
+                    placeholderTextColor="#999"
+                    keyboardType="decimal-pad"
+                    value={formData.amount}
+                    onChangeText={handleAmountChange}
+                    editable={!withdrawalLoading}
+                    maxLength={15}
+                  />
+                </View>
+                <ThemedText style={styles.amountHint}>
+                  Enter numbers only (e.g., 100.50)
+                </ThemedText>
+              </View>
+
+              <View style={styles.inputContainer}>
+                <ThemedText style={styles.label}>
+                  Reason for Withdrawal *
+                </ThemedText>
+                <View
+                  style={[
+                    styles.pickerWrapper,
+                    { backgroundColor: theme.uiBackground },
+                  ]}
+                >
+                  <Picker
+                    selectedValue={formData.reasonType}
+                    onValueChange={(itemValue) =>
+                      setFormData({
+                        ...formData,
+                        reasonType: itemValue,
+                        eventName: "",
+                        campName: "",
+                        otherReason: "",
+                      })
+                    }
+                    style={{ color: theme.text }}
+                    enabled={!withdrawalLoading}
+                  >
+                    <Picker.Item label="Event" value="event" />
+                    <Picker.Item label="Camp" value="camp" />
+                    <Picker.Item label="Others" value="others" />
+                  </Picker>
+                </View>
+              </View>
+
+              {formData.reasonType === "event" && (
+                <View style={styles.inputContainer}>
+                  <ThemedText style={styles.label}>Event Name *</ThemedText>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        color: theme.text,
+                        backgroundColor: theme.uiBackground,
+                      },
+                    ]}
+                    placeholder="e.g., End of Year Party, Food Bazaar, etc."
+                    placeholderTextColor="#999"
+                    value={formData.eventName}
+                    onChangeText={(text) =>
+                      setFormData({ ...formData, eventName: text })
+                    }
+                    editable={!withdrawalLoading}
+                  />
+                </View>
+              )}
+
+              {formData.reasonType === "camp" && (
+                <View style={styles.inputContainer}>
+                  <ThemedText style={styles.label}>Camp Name *</ThemedText>
+                  <View
+                    style={[
+                      styles.pickerWrapper,
+                      { backgroundColor: theme.uiBackground },
+                    ]}
+                  >
+                    <Picker
+                      selectedValue={formData.campName}
+                      onValueChange={(itemValue) =>
+                        setFormData({ ...formData, campName: itemValue })
+                      }
+                      style={{ color: theme.text }}
+                      enabled={!withdrawalLoading}
+                    >
+                      <Picker.Item label="" value="" />
+                      <Picker.Item
+                        label="Meridian Camp"
+                        value="Meridian Camp"
+                      />
+                      <Picker.Item
+                        label="National Camp"
+                        value="National Camp"
+                      />
+                    </Picker>
+                  </View>
+                </View>
+              )}
+
+              {formData.reasonType === "others" && (
+                <View style={styles.inputContainer}>
+                  <ThemedText style={styles.label}>Reason Details *</ThemedText>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        color: theme.text,
+                        backgroundColor: theme.uiBackground,
+                      },
+                    ]}
+                    placeholder="e.g., Member Support, Supplies, etc."
+                    placeholderTextColor="#999"
+                    value={formData.otherReason}
+                    onChangeText={(text) =>
+                      setFormData({ ...formData, otherReason: text })
+                    }
+                    editable={!withdrawalLoading}
+                    multiline
+                    numberOfLines={3}
+                  />
+                </View>
+              )}
+
+              <View style={styles.inputContainer}>
+                <ThemedText style={styles.label}>Withdrawal Year</ThemedText>
+                <TextInput
+                  style={[
+                    styles.input,
+                    { color: theme.text, backgroundColor: theme.uiBackground },
+                  ]}
+                  value={formData.year}
+                  editable={false}
+                />
+              </View>
+              <View style={styles.inputContainer}>
+                <ThemedText style={styles.label}>Withdrawal Date</ThemedText>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      color: theme.text,
+                      backgroundColor: theme.uiBackground,
+                      opacity: 0.7,
+                    },
+                  ]}
+                  value={formData.withdrawalDate}
+                  editable={false}
+                  placeholder="YYYY-MM-DD"
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
+                <ThemedText style={styles.label}>Withdrawn By</ThemedText>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      color: theme.text,
+                      backgroundColor: theme.uiBackground,
+                      opacity: 0.7,
+                    },
+                  ]}
+                  value={formData.withdrawnBy}
+                  editable={false}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.submitButton,
+                  { backgroundColor: Colors.blueAccent },
+                  withdrawalLoading && styles.submitButtonDisabled,
+                ]}
+                onPress={prepareWithdrawalConfirmation}
+                disabled={withdrawalLoading}
+              >
+                {withdrawalLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <ThemedText style={styles.submitButtonText}>
+                    Process Withdrawal
+                  </ThemedText>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header Card */}
         <View
           style={[styles.headerCard, { backgroundColor: Colors.uiBackground }]}
         >
           <View style={styles.headerContent}>
-            {/* <MaterialIcons
-              name="account-balance-wallet"
-              size={40}
-              color={Colors.blueAccent}
-            /> */}
             <View style={styles.headerText}>
-              {/* <ThemedText style={styles.headerTitle}>Withdraw Funds</ThemedText> */}
               <ThemedText style={styles.headerSubtitle}>
                 Amount Available: {formatCurrency(totalAmount)}
               </ThemedText>
@@ -413,250 +834,6 @@ const Withdrawal = () => {
           )}
         </View>
       </ScrollView>
-
-      {/* Withdrawal Modal */}
-      <Modal
-        visible={showWithdrawalModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowWithdrawalModal(false)}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.modalOverlay}
-        >
-          <TouchableOpacity
-            style={styles.modalBackdrop}
-            activeOpacity={1}
-            onPress={() => setShowWithdrawalModal(false)}
-          />
-          <View
-            style={[
-              styles.modalContent,
-              { backgroundColor: theme.navBackground },
-            ]}
-          >
-            <View style={styles.modalHeader}>
-              <View style={styles.modalHeaderLeft}>
-                {/* <MaterialIcons
-                  name="account-balance-wallet"
-                  size={24}
-                  color={Colors.blueAccent}
-                /> */}
-                <ThemedText style={styles.modalTitle}>
-                  Withdraw Funds
-                </ThemedText>
-              </View>
-              <TouchableOpacity onPress={() => setShowWithdrawalModal(false)}>
-                <MaterialIcons name="close" size={24} color={theme.text} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              style={styles.modalBody}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              {/* Available Balance */}
-              <View style={styles.balanceContainer}>
-                <ThemedText style={styles.balanceLabel}>
-                  Available Coffers
-                </ThemedText>
-                <ThemedText style={styles.balanceAmount}>
-                  {formatCurrency(totalAmount)}
-                </ThemedText>
-              </View>
-
-              <View style={styles.inputContainer}>
-                <ThemedText style={styles.label}>
-                  Amount to Withdraw (GH₵) *
-                </ThemedText>
-                <TextInput
-                  style={[
-                    styles.input,
-                    { color: theme.text, backgroundColor: theme.uiBackground },
-                  ]}
-                  placeholder="0.00"
-                  placeholderTextColor="#999"
-                  keyboardType="numeric"
-                  value={formData.amount}
-                  onChangeText={(text) =>
-                    setFormData({ ...formData, amount: text })
-                  }
-                  editable={!withdrawalLoading}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <ThemedText style={styles.label}>
-                  Reason for Withdrawal *
-                </ThemedText>
-                <View
-                  style={[
-                    styles.pickerWrapper,
-                    { backgroundColor: theme.uiBackground },
-                  ]}
-                >
-                  <Picker
-                    selectedValue={formData.reasonType}
-                    onValueChange={(itemValue) =>
-                      setFormData({
-                        ...formData,
-                        reasonType: itemValue,
-                        eventName: "",
-                        campName: "",
-                        otherReason: "",
-                      })
-                    }
-                    style={{ color: theme.text }}
-                  >
-                    <Picker.Item label="Event" value="event" />
-                    <Picker.Item label="Camp" value="camp" />
-                    <Picker.Item label="Others" value="others" />
-                  </Picker>
-                </View>
-              </View>
-
-              {formData.reasonType === "event" && (
-                <View style={styles.inputContainer}>
-                  <ThemedText style={styles.label}>Event Name *</ThemedText>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      {
-                        color: theme.text,
-                        backgroundColor: theme.uiBackground,
-                      },
-                    ]}
-                    placeholder="e.g., End of Year Party, Food Bazaar, etc."
-                    placeholderTextColor="#999"
-                    value={formData.eventName}
-                    onChangeText={(text) =>
-                      setFormData({ ...formData, eventName: text })
-                    }
-                    editable={!withdrawalLoading}
-                  />
-                </View>
-              )}
-
-              {formData.reasonType === "camp" && (
-                <View style={styles.inputContainer}>
-                  <ThemedText style={styles.label}>Camp Name *</ThemedText>
-                  <View
-                    style={[
-                      styles.pickerWrapper,
-                      { backgroundColor: theme.uiBackground },
-                    ]}
-                  >
-                    <Picker
-                      selectedValue={formData.campName}
-                      onValueChange={(itemValue) =>
-                        setFormData({ ...formData, campName: itemValue })
-                      }
-                      style={{ color: theme.text }}
-                    >
-                      <Picker.Item label="" value="" />
-                      <Picker.Item
-                        label="Meridian Camp"
-                        value="Meridian Camp"
-                      />
-                      <Picker.Item
-                        label="National Camp"
-                        value="National Camp"
-                      />
-                    </Picker>
-                  </View>
-                </View>
-              )}
-
-              {formData.reasonType === "others" && (
-                <View style={styles.inputContainer}>
-                  <ThemedText style={styles.label}>Reason Details *</ThemedText>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      {
-                        color: theme.text,
-                        backgroundColor: theme.uiBackground,
-                      },
-                    ]}
-                    placeholder="e.g., Member Support, Supplies, etc."
-                    placeholderTextColor="#999"
-                    value={formData.otherReason}
-                    onChangeText={(text) =>
-                      setFormData({ ...formData, otherReason: text })
-                    }
-                    editable={!withdrawalLoading}
-                    multiline
-                  />
-                </View>
-              )}
-
-              <View style={styles.inputContainer}>
-                <ThemedText style={styles.label}>Withdrawal Year</ThemedText>
-                <TextInput
-                  style={[
-                    styles.input,
-                    { color: theme.text, backgroundColor: theme.uiBackground },
-                  ]}
-                  value={formData.year}
-                  editable={false}
-                />
-              </View>
-              <View style={styles.inputContainer}>
-                <ThemedText style={styles.label}>Withdrawal Date</ThemedText>
-                <TextInput
-                  style={[
-                    styles.input,
-                    {
-                      color: theme.text,
-                      backgroundColor: theme.uiBackground,
-                      opacity: 0.7,
-                    },
-                  ]}
-                  value={formData.withdrawalDate}
-                  editable={false}
-                  placeholder="YYYY-MM-DD"
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <ThemedText style={styles.label}>Withdrawn By</ThemedText>
-                <TextInput
-                  style={[
-                    styles.input,
-                    {
-                      color: theme.text,
-                      backgroundColor: theme.uiBackground,
-                      opacity: 0.7,
-                    },
-                  ]}
-                  value={formData.withdrawnBy}
-                  editable={false}
-                />
-              </View>
-
-              <TouchableOpacity
-                style={[
-                  styles.submitButton,
-                  { backgroundColor: Colors.blueAccent },
-                  withdrawalLoading && styles.submitButtonDisabled,
-                ]}
-                onPress={handleWithdrawal}
-                disabled={withdrawalLoading}
-              >
-                {withdrawalLoading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <ThemedText style={styles.submitButtonText}>
-                    Process Withdrawal
-                  </ThemedText>
-                )}
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
     </ThemedView>
   );
 };
@@ -868,12 +1045,31 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginBottom: 8,
   },
+  amountInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  currencySymbol: {
+    position: "absolute",
+    left: 14,
+    fontSize: 16,
+    fontWeight: "600",
+    zIndex: 1,
+  },
   input: {
     borderRadius: 8,
     padding: 14,
+    paddingLeft: 50,
     fontSize: 16,
     borderWidth: 1,
     borderColor: "#e0e0e0",
+    flex: 1,
+  },
+  amountHint: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 4,
+    fontStyle: "italic",
   },
   pickerWrapper: {
     borderRadius: 8,
@@ -910,7 +1106,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.blueAccent + "15",
   },
   viewAllButtonText: {
-    // color: Colors.blueAccent,
     fontSize: 14,
     fontWeight: "600",
   },
