@@ -619,7 +619,7 @@ const MemberInfo = ({ navigation }) => {
                 name="shield-checkmark"
                 size={isWeb ? 18 : 16}
                 color={
-                  userData?.isExecutive ? Colors.goldAccent : Colors.blueAccent
+                  userData?.isExecutive ? Colors.goldAccent : Colors.goldAccent
                 }
               />
               <ThemedText style={styles.roleText}>{userData?.role}</ThemedText>

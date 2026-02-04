@@ -91,6 +91,7 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
           );
           setCurrentUserAvatar(savedProfileImg);
 
+          // Fetch user document from Firestore
           const userDoc = await getDoc(doc(db, "users", user.uid));
           if (userDoc.exists()) {
             const userData = userDoc.data();
@@ -116,7 +117,7 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
             }
           } else {
             console.log("No user data found in Firestore, using basic profile");
-            setUserRole("Member");
+            setUserRole("member");
           }
         } catch (error) {
           console.error("Error loading user profile:", error);
@@ -124,6 +125,7 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
           setUserName(
             savedName || user.displayName || user.email.split("@")[0]
           );
+          setUserRole("member");
         } finally {
           setLoadingProfile(false);
         }
@@ -224,7 +226,6 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
     }
   };
 
-  // Helper function to convert file/Blob to Base64
   const toBase64 = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -249,7 +250,6 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
       let base64Image;
 
       if (Platform.OS === "web") {
-        // For web, we need to fetch the image and convert it
         const response = await fetch(uri);
         const blob = await response.blob();
         base64Image = await toBase64(blob);
@@ -511,6 +511,7 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
               opacity={0.3}
             />
           </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => {
@@ -541,6 +542,43 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
             />
           </TouchableOpacity>
 
+          {/* Only show Maintenance for admins */}
+          {userRole && userRole === "admin" && (
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                onClose();
+                router.push("/maintenance");
+              }}
+              activeOpacity={0.7}
+            >
+              <View
+                style={[
+                  styles.menuIconContainer,
+                  { backgroundColor: theme.uiBackground },
+                ]}
+              >
+                <Ionicons
+                  name="settings-outline"
+                  size={20}
+                  color={theme.text}
+                />
+              </View>
+              <View style={styles.menuTextContainer}>
+                <ThemedText style={styles.menuText}>Maintenance</ThemedText>
+                <ThemedText style={styles.menuSubtext}>
+                  Role Access Control
+                </ThemedText>
+              </View>
+              <Ionicons
+                name="chevron-forward"
+                size={18}
+                color={theme.text}
+                opacity={0.3}
+              />
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => {
@@ -555,7 +593,11 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
                 { backgroundColor: theme.uiBackground },
               ]}
             >
-              <Ionicons name="settings-outline" size={20} color={theme.text} />
+              <Ionicons
+                name="document-text-outline"
+                size={20}
+                color={theme.text}
+              />
             </View>
             <View style={styles.menuTextContainer}>
               <ThemedText style={styles.menuText}>Settings</ThemedText>

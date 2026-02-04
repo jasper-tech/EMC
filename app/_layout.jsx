@@ -293,6 +293,13 @@ const LayoutContent = () => {
                 gestureEnabled: false,
               }}
             />
+             <Stack.Screen
+              name="maintenance"
+              options={{
+                headerTitle: "Maintenance",
+                gestureEnabled: false,
+              }}
+            />
           </Stack>
         </AppWrapper>
       )}

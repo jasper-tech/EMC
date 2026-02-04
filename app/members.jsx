@@ -11,7 +11,7 @@ import {
   Animated,
   Image,
   Platform,
-} from "react-native"; // ADDED Platform import
+} from "react-native";
 import React, { useState, useEffect, useRef, useContext } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../constants/Colors";
@@ -26,12 +26,16 @@ import {
   addDoc,
   updateDoc,
   doc,
+  getDoc,
   serverTimestamp,
+  where,
+  getDocs,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { auth } from "../firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
+import CustomAlert from "../components/CustomAlert";
 
 const Members = () => {
   const [members, setMembers] = useState([]);
@@ -46,6 +50,22 @@ const Members = () => {
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
 
+  // User states
+  const [currentUserRole, setCurrentUserRole] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [userPermissions, setUserPermissions] = useState({
+    canAdd: false,
+    canEdit: false,
+  });
+
+  // Alert states
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertType, setAlertType] = useState("success");
+  const [alertTitle, setAlertTitle] = useState("");
+  const [alertMessage, setAlertMessage] = useState("");
+  const [alertAutoClose, setAlertAutoClose] = useState(true);
+
   const { scheme } = useContext(ThemeContext);
   const theme = Colors[scheme] ?? Colors.light;
 
@@ -56,10 +76,103 @@ const Members = () => {
     fullname: "",
     address: "",
     phone: "",
-    birthDate: "", // Added birth date field
+    birthDate: "",
     dateJoined: new Date().toISOString().split("T")[0],
     profileImg: "",
   });
+
+  // Function to check user permissions from Firestore
+  const checkUserPermissions = async (userRole) => {
+    try {
+      const permissionsRef = doc(db, "settings", "rolePermissions");
+      const permissionsDoc = await getDoc(permissionsRef);
+
+      if (permissionsDoc.exists()) {
+        const permissions = permissionsDoc.data();
+
+        // Check if "all" is enabled (special case)
+        if (permissions.all === 1) {
+          return { canAdd: true, canEdit: true };
+        }
+
+        // Check specific role
+        if (permissions[userRole] === 1) {
+          return { canAdd: true, canEdit: true };
+        }
+      }
+
+      return { canAdd: false, canEdit: false };
+    } catch (error) {
+      console.error("Error checking permissions:", error);
+      return { canAdd: false, canEdit: false };
+    }
+  };
+
+  // Fetch current user role and permissions on component mount
+  useEffect(() => {
+    const fetchCurrentUserRole = async () => {
+      try {
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+          setCurrentUserId(currentUser.uid);
+
+          // Fetch user document from Firestore
+          const userRef = doc(db, "users", currentUser.uid);
+          const userDoc = await getDoc(userRef);
+
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            const userRole = userData.role || "member";
+            setCurrentUserRole(userRole);
+            setIsAdmin(userRole === "admin");
+
+            // Check permissions for non-admin users
+            if (userRole !== "admin") {
+              const permissions = await checkUserPermissions(userRole);
+              setUserPermissions(permissions);
+            } else {
+              // Admins have full access
+              setUserPermissions({ canAdd: true, canEdit: true });
+            }
+          } else {
+            // If user document doesn't exist, check if they're in members
+            const membersRef = collection(db, "members");
+            const q = query(membersRef, where("uid", "==", currentUser.uid));
+            const querySnapshot = await getDocs(q);
+
+            if (!querySnapshot.empty) {
+              const memberData = querySnapshot.docs[0].data();
+              let userRole = "member";
+
+              // Check if member has a role field
+              if (memberData.role) {
+                userRole = memberData.role;
+              } else if (memberData.isExecutive) {
+                userRole = "executive";
+              }
+
+              setCurrentUserRole(userRole);
+
+              // Check permissions
+              const permissions = await checkUserPermissions(userRole);
+              setUserPermissions(permissions);
+            } else {
+              setCurrentUserRole("guest");
+              setUserPermissions({ canAdd: false, canEdit: false });
+            }
+            setIsAdmin(false);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching user role:", error);
+        setCurrentUserRole("guest");
+        setUserPermissions({ canAdd: false, canEdit: false });
+        setIsAdmin(false);
+      }
+    };
+
+    fetchCurrentUserRole();
+  }, []);
 
   useEffect(() => {
     const membersRef = collection(db, "members");
@@ -115,21 +228,19 @@ const Members = () => {
           member.fullname?.toLowerCase().includes(searchQuery.toLowerCase()) ||
           member.phone?.includes(searchQuery) ||
           member.address?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          member.birthDate?.includes(searchQuery) // Added birth date to search
+          member.birthDate?.includes(searchQuery)
       );
       setFilteredMembers(filtered);
     }
   }, [searchQuery, members]);
 
-  // WEB-COMPATIBLE ALERT FUNCTION
-  const showAlert = (title, message) => {
-    if (Platform.OS === "web") {
-      // Use browser's native alert for web
-      window.alert(`${title}\n\n${message}`);
-    } else {
-      // Use React Native Alert for mobile
-      Alert.alert(title, message);
-    }
+  // Custom alert function for all platforms
+  const showAlert = (title, message, type = "info") => {
+    setAlertType(type);
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertAutoClose(type === "success" || type === "failed");
+    setAlertVisible(true);
   };
 
   const resetForm = () => {
@@ -200,7 +311,8 @@ const Members = () => {
       if (status !== "granted") {
         showAlert(
           "Permission required",
-          "Sorry, we need camera roll permissions to select an image."
+          "Sorry, we need camera roll permissions to select an image.",
+          "danger"
         );
         return;
       }
@@ -219,7 +331,7 @@ const Members = () => {
       }
     } catch (error) {
       console.error("Error picking image:", error);
-      showAlert("Error", "Failed to pick image");
+      showAlert("Error", "Failed to pick image", "failed");
     }
   };
 
@@ -227,21 +339,35 @@ const Members = () => {
     setFormData({ ...formData, profileImg: "" });
   };
 
+  // Check if user can add members (admin or has permission)
+  const handleAddButtonPress = () => {
+    if (!isAdmin && !userPermissions.canAdd) {
+      showAlert(
+        "Access Denied",
+        "You don't have permission to add new members. Please contact an administrator.",
+        "danger"
+      );
+      return;
+    }
+    setShowAddModal(true);
+  };
+
   const handleAddMember = async () => {
     if (!formData.fullname.trim()) {
-      showAlert("Error", "Please enter member's full name");
+      showAlert("Error", "Please enter member's full name", "danger");
       return;
     }
 
     if (!formData.phone.trim()) {
-      showAlert("Error", "Please enter member's phone number");
+      showAlert("Error", "Please enter member's phone number", "danger");
       return;
     }
 
     if (formData.birthDate && !validateDate(formData.birthDate, "birth")) {
       showAlert(
         "Error",
-        "Please enter a valid birth date in YYYY-MM-DD format (must be in the past)"
+        "Please enter a valid birth date in YYYY-MM-DD format (must be in the past)",
+        "danger"
       );
       return;
     }
@@ -249,7 +375,8 @@ const Members = () => {
     if (!validateDate(formData.dateJoined, "joined")) {
       showAlert(
         "Error",
-        "Please enter a valid date joined in YYYY-MM-DD format (cannot be in the future)"
+        "Please enter a valid date joined in YYYY-MM-DD format (cannot be in the future)",
+        "danger"
       );
       return;
     }
@@ -277,30 +404,64 @@ const Members = () => {
 
       resetForm();
       setShowAddModal(false);
-      showAlert("Success", "Member added successfully!");
+      showAlert("Success", "Member added successfully!", "success");
     } catch (error) {
       console.error("Error adding member:", error);
-      showAlert("Error", "Failed to add member");
+      let errorMessage = "Failed to add member. ";
+
+      if (error.code === "permission-denied") {
+        errorMessage += "You don't have permission to add members.";
+      } else if (error.code === "unavailable") {
+        errorMessage += "Network error. Please check your connection.";
+      } else {
+        errorMessage += "Please try again.";
+      }
+
+      showAlert("Error", errorMessage, "failed");
     } finally {
       setSubmitting(false);
     }
   };
 
+  const openEditModal = (member) => {
+    // Check if user has permission to edit
+    if (!isAdmin && !userPermissions.canEdit) {
+      showAlert(
+        "Access Denied",
+        "You don't have permission to edit member details. Please contact an administrator.",
+        "danger"
+      );
+      return;
+    }
+
+    setSelectedMember(member);
+    setFormData({
+      fullname: member.fullname || "",
+      address: member.address || "",
+      phone: member.phone || "",
+      birthDate: member.birthDate || "",
+      dateJoined: member.dateJoined || new Date().toISOString().split("T")[0],
+      profileImg: member.profileImg || "",
+    });
+    setShowEditModal(true);
+  };
+
   const handleEditMember = async () => {
     if (!formData.fullname.trim()) {
-      showAlert("Error", "Please enter member's full name");
+      showAlert("Error", "Please enter member's full name", "danger");
       return;
     }
 
     if (!formData.phone.trim()) {
-      showAlert("Error", "Please enter member's phone number");
+      showAlert("Error", "Please enter member's phone number", "danger");
       return;
     }
 
     if (formData.birthDate && !validateDate(formData.birthDate, "birth")) {
       showAlert(
         "Error",
-        "Please enter a valid birth date in YYYY-MM-DD format (must be in the past)"
+        "Please enter a valid birth date in YYYY-MM-DD format (must be in the past)",
+        "danger"
       );
       return;
     }
@@ -308,21 +469,36 @@ const Members = () => {
     if (!validateDate(formData.dateJoined, "joined")) {
       showAlert(
         "Error",
-        "Please enter a valid date joined in YYYY-MM-DD format (cannot be in the future)"
+        "Please enter a valid date joined in YYYY-MM-DD format (cannot be in the future)",
+        "danger"
       );
       return;
     }
 
     try {
       setSubmitting(true);
-      const memberRef = doc(db, "members", selectedMember.id);
-      await updateDoc(memberRef, {
-        ...formData,
+
+      // Check permissions again (in case they changed)
+      if (!isAdmin && !userPermissions.canEdit) {
+        throw new Error("Unauthorized: Edit permission required");
+      }
+
+      const updateData = {
+        fullname: String(formData.fullname || ""),
+        address: String(formData.address || ""),
+        phone: String(formData.phone || ""),
+        birthDate: formData.birthDate || null,
+        dateJoined: formData.dateJoined,
+        profileImg: formData.profileImg || "",
         age: formData.birthDate ? calculateAge(formData.birthDate) : null,
         updatedAt: serverTimestamp(),
-      });
+      };
 
-      // Also update users collection if this is an executive
+      // Update member
+      const memberRef = doc(db, "members", selectedMember.id);
+      await updateDoc(memberRef, updateData);
+
+      // If executive, also update user record
       if (selectedMember.isExecutive && selectedMember.uid) {
         const userRef = doc(db, "users", selectedMember.uid);
         await updateDoc(userRef, {
@@ -334,20 +510,18 @@ const Members = () => {
           updatedAt: serverTimestamp(),
         });
 
-        // UPDATE ASYNCSTORAGE FOR INSTANT SIDEPANEL UPDATE
+        // Update AsyncStorage for current user
         const currentUser = auth.currentUser;
         if (currentUser && currentUser.uid === selectedMember.uid) {
-          // If editing current user's own profile, update AsyncStorage
-          const userData = {
-            fullName: formData.fullname,
-            phone: formData.phone,
-            address: formData.address,
-            birthDate: formData.birthDate,
-            profileImg: formData.profileImg,
-          };
           await AsyncStorage.setItem(
             "currentUserData",
-            JSON.stringify(userData)
+            JSON.stringify({
+              fullName: formData.fullname,
+              phone: formData.phone,
+              address: formData.address,
+              birthDate: formData.birthDate,
+              profileImg: formData.profileImg,
+            })
           );
         }
       }
@@ -355,26 +529,38 @@ const Members = () => {
       setShowEditModal(false);
       setSelectedMember(null);
       resetForm();
-      showAlert("Success", "Member updated successfully!");
+
+      showAlert("Success", "Member updated successfully!", "success");
     } catch (error) {
-      console.error("Error updating member:", error);
-      showAlert("Error", "Failed to update member");
+      console.error("Update error details:", {
+        code: error.code,
+        message: error.message,
+        stack: error.stack,
+      });
+
+      let errorMessage = "Failed to update member. ";
+
+      // User-friendly error messages
+      if (error.code === "permission-denied") {
+        errorMessage += "You don't have permission to update members.";
+      } else if (error.code === "not-found") {
+        errorMessage += "Member not found. It may have been deleted.";
+      } else if (error.code === "unavailable") {
+        errorMessage += "Network error. Please check your internet connection.";
+      } else if (error.code === "invalid-argument") {
+        errorMessage += "Invalid data provided. Please check all fields.";
+      } else if (error.message === "Unauthorized: Edit permission required") {
+        errorMessage =
+          "Access denied. You don't have permission to edit members.";
+      } else {
+        errorMessage +=
+          "Please try again. If the problem persists, contact support.";
+      }
+
+      showAlert("Error", errorMessage, "failed");
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const openEditModal = (member) => {
-    setSelectedMember(member);
-    setFormData({
-      fullname: member.fullname || "",
-      address: member.address || "",
-      phone: member.phone || "",
-      birthDate: member.birthDate || "",
-      dateJoined: member.dateJoined || new Date().toISOString().split("T")[0],
-      profileImg: member.profileImg || "",
-    });
-    setShowEditModal(true);
   };
 
   const openImageModal = (imageUri) => {
@@ -402,10 +588,27 @@ const Members = () => {
     return age ? `${age} years` : "";
   };
 
+  // Function to check if user can edit a specific member
+  const canUserEditMember = (member) => {
+    // Admins can always edit
+    if (isAdmin) return true;
+
+    // Check if user has edit permission
+    if (!userPermissions.canEdit) return false;
+
+    // Optional: Add additional checks here
+    // For example: Can only edit their own profile? Or all members?
+    // return member.uid === currentUserId; // If you want users to only edit their own profile
+
+    return true; // If user has edit permission, they can edit any member
+  };
+
   const renderMemberCard = ({ item, index }) => {
     const isExpanded = expandedMemberId === item.id;
     const isExecutive = item.isExecutive;
     const ageDisplay = getAgeDisplay(item.birthDate);
+    const isOwnProfile = item.uid === currentUserId;
+    const canEdit = canUserEditMember(item);
 
     return (
       <Animated.View
@@ -447,6 +650,12 @@ const Members = () => {
                     style={{ opacity: 0.3 }}
                   />
                 )}
+                {/* Show admin badge if user is admin and it's their own profile */}
+                {isAdmin && isOwnProfile && (
+                  <View style={styles.adminBadge}>
+                    <Ionicons name="shield-checkmark" size={12} color="#fff" />
+                  </View>
+                )}
               </View>
             </TouchableOpacity>
 
@@ -461,6 +670,9 @@ const Members = () => {
                     size={16}
                     color={Colors.goldAccent}
                   />
+                )}
+                {isOwnProfile && (
+                  <ThemedText style={styles.youBadge}>(You)</ThemedText>
                 )}
               </View>
               <ThemedText style={styles.memberPhone}>{item.phone}</ThemedText>
@@ -559,16 +771,19 @@ const Members = () => {
                 </View>
               )}
 
-              <TouchableOpacity
-                style={[
-                  styles.editButton,
-                  { backgroundColor: Colors.blueAccent },
-                ]}
-                onPress={() => openEditModal(item)}
-              >
-                <Ionicons name="create-outline" size={18} color="#fff" />
-                <ThemedText style={styles.editButtonText}>Edit</ThemedText>
-              </TouchableOpacity>
+              {/* Show edit button only if user has permission */}
+              {canEdit && (
+                <TouchableOpacity
+                  style={[
+                    styles.editButton,
+                    { backgroundColor: Colors.blueAccent },
+                  ]}
+                  onPress={() => openEditModal(item)}
+                >
+                  <Ionicons name="create-outline" size={18} color="#fff" />
+                  <ThemedText style={styles.editButtonText}>Edit</ThemedText>
+                </TouchableOpacity>
+              )}
             </View>
           )}
         </TouchableOpacity>
@@ -687,7 +902,7 @@ const Members = () => {
                   <TextInput
                     style={[
                       styles.input,
-                      Platform.OS === "web" && styles.webInput, // Add web-specific styles
+                      Platform.OS === "web" && styles.webInput,
                     ]}
                     value={formData.fullname}
                     onChangeText={(text) =>
@@ -695,7 +910,6 @@ const Members = () => {
                     }
                     placeholder="Enter full name"
                     placeholderTextColor="#999"
-                    // Use different approach for web to ensure color works
                     color={Platform.OS === "web" ? undefined : theme.text}
                   />
                 </View>
@@ -879,7 +1093,6 @@ const Members = () => {
           placeholderTextColor={theme.text + "80"}
           value={searchQuery}
           onChangeText={setSearchQuery}
-          // Use different approach for web
           color={Platform.OS === "web" ? undefined : theme.text}
         />
         {searchQuery !== "" && (
@@ -889,11 +1102,21 @@ const Members = () => {
         )}
       </View>
 
-      {/* Total Members Count */}
+      {/* Total Members Count and User Info */}
       <View style={styles.memberCountContainer}>
         <ThemedText style={styles.memberCountText}>
           Total Members: {filteredMembers.length}
         </ThemedText>
+        {/* Show current user role and permissions */}
+        {currentUserRole && (
+          <View style={styles.userInfoContainer}>
+            {(userPermissions.canAdd || userPermissions.canEdit) && (
+              <ThemedText style={styles.permissionStatus}>
+                • Add/Edit Access
+              </ThemedText>
+            )}
+          </View>
+        )}
       </View>
 
       {filteredMembers.length === 0 ? (
@@ -918,17 +1141,30 @@ const Members = () => {
         />
       )}
 
-      <TouchableOpacity
-        style={[styles.fab, { backgroundColor: Colors.blueAccent }]}
-        onPress={() => setShowAddModal(true)}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="add" size={28} color="#fff" />
-      </TouchableOpacity>
+      {/* FAB Button - Show for users with add permission */}
+      {(isAdmin || userPermissions.canAdd) && (
+        <TouchableOpacity
+          style={[styles.fab, { backgroundColor: Colors.blueAccent }]}
+          onPress={handleAddButtonPress}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="add" size={28} color="#fff" />
+        </TouchableOpacity>
+      )}
 
       {renderModal(false)}
       {renderModal(true)}
       {renderImageModal()}
+
+      {/* Custom Alert Component */}
+      <CustomAlert
+        visible={alertVisible}
+        type={alertType}
+        title={alertTitle}
+        message={alertMessage}
+        autoClose={alertAutoClose}
+        onConfirm={() => setAlertVisible(false)}
+      />
     </ThemedView>
   );
 };
@@ -968,19 +1204,36 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
   },
-  // WEB-SPECIFIC INPUT STYLES
   webInput: {
-    // For web, use style-based color instead of color prop
-    color: "inherit", // This will inherit from parent or use CSS
+    color: "inherit",
   },
   memberCountContainer: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    alignItems: "flex-end",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   memberCountText: {
     fontSize: 14,
     fontWeight: "600",
+    opacity: 0.7,
+  },
+  userInfoContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  userRoleText: {
+    fontSize: 12,
+    fontWeight: "500",
+    opacity: 0.5,
+    fontStyle: "italic",
+  },
+  permissionStatus: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: Colors.greenAccent,
     opacity: 0.7,
   },
   listContent: {
@@ -1014,13 +1267,38 @@ const styles = StyleSheet.create({
     height: "100%",
     borderRadius: 22,
   },
+  adminBadge: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    backgroundColor: Colors.greenAccent,
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#fff",
+  },
   memberInfo: {
     flex: 1,
+  },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 4,
   },
   memberName: {
     fontSize: 16,
     fontWeight: "600",
-    marginBottom: 4,
+  },
+  youBadge: {
+    fontSize: 12,
+    color: Colors.blueAccent,
+    fontStyle: "italic",
+    opacity: 0.7,
   },
   memberPhone: {
     fontSize: 14,
@@ -1030,6 +1308,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     opacity: 0.5,
     fontStyle: "italic",
+  },
+  memberEmail: {
+    fontSize: 12,
+    opacity: 0.5,
+    marginTop: 2,
   },
   expandedContent: {
     marginTop: 16,
@@ -1089,6 +1372,23 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     fontWeight: "600",
+  },
+  infoMessage: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    padding: 12,
+    backgroundColor: Colors.blueAccent + "10",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.blueAccent + "30",
+  },
+  infoMessageText: {
+    fontSize: 13,
+    color: Colors.blueAccent,
+    opacity: 0.8,
+    textAlign: "center",
   },
   emptyContainer: {
     flex: 1,
@@ -1219,38 +1519,6 @@ const styles = StyleSheet.create({
     color: Colors.greenAccent,
     marginTop: 4,
     fontWeight: "600",
-  },
-  executiveBadge: {
-    position: "absolute",
-    top: -2,
-    right: -2,
-    backgroundColor: Colors.goldAccent,
-    borderRadius: 8,
-    width: 16,
-    height: 16,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  nameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 4,
-  },
-  roleBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  roleText: {
-    fontSize: 10,
-    fontWeight: "600",
-  },
-  memberEmail: {
-    fontSize: 12,
-    opacity: 0.5,
-    marginTop: 2,
   },
   // Image related styles
   imageSection: {
