@@ -903,6 +903,7 @@ const Members = () => {
                     style={[
                       styles.input,
                       Platform.OS === "web" && styles.webInput,
+                      { color: theme.text },
                     ]}
                     value={formData.fullname}
                     onChangeText={(text) =>
@@ -910,7 +911,7 @@ const Members = () => {
                     }
                     placeholder="Enter full name"
                     placeholderTextColor="#999"
-                    color={Platform.OS === "web" ? undefined : theme.text}
+                    // color={Platform.OS === "web" ? undefined : theme.text}
                   />
                 </View>
               </View>
@@ -922,6 +923,7 @@ const Members = () => {
                     styles.inputWrapper,
                     styles.textAreaWrapper,
                     { backgroundColor: theme.card },
+                    { color: theme.text },
                   ]}
                 >
                   <Ionicons
@@ -935,6 +937,7 @@ const Members = () => {
                       styles.input,
                       styles.textArea,
                       Platform.OS === "web" && styles.webInput,
+                      { color: theme.text },
                     ]}
                     value={formData.address}
                     onChangeText={(text) =>
@@ -944,7 +947,7 @@ const Members = () => {
                     placeholderTextColor="#999"
                     multiline
                     numberOfLines={3}
-                    color={Platform.OS === "web" ? undefined : theme.text}
+                    // color={Platform.OS === "web" ? undefined : theme.text}
                   />
                 </View>
               </View>
@@ -964,6 +967,7 @@ const Members = () => {
                     style={[
                       styles.input,
                       Platform.OS === "web" && styles.webInput,
+                      { color: theme.text },
                     ]}
                     value={formData.phone}
                     onChangeText={(text) =>
@@ -972,7 +976,7 @@ const Members = () => {
                     placeholder="Enter phone number"
                     placeholderTextColor="#999"
                     keyboardType="phone-pad"
-                    color={Platform.OS === "web" ? undefined : theme.text}
+                    // color={Platform.OS === "web" ? undefined : theme.text}
                   />
                 </View>
               </View>
@@ -993,6 +997,7 @@ const Members = () => {
                     style={[
                       styles.input,
                       Platform.OS === "web" && styles.webInput,
+                      { color: theme.text },
                     ]}
                     value={formData.birthDate}
                     onChangeText={(text) =>
@@ -1001,7 +1006,7 @@ const Members = () => {
                     placeholder="YYYY-MM-DD"
                     placeholderTextColor="#999"
                     keyboardType="numbers-and-punctuation"
-                    color={Platform.OS === "web" ? undefined : theme.text}
+                    // color={Platform.OS === "web" ? undefined : theme.text}
                   />
                 </View>
                 <ThemedText style={styles.dateHint}>
@@ -1030,6 +1035,7 @@ const Members = () => {
                     style={[
                       styles.input,
                       Platform.OS === "web" && styles.webInput,
+                      { color: theme.text },
                     ]}
                     value={formData.dateJoined}
                     onChangeText={(text) =>
@@ -1038,7 +1044,7 @@ const Members = () => {
                     placeholder="YYYY-MM-DD"
                     placeholderTextColor="#999"
                     keyboardType="numbers-and-punctuation"
-                    color={Platform.OS === "web" ? undefined : theme.text}
+                    // color={Platform.OS === "web" ? undefined : theme.text}
                   />
                 </View>
                 <ThemedText style={styles.dateHint}>
@@ -1088,12 +1094,16 @@ const Members = () => {
       <View style={[styles.searchContainer, { backgroundColor: theme.card }]}>
         <Ionicons name="search" size={20} color={Colors.blueAccent} />
         <TextInput
-          style={[styles.searchInput, Platform.OS === "web" && styles.webInput]}
+          style={[
+            styles.searchInput,
+            Platform.OS === "web" && styles.webInput,
+            { color: theme.text },
+          ]}
           placeholder="Search members..."
           placeholderTextColor={theme.text + "80"}
           value={searchQuery}
           onChangeText={setSearchQuery}
-          color={Platform.OS === "web" ? undefined : theme.text}
+          // color={Platform.OS === "web" ? undefined : theme.text}
         />
         {searchQuery !== "" && (
           <TouchableOpacity onPress={() => setSearchQuery("")}>
