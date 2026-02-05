@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   ScrollView,
   TextInput,
-  Alert,
   ActivityIndicator,
   Dimensions,
   Platform,
@@ -15,6 +14,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import ThemedView from "../components/ThemedView";
 import ThemedText from "../components/ThemedText";
 import FooterNav from "../components/FooterNav";
+import { CustomAlert } from "../components/CustomAlert";
 import { Colors } from "../constants/Colors";
 import { ThemeContext } from "../context/ThemeContext";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
@@ -105,6 +105,14 @@ const AddProgram = () => {
   const { scheme } = useContext(ThemeContext);
   const theme = Colors[scheme] ?? Colors.light;
 
+  // Alert state
+  const [alertConfig, setAlertConfig] = useState({
+    visible: false,
+    type: "success",
+    title: "",
+    message: "",
+  });
+
   // Form state
   const [formData, setFormData] = useState({
     title: "",
@@ -115,22 +123,42 @@ const AddProgram = () => {
     organizer: "",
   });
 
+  const showAlert = (type, title, message) => {
+    setAlertConfig({
+      visible: true,
+      type,
+      title,
+      message,
+    });
+  };
+
+  const hideAlert = () => {
+    setAlertConfig({
+      ...alertConfig,
+      visible: false,
+    });
+  };
+
   const handleAddProgram = async () => {
     // Basic validation
     if (!formData.title.trim()) {
-      Alert.alert("Error", "Please enter program title");
+      showAlert("failed", "Validation Error", "Please enter program title");
       return;
     }
 
     if (!formData.date.trim()) {
-      Alert.alert("Error", "Please enter program date");
+      showAlert("failed", "Validation Error", "Please enter program date");
       return;
     }
 
     // Validate date format (YYYY-MM-DD)
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!dateRegex.test(formData.date)) {
-      Alert.alert("Error", "Please enter date in YYYY-MM-DD format");
+      showAlert(
+        "failed",
+        "Invalid Date Format",
+        "Please enter date in YYYY-MM-DD format"
+      );
       return;
     }
 
@@ -154,14 +182,19 @@ const AddProgram = () => {
         organizer: "",
       });
 
-      Alert.alert("Success", "Program added successfully!", [
-        { text: "OK", onPress: () => router.back() },
-      ]);
+      showAlert("success", "Success!", "Program has been added successfully");
     } catch (error) {
       console.error("Error adding program:", error);
-      Alert.alert("Error", "Failed to add program");
+      showAlert("failed", "Error", "Failed to add program. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAlertConfirm = () => {
+    hideAlert();
+    if (alertConfig.type === "success") {
+      router.back();
     }
   };
 
@@ -321,6 +354,17 @@ const AddProgram = () => {
       </ScrollView>
 
       <FooterNav />
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alertConfig.visible}
+        type={alertConfig.type}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        autoClose={true}
+        onConfirm={handleAlertConfirm}
+        onCancel={hideAlert}
+      />
     </ThemedView>
   );
 };

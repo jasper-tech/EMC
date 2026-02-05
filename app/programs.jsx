@@ -1,18 +1,22 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useEffect } from "react";
 import {
   StyleSheet,
   View,
   TouchableOpacity,
   Dimensions,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
+import { doc, getDoc } from "firebase/firestore";
+import { db, auth } from "../firebase";
 import ThemedView from "../components/ThemedView";
 import ThemedText from "../components/ThemedText";
 import FooterNav from "../components/FooterNav";
 import { Colors } from "../constants/Colors";
 import { ThemeContext } from "../context/ThemeContext";
+import { checkPermission } from "../Utils/permissionsHelper";
 
 const { width } = Dimensions.get("window");
 const isWeb = Platform.OS === "web";
@@ -21,6 +25,48 @@ const Programs = () => {
   const router = useRouter();
   const { scheme } = useContext(ThemeContext);
   const theme = Colors[scheme] ?? Colors.light;
+
+  const [canAddProgram, setCanAddProgram] = useState(false);
+  const [userRole, setUserRole] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Check user permissions on mount
+  useEffect(() => {
+    const checkUserPermissions = async () => {
+      try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          setLoading(false);
+          return;
+        }
+
+        // Get user document to retrieve role
+        const userRef = doc(db, "users", currentUser.uid);
+        const userDoc = await getDoc(userRef);
+
+        if (!userDoc.exists()) {
+          setLoading(false);
+          return;
+        }
+
+        const userData = userDoc.data();
+        const role = userData.role || "member";
+        setUserRole(role);
+
+        // Check if user is admin or has permission to add events
+        const isAdmin = role?.toLowerCase() === "admin";
+        const hasPermission = await checkPermission(role, "addEvents");
+
+        setCanAddProgram(isAdmin || hasPermission);
+      } catch (error) {
+        console.error("Error checking user permissions:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkUserPermissions();
+  }, []);
 
   const handleBack = () => {
     router.back();
@@ -44,66 +90,70 @@ const Programs = () => {
           </ThemedText>
         </View>
 
-        {/* Program Tabs */}
-        <View style={styles.tabsContainer}>
-          <TouchableOpacity
-            style={[styles.tabCard, { borderColor: theme.border }]}
-            onPress={navigateToAddProgram}
-            activeOpacity={0.7}
-          >
-            <View
-              style={[
-                styles.iconContainer,
-                // { backgroundColor: Colors.greenAccent + "20" },
-              ]}
-            >
-              <MaterialIcons
-                name="add-circle"
-                size={48}
-                color={Colors.greenAccent}
-              />
-            </View>
-            <ThemedText style={styles.tabTitle}>Add Program</ThemedText>
-            <ThemedText style={styles.tabDescription}>
-              Create and schedule new programs
+        {/* Loading State */}
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Colors.blueAccent} />
+            <ThemedText style={styles.loadingText}>
+              Loading permissions...
             </ThemedText>
-            <MaterialIcons
-              name="arrow-forward"
-              size={24}
-              color={theme.text}
-              style={{ opacity: 0.5, marginTop: 8 }}
-            />
-          </TouchableOpacity>
+          </View>
+        ) : (
+          /* Program Tabs */
+          <View style={styles.tabsContainer}>
+            {/* Add Program Tab - Only visible with permission */}
+            {canAddProgram && (
+              <TouchableOpacity
+                style={[styles.tabCard, { borderColor: theme.border }]}
+                onPress={navigateToAddProgram}
+                activeOpacity={0.7}
+              >
+                <View style={styles.iconContainer}>
+                  <MaterialIcons
+                    name="add-circle"
+                    size={48}
+                    color={Colors.greenAccent}
+                  />
+                </View>
+                <ThemedText style={styles.tabTitle}>Add Program</ThemedText>
+                <ThemedText style={styles.tabDescription}>
+                  Create and schedule new programs
+                </ThemedText>
+                <MaterialIcons
+                  name="arrow-forward"
+                  size={24}
+                  color={theme.text}
+                  style={{ opacity: 0.5, marginTop: 8 }}
+                />
+              </TouchableOpacity>
+            )}
 
-          <TouchableOpacity
-            style={[styles.tabCard, { borderColor: theme.border }]}
-            onPress={navigateToViewPrograms}
-            activeOpacity={0.7}
-          >
-            <View
-              style={[
-                styles.iconContainer,
-                // { backgroundColor: Colors.blueAccent + "20" },
-              ]}
+            {/* View Programs Tab - Always visible */}
+            <TouchableOpacity
+              style={[styles.tabCard, { borderColor: theme.border }]}
+              onPress={navigateToViewPrograms}
+              activeOpacity={0.7}
             >
+              <View style={styles.iconContainer}>
+                <MaterialIcons
+                  name="list-alt"
+                  size={48}
+                  color={Colors.blueAccent}
+                />
+              </View>
+              <ThemedText style={styles.tabTitle}>View Programs</ThemedText>
+              <ThemedText style={styles.tabDescription}>
+                See all scheduled programs
+              </ThemedText>
               <MaterialIcons
-                name="list-alt"
-                size={48}
-                color={Colors.blueAccent}
+                name="arrow-forward"
+                size={24}
+                color={theme.text}
+                style={{ opacity: 0.5, marginTop: 8 }}
               />
-            </View>
-            <ThemedText style={styles.tabTitle}>View Programs</ThemedText>
-            <ThemedText style={styles.tabDescription}>
-              See all scheduled programs
-            </ThemedText>
-            <MaterialIcons
-              name="arrow-forward"
-              size={24}
-              color={theme.text}
-              style={{ opacity: 0.5, marginTop: 8 }}
-            />
-          </TouchableOpacity>
-        </View>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
       <FooterNav />
     </ThemedView>
@@ -145,6 +195,16 @@ const styles = StyleSheet.create({
     opacity: 0.7,
     textAlign: "center",
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 14,
+    opacity: 0.6,
+  },
   tabsContainer: {
     gap: 20,
   },
@@ -177,5 +237,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     opacity: 0.6,
     textAlign: "center",
+  },
+  infoCard: {
+    backgroundColor: Colors.blueAccent + "10",
+    borderRadius: 12,
+    padding: 20,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.blueAccent + "30",
+  },
+  infoText: {
+    fontSize: 14,
+    opacity: 0.8,
+    textAlign: "center",
+    lineHeight: 20,
   },
 });

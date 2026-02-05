@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
   Dimensions,
   Platform,
-  Alert,
   TextInput,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -15,6 +14,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import ThemedView from "../components/ThemedView";
 import ThemedText from "../components/ThemedText";
 import FooterNav from "../components/FooterNav";
+import { CustomAlert } from "../components/CustomAlert";
 import { Colors } from "../constants/Colors";
 import { ThemeContext } from "../context/ThemeContext";
 import {
@@ -24,8 +24,10 @@ import {
   deleteDoc,
   doc,
   updateDoc,
+  getDoc,
 } from "firebase/firestore";
-import { db } from "../firebase";
+import { db, auth } from "../firebase";
+import { checkPermission } from "../Utils/permissionsHelper";
 
 const { width } = Dimensions.get("window");
 const isWeb = Platform.OS === "web";
@@ -121,6 +123,79 @@ const ViewPrograms = () => {
   const [editFormData, setEditFormData] = useState({});
   const [savingEdit, setSavingEdit] = useState(false);
 
+  // Permission states
+  const [canManagePrograms, setCanManagePrograms] = useState(false);
+  const [userRole, setUserRole] = useState(null);
+  const [loadingPermissions, setLoadingPermissions] = useState(true);
+
+  // Alert state
+  const [alertConfig, setAlertConfig] = useState({
+    visible: false,
+    type: "success",
+    title: "",
+    message: "",
+  });
+
+  const [deleteConfirmation, setDeleteConfirmation] = useState({
+    visible: false,
+    programId: null,
+    programTitle: "",
+  });
+
+  // Check user permissions on mount
+  useEffect(() => {
+    const checkUserPermissions = async () => {
+      try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          setLoadingPermissions(false);
+          return;
+        }
+
+        // Get user document to retrieve role
+        const userRef = doc(db, "users", currentUser.uid);
+        const userDoc = await getDoc(userRef);
+
+        if (!userDoc.exists()) {
+          setLoadingPermissions(false);
+          return;
+        }
+
+        const userData = userDoc.data();
+        const role = userData.role || "member";
+        setUserRole(role);
+
+        // Check if user is admin or has permission to add events
+        const isAdmin = role?.toLowerCase() === "admin";
+        const hasPermission = await checkPermission(role, "addEvents");
+
+        setCanManagePrograms(isAdmin || hasPermission);
+      } catch (error) {
+        console.error("Error checking user permissions:", error);
+      } finally {
+        setLoadingPermissions(false);
+      }
+    };
+
+    checkUserPermissions();
+  }, []);
+
+  const showAlert = (type, title, message) => {
+    setAlertConfig({
+      visible: true,
+      type,
+      title,
+      message,
+    });
+  };
+
+  const hideAlert = () => {
+    setAlertConfig({
+      ...alertConfig,
+      visible: false,
+    });
+  };
+
   useEffect(() => {
     const programsRef = collection(db, "programs");
     const q = query(programsRef);
@@ -185,6 +260,15 @@ const ViewPrograms = () => {
   };
 
   const handleEditClick = (program) => {
+    if (!canManagePrograms) {
+      showAlert(
+        "failed",
+        "Access Denied",
+        "You don't have permission to edit programs. Please contact an administrator."
+      );
+      return;
+    }
+
     setEditingProgramId(program.id);
     setEditFormData({
       title: program.title || "",
@@ -200,18 +284,22 @@ const ViewPrograms = () => {
   const handleSaveEdit = async (programId) => {
     // Validation
     if (!editFormData.title.trim()) {
-      Alert.alert("Error", "Please enter program title");
+      showAlert("failed", "Validation Error", "Please enter program title");
       return;
     }
 
     if (!editFormData.date.trim()) {
-      Alert.alert("Error", "Please enter program date");
+      showAlert("failed", "Validation Error", "Please enter program date");
       return;
     }
 
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!dateRegex.test(editFormData.date)) {
-      Alert.alert("Error", "Please enter date in YYYY-MM-DD format");
+      showAlert(
+        "failed",
+        "Invalid Date Format",
+        "Please enter date in YYYY-MM-DD format"
+      );
       return;
     }
 
@@ -233,10 +321,14 @@ const ViewPrograms = () => {
 
       setEditingProgramId(null);
       setEditFormData({});
-      Alert.alert("Success", "Program updated successfully!");
+      showAlert("success", "Success!", "Program has been updated successfully");
     } catch (error) {
       console.error("Error updating program:", error);
-      Alert.alert("Error", "Failed to update program. Please try again.");
+      showAlert(
+        "failed",
+        "Error",
+        "Failed to update program. Please try again."
+      );
     } finally {
       setSavingEdit(false);
     }
@@ -247,37 +339,56 @@ const ViewPrograms = () => {
     setEditFormData({});
   };
 
-  const handleDelete = async (programId, programTitle) => {
-    Alert.alert(
-      "Delete Program",
-      `Are you sure you want to delete "${programTitle}"?`,
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteDoc(doc(db, "programs", programId));
-              // Remove from local state
-              setPrograms(
-                programs.filter((program) => program.id !== programId)
-              );
-              Alert.alert("Success", "Program deleted successfully!");
-            } catch (error) {
-              console.error("Error deleting program:", error);
-              Alert.alert(
-                "Error",
-                "Failed to delete program. Please try again."
-              );
-            }
-          },
-        },
-      ]
-    );
+  const handleDeleteRequest = (programId, programTitle) => {
+    if (!canManagePrograms) {
+      showAlert(
+        "failed",
+        "Access Denied",
+        "You don't have permission to delete programs. Please contact an administrator."
+      );
+      return;
+    }
+
+    setDeleteConfirmation({
+      visible: true,
+      programId,
+      programTitle,
+    });
+    setShowActionsFor(null); // Close actions menu
+  };
+
+  const handleDeleteConfirm = async () => {
+    try {
+      const { programId } = deleteConfirmation;
+      await deleteDoc(doc(db, "programs", programId));
+
+      // Remove from local state
+      setPrograms(programs.filter((program) => program.id !== programId));
+
+      // Hide confirmation dialog
+      setDeleteConfirmation({
+        visible: false,
+        programId: null,
+        programTitle: "",
+      });
+
+      showAlert("success", "Success!", "Program deleted successfully");
+    } catch (error) {
+      console.error("Error deleting program:", error);
+      showAlert(
+        "failed",
+        "Error",
+        "Failed to delete program. Please try again."
+      );
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteConfirmation({
+      visible: false,
+      programId: null,
+      programTitle: "",
+    });
   };
 
   const toggleActions = (programId) => {
@@ -331,7 +442,7 @@ const ViewPrograms = () => {
           </View>
 
           {/* Programs List */}
-          {loadingPrograms ? (
+          {loadingPrograms || loadingPermissions ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={theme.text} />
               <ThemedText style={styles.loadingText}>
@@ -361,15 +472,17 @@ const ViewPrograms = () => {
                   </ThemedText>
                 </TouchableOpacity>
               ) : (
-                <TouchableOpacity
-                  style={styles.addButton}
-                  onPress={() => router.push("/addprogram")}
-                >
-                  <MaterialIcons name="add" size={20} color="#fff" />
-                  <ThemedText style={styles.addButtonText}>
-                    Add First Program
-                  </ThemedText>
-                </TouchableOpacity>
+                canManagePrograms && (
+                  <TouchableOpacity
+                    style={styles.addButton}
+                    onPress={() => router.push("/addprogram")}
+                  >
+                    <MaterialIcons name="add" size={20} color="#fff" />
+                    <ThemedText style={styles.addButtonText}>
+                      Add First Program
+                    </ThemedText>
+                  </TouchableOpacity>
+                )
               )}
             </View>
           ) : (
@@ -551,29 +664,31 @@ const ViewPrograms = () => {
                             </ThemedText>
                           )}
 
-                          {/* Actions Button (Three Dots) */}
-                          <TouchableOpacity
-                            style={styles.actionsButton}
-                            onPress={() => toggleActions(program.id)}
-                            hitSlop={{
-                              top: 10,
-                              bottom: 10,
-                              left: 10,
-                              right: 10,
-                            }}
-                          >
-                            <MaterialIcons
-                              name="more-vert"
-                              size={24}
-                              color={theme.text}
-                              style={{ opacity: 0.6 }}
-                            />
-                          </TouchableOpacity>
+                          {/* Actions Button (Three Dots) - Only show with permission */}
+                          {canManagePrograms && (
+                            <TouchableOpacity
+                              style={styles.actionsButton}
+                              onPress={() => toggleActions(program.id)}
+                              hitSlop={{
+                                top: 10,
+                                bottom: 10,
+                                left: 10,
+                                right: 10,
+                              }}
+                            >
+                              <MaterialIcons
+                                name="more-vert"
+                                size={24}
+                                color={theme.text}
+                                style={{ opacity: 0.6 }}
+                              />
+                            </TouchableOpacity>
+                          )}
                         </View>
                       </View>
 
                       {/* Actions Menu (Edit/Delete) */}
-                      {showActionsFor === program.id && (
+                      {showActionsFor === program.id && canManagePrograms && (
                         <View
                           style={[
                             styles.actionsMenu,
@@ -604,7 +719,7 @@ const ViewPrograms = () => {
                           <TouchableOpacity
                             style={styles.actionButton}
                             onPress={() =>
-                              handleDelete(program.id, program.title)
+                              handleDeleteRequest(program.id, program.title)
                             }
                           >
                             <MaterialIcons
@@ -673,6 +788,31 @@ const ViewPrograms = () => {
       </ScrollView>
 
       <FooterNav />
+
+      {/* Custom Alert for success/error messages */}
+      <CustomAlert
+        visible={alertConfig.visible}
+        type={alertConfig.type}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        autoClose={true}
+        onConfirm={hideAlert}
+        onCancel={hideAlert}
+      />
+
+      {/* Delete Confirmation Alert */}
+      <CustomAlert
+        visible={deleteConfirmation.visible}
+        type="danger"
+        title="Delete Program"
+        message={`Are you sure you want to delete "${deleteConfirmation.programTitle}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        autoClose={false}
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+        dismissOnBackdrop={false}
+      />
     </ThemedView>
   );
 };
