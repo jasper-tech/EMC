@@ -184,8 +184,11 @@ const Members = () => {
           ...doc.data(),
         }));
 
-        // Sort members: executives first, then regular members
-        const sortedMembers = membersList.sort((a, b) => {
+        const nonAdminMembers = membersList.filter(
+          (member) => member.role?.toLowerCase() !== "admin"
+        );
+
+        const sortedMembers = nonAdminMembers.sort((a, b) => {
           if (a.isExecutive && !b.isExecutive) return -1;
           if (!a.isExecutive && b.isExecutive) return 1;
           return 0;

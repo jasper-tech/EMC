@@ -26,6 +26,7 @@ import {
   orderBy,
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
+import CustomAlert from "../components/CustomAlert";
 
 const CollectPayments = () => {
   const { scheme } = useContext(ThemeContext);
@@ -33,7 +34,8 @@ const CollectPayments = () => {
 
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(currentYear);
   const [selectedMonth, setSelectedMonth] = useState(null);
   const [unpaidMembers, setUnpaidMembers] = useState([]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -47,12 +49,17 @@ const CollectPayments = () => {
     regularAmount: "",
     executiveAmount: "",
   });
+  const [showAllYears, setShowAllYears] = useState(false);
+  const [nonAdminMembers, setNonAdminMembers] = useState([]);
+
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertType, setAlertType] = useState("info");
+  const [alertTitle, setAlertTitle] = useState("");
+  const [alertMessage, setAlertMessage] = useState("");
+  const [alertAutoClose, setAlertAutoClose] = useState(true);
 
   // Generate years from 2022 to current year
-  const years = Array.from(
-    { length: new Date().getFullYear() - 2021 },
-    (_, i) => 2022 + i
-  );
+  const years = Array.from({ length: currentYear - 2021 }, (_, i) => 2022 + i);
 
   const months = [
     { name: "January", value: 1 },
@@ -91,7 +98,17 @@ const CollectPayments = () => {
           id: doc.id,
           ...doc.data(),
         }));
+
+        const adminMembers = membersList.filter(
+          (member) => member.role?.toLowerCase() === "admin"
+        );
+
+        const nonAdminMembers = membersList.filter(
+          (member) => member.role?.toLowerCase() !== "admin"
+        );
+
         setMembers(membersList);
+        setNonAdminMembers(nonAdminMembers);
         setLoading(false);
       });
 
@@ -156,7 +173,6 @@ const CollectPayments = () => {
   const loadUnpaidMembers = () => {
     if (!selectedMonth) return;
 
-    // Get all paid member IDs for selected month and year
     const paidMemberIds = transactions
       .filter(
         (transaction) =>
@@ -166,18 +182,16 @@ const CollectPayments = () => {
       )
       .map((transaction) => transaction.memberId);
 
-    // Filter members who haven't paid
-    const unpaid = members.filter(
+    // Filter non-admin members who haven't paid
+    const unpaid = nonAdminMembers.filter(
       (member) => !paidMemberIds.includes(member.id)
     );
 
     // Sort: executives first, then by name
     const sortedUnpaid = unpaid.sort((a, b) => {
-      // Executives come first
       if (a.isExecutive && !b.isExecutive) return -1;
       if (!a.isExecutive && b.isExecutive) return 1;
 
-      // If same type (both executives or both regular), sort alphabetically by name
       return a.fullname.localeCompare(b.fullname);
     });
 
@@ -187,9 +201,11 @@ const CollectPayments = () => {
   const openPaymentModal = (member) => {
     const allocation = getDuesAllocationForYear(selectedYear);
     if (!allocation) {
-      Alert.alert(
+      showAlert(
         "Dues Not Allocated",
-        `Dues have not been allocated for ${selectedYear}. Please allocate dues first.`
+        `Dues have not been allocated for ${selectedYear}. Please allocate dues first.`,
+        "info",
+        false
       );
       return;
     }
@@ -200,13 +216,18 @@ const CollectPayments = () => {
 
   const processPayment = async () => {
     if (!selectedMember || !selectedMonth) {
-      Alert.alert("Error", "Missing required information");
+      showAlert("Error", "Missing required information", "danger", false);
       return;
     }
 
     const allocation = getDuesAllocationForYear(selectedYear);
     if (!allocation) {
-      Alert.alert("Error", "Dues allocation not found for this year");
+      showAlert(
+        "Error",
+        "Dues allocation not found for this year",
+        "danger",
+        false
+      );
       return;
     }
 
@@ -258,18 +279,23 @@ const CollectPayments = () => {
         readBy: [],
       });
 
-      Alert.alert(
-        "Success",
+      showAlert(
+        "Payment Successful",
         `Payment of GH₵${amount.toFixed(2)} recorded for ${
           selectedMember.fullname
-        }`
+        }`,
+        "success"
       );
 
       setShowPaymentModal(false);
       setSelectedMember(null);
     } catch (error) {
       console.error("Error processing payment:", error);
-      Alert.alert("Error", "Failed to process payment. Please try again.");
+      showAlert(
+        "Payment Failed",
+        "Failed to process payment. Please try again.",
+        "failed"
+      );
     } finally {
       setProcessingPayment(false);
     }
@@ -290,7 +316,7 @@ const CollectPayments = () => {
       regularAmount <= 0 ||
       executiveAmount <= 0
     ) {
-      Alert.alert("Error", "Please enter valid amounts");
+      showAlert("Error", "Please enter valid amounts", "danger", false);
       return;
     }
 
@@ -331,12 +357,20 @@ const CollectPayments = () => {
         readBy: [],
       });
 
-      Alert.alert("Success", `Dues allocated successfully for ${selectedYear}`);
+      showAlert(
+        "Success",
+        `Dues allocated successfully for ${selectedYear}`,
+        "success"
+      );
       setShowAllocationModal(false);
       setAllocationData({ regularAmount: "", executiveAmount: "" });
     } catch (error) {
       console.error("Error allocating dues:", error);
-      Alert.alert("Error", "Failed to allocate dues. Please try again.");
+      showAlert(
+        "Error",
+        "Failed to allocate dues. Please try again.",
+        "failed"
+      );
     } finally {
       setAllocatingDues(false);
     }
@@ -350,13 +384,13 @@ const CollectPayments = () => {
         transaction.year === selectedYear
     ).length;
 
-    const totalMembers = members.length;
+    const totalNonAdminMembers = nonAdminMembers.length;
     const paidPercentage =
-      totalMembers > 0 ? (paidCount / totalMembers) * 100 : 0;
+      totalNonAdminMembers > 0 ? (paidCount / totalNonAdminMembers) * 100 : 0;
 
     return {
       paidCount,
-      totalMembers,
+      totalMembers: totalNonAdminMembers,
       paidPercentage,
     };
   };
@@ -367,18 +401,17 @@ const CollectPayments = () => {
     return (
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          {/* <ThemedText style={styles.sectionTitle}>
+          <ThemedText style={styles.sectionTitle}>
             Allocate dues for the year
           </ThemedText>
           <TouchableOpacity
             style={styles.allocateButton}
             onPress={() => setShowAllocationModal(true)}
           >
-            <MaterialIcons name="currency-cedi" size={18} color="#fff" />
             <ThemedText style={styles.allocateButtonText}>
               {allocation ? "Update Dues" : "Allocate Dues"}
             </ThemedText>
-          </TouchableOpacity> */}
+          </TouchableOpacity>
         </View>
 
         {allocation && (
@@ -402,40 +435,82 @@ const CollectPayments = () => {
           </View>
         )}
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.yearScrollView}
-        >
-          <View style={styles.yearContainer}>
-            {years.map((year) => (
-              <TouchableOpacity
-                key={year}
-                style={[
-                  styles.yearButton,
-                  selectedYear === year && {
-                    backgroundColor: Colors.blueAccent,
-                  },
-                ]}
-                onPress={() => {
-                  setSelectedYear(year);
-                  setSelectedMonth(null);
-                }}
-              >
-                <ThemedText
-                  style={[
-                    styles.yearButtonText,
-                    selectedYear === year && styles.yearButtonTextSelected,
-                  ]}
-                >
-                  {year}
-                </ThemedText>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </ScrollView>
+        <View style={styles.yearHeader}>
+          <ThemedText style={styles.yearTitle}>Selected Year:</ThemedText>
+
+          {/* View Past Years button in top left */}
+          <TouchableOpacity
+            style={styles.pastYearsButton}
+            onPress={() => setShowAllYears(!showAllYears)}
+          >
+            <MaterialIcons name="history" size={18} color={Colors.blueAccent} />
+            <ThemedText style={styles.pastYearsText}>
+              {showAllYears ? "Hide" : "View Past Years"}
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
+
+        {/* Show only current year by default */}
+        <View style={styles.currentYearContainer}>
+          <TouchableOpacity
+            style={[
+              styles.currentYearButton,
+              { backgroundColor: Colors.blueAccent },
+            ]}
+          >
+            <ThemedText style={styles.currentYearText}>
+              {currentYear}
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
+
+        {/* Show past years only when toggled */}
+        {showAllYears && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.pastYearsScrollView}
+          >
+            <View style={styles.pastYearsContainer}>
+              {years
+                .filter((year) => year < currentYear) // Only show past years
+                .map((year) => (
+                  <TouchableOpacity
+                    key={year}
+                    style={[
+                      styles.pastYearButton,
+                      selectedYear === year && {
+                        backgroundColor: Colors.blueAccent + "40",
+                      },
+                    ]}
+                    onPress={() => {
+                      setSelectedYear(year);
+                      setSelectedMonth(null);
+                    }}
+                  >
+                    <ThemedText
+                      style={[
+                        styles.pastYearText,
+                        selectedYear === year && styles.pastYearTextSelected,
+                      ]}
+                    >
+                      {year}
+                    </ThemedText>
+                  </TouchableOpacity>
+                ))}
+            </View>
+          </ScrollView>
+        )}
       </View>
     );
+  };
+
+  const showAlert = (title, message, type = "info", autoClose = true) => {
+    setAlertType(type);
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertAutoClose(autoClose);
+    setAlertVisible(true);
   };
 
   const renderMonthGrid = () => {
@@ -463,7 +538,6 @@ const CollectPayments = () => {
               style={styles.allocateCtaButton}
               onPress={() => setShowAllocationModal(true)}
             >
-              {/* <MaterialIcons name="attach-money" size={18} color="#fff" /> */}
               <ThemedText style={styles.allocateCtaButtonText}>
                 Allocate Dues for {selectedYear}
               </ThemedText>
@@ -573,7 +647,7 @@ const CollectPayments = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Title and count in separate row for better layout */}
+        {/* Title and count  */}
         <View style={styles.titleRow}>
           <ThemedText style={styles.sectionTitle}>
             Unpaid Members - {selectedMonth.name} {selectedYear}
@@ -766,7 +840,7 @@ const CollectPayments = () => {
                 <ActivityIndicator color="#fff" />
               ) : (
                 <>
-                  {/* <MaterialIcons name="currency-cedi" size={20} color="#fff" /> */}
+                  <MaterialIcons name="currency-cedi" size={20} color="#fff" />
                   <ThemedText style={styles.confirmButtonText}>
                     Allocate Dues
                   </ThemedText>
@@ -895,6 +969,14 @@ const CollectPayments = () => {
       </ScrollView>
       {renderAllocationModal()}
       {renderPaymentModal()}
+      <CustomAlert
+        visible={alertVisible}
+        type={alertType}
+        title={alertTitle}
+        message={alertMessage}
+        autoClose={alertAutoClose}
+        onConfirm={() => setAlertVisible(false)}
+      />
     </ThemedView>
   );
 };
@@ -943,33 +1025,77 @@ const styles = StyleSheet.create({
   unpaidCount: {
     fontSize: 14,
     fontWeight: "600",
-
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
   },
-  yearScrollView: {
-    marginHorizontal: -16,
-  },
-  yearContainer: {
+  yearHeader: {
     flexDirection: "row",
-    paddingHorizontal: 16,
-    gap: 8,
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
   },
-  yearButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
+  yearTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    opacity: 0.8,
+  },
+  pastYearsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
     backgroundColor: Colors.uiBackground,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  yearButtonText: {
+  pastYearsText: {
     fontSize: 14,
-    fontWeight: "600",
+    color: Colors.blueAccent,
+    fontWeight: "500",
   },
-  yearButtonTextSelected: {
+  currentYearContainer: {
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  currentYearButton: {
+    paddingHorizontal: 40,
+    paddingVertical: 12,
+    borderRadius: 25,
+    minWidth: 120,
+    alignItems: "center",
+  },
+  currentYearText: {
     color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  pastYearsScrollView: {
+    marginHorizontal: -16,
+  },
+  pastYearsContainer: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    gap: 8,
+    marginTop: 8,
+  },
+  pastYearButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: Colors.uiBackground,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  pastYearText: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  pastYearTextSelected: {
+    color: Colors.blueAccent,
+    fontWeight: "600",
   },
   allocateButton: {
     flexDirection: "row",
@@ -1147,9 +1273,9 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   executiveAvatar: {
-    // backgroundColor: Colors.goldAccent + "20",
-    // borderWidth: 2,
-    // borderColor: Colors.goldAccent,
+    backgroundColor: Colors.goldAccent + "20",
+    borderWidth: 2,
+    borderColor: Colors.goldAccent,
   },
   memberDetails: {
     flex: 1,
@@ -1310,12 +1436,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     flexWrap: "wrap",
   },
-
   membersScrollView: {
     maxHeight: 400,
     flexGrow: 0,
   },
-
   membersScrollContent: {
     paddingBottom: 8,
   },

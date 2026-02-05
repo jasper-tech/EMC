@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Image,
+  Platform,
 } from "react-native";
 import React, { useState, useEffect, useContext } from "react";
 import { MaterialIcons, Ionicons } from "@expo/vector-icons";
@@ -20,20 +21,20 @@ const TrackPayments = () => {
   const theme = Colors[scheme] ?? Colors.light;
 
   const [loading, setLoading] = useState(true);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(currentYear);
   const [members, setMembers] = useState([]);
+  const [nonAdminMembers, setNonAdminMembers] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [duesAllocations, setDuesAllocations] = useState([]);
   const [selectedMember, setSelectedMember] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredMembers, setFilteredMembers] = useState([]);
   const [showSummaryTiles, setShowSummaryTiles] = useState(true);
+  const [showAllYears, setShowAllYears] = useState(false);
 
   // Generate years from 2022 to current year
-  const years = Array.from(
-    { length: new Date().getFullYear() - 2021 },
-    (_, i) => 2022 + i
-  );
+  const years = Array.from({ length: currentYear - 2021 }, (_, i) => 2022 + i);
 
   const months = [
     { name: "January", value: 1 },
@@ -57,10 +58,10 @@ const TrackPayments = () => {
   }, []);
 
   useEffect(() => {
-    let filtered = members;
+    let filtered = nonAdminMembers; // Use nonAdminMembers instead of members
 
     if (searchQuery.trim() !== "") {
-      filtered = members.filter(
+      filtered = nonAdminMembers.filter(
         (member) =>
           member.fullname?.toLowerCase().includes(searchQuery.toLowerCase()) ||
           member.phone?.includes(searchQuery)
@@ -75,7 +76,7 @@ const TrackPayments = () => {
     });
 
     setFilteredMembers(sortedMembers);
-  }, [searchQuery, members]);
+  }, [searchQuery, nonAdminMembers]);
 
   const loadMembers = async () => {
     try {
@@ -87,7 +88,14 @@ const TrackPayments = () => {
           id: doc.id,
           ...doc.data(),
         }));
-        setMembers(membersList);
+
+        // Filter out admin members
+        const nonAdminMembersList = membersList.filter(
+          (member) => member.role?.toLowerCase() !== "admin"
+        );
+
+        setMembers(membersList); // Keep all members for any other calculations
+        setNonAdminMembers(nonAdminMembersList); // Use this for tracking
         setLoading(false);
       });
 
@@ -153,6 +161,20 @@ const TrackPayments = () => {
       };
     }
 
+    // Check if member is admin (shouldn't be in nonAdminMembers)
+    const isAdmin = member.role?.toLowerCase() === "admin";
+    if (isAdmin) {
+      return {
+        expectedAmount: 0,
+        paidAmount: 0,
+        owingAmount: 0,
+        paidMonths: [],
+        paymentRate: 100, // Admin shows as 100% paid
+        monthlyAmount: 0,
+        totalPayments: 0,
+      };
+    }
+
     const monthlyAmount = member.isExecutive
       ? allocation.executiveAmount
       : allocation.regularAmount;
@@ -201,40 +223,77 @@ const TrackPayments = () => {
     return { status: "Behind", color: Colors.redAccent };
   };
 
-  const renderYearSelector = () => (
-    <View style={styles.section}>
-      <ThemedText style={styles.sectionTitle}>Select Year</ThemedText>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.yearScrollView}
-      >
-        <View style={styles.yearContainer}>
-          {years.map((year) => (
-            <TouchableOpacity
-              key={year}
-              style={[
-                styles.yearButton,
-                selectedYear === year && {
-                  backgroundColor: Colors.blueAccent,
-                },
-              ]}
-              onPress={() => setSelectedYear(year)}
-            >
-              <ThemedText
-                style={[
-                  styles.yearButtonText,
-                  selectedYear === year && styles.yearButtonTextSelected,
-                ]}
-              >
-                {year}
-              </ThemedText>
-            </TouchableOpacity>
-          ))}
+  const renderYearSelector = () => {
+    const allocation = getDuesAllocationForYear(selectedYear);
+
+    return (
+      <View style={styles.section}>
+        <View style={styles.yearHeader}>
+          <ThemedText style={styles.yearTitle}>Selected Year:</ThemedText>
+
+          {/* View Past Years button */}
+          <TouchableOpacity
+            style={styles.pastYearsButton}
+            onPress={() => setShowAllYears(!showAllYears)}
+          >
+            <MaterialIcons name="history" size={18} color={Colors.blueAccent} />
+            <ThemedText style={styles.pastYearsText}>
+              {showAllYears ? "Hide" : "View Past Years"}
+            </ThemedText>
+          </TouchableOpacity>
         </View>
-      </ScrollView>
-    </View>
-  );
+
+        {/* Show only current year by default */}
+        <View style={styles.currentYearContainer}>
+          <TouchableOpacity
+            style={[
+              styles.currentYearButton,
+              { backgroundColor: Colors.blueAccent },
+            ]}
+          >
+            <ThemedText style={styles.currentYearText}>
+              {currentYear}
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
+
+        {/* Show past years only when toggled */}
+        {showAllYears && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.pastYearsScrollView}
+          >
+            <View style={styles.pastYearsContainer}>
+              {years
+                .filter((year) => year < currentYear) // Only show past years
+                .map((year) => (
+                  <TouchableOpacity
+                    key={year}
+                    style={[
+                      styles.pastYearButton,
+                      selectedYear === year && {
+                        backgroundColor: Colors.blueAccent + "40",
+                      },
+                    ]}
+                    onPress={() => setSelectedYear(year)}
+                  >
+                    <ThemedText
+                      style={[
+                        styles.pastYearText,
+                        selectedYear === year && styles.pastYearTextSelected,
+                      ]}
+                    >
+                      {year}
+                    </ThemedText>
+                  </TouchableOpacity>
+                ))}
+            </View>
+          </ScrollView>
+        )}
+      </View>
+    );
+  };
 
   const renderMemberCard = (member) => {
     const summary = getMemberPaymentSummary(member, selectedYear);
@@ -354,13 +413,13 @@ const TrackPayments = () => {
           <View style={styles.statItem}>
             <ThemedText style={styles.statLabel}>Paid</ThemedText>
             <ThemedText style={styles.statValue}>
-              GH₵{summary.paidAmount}
+              GH₵{summary.paidAmount.toFixed(2)}
             </ThemedText>
           </View>
           <View style={styles.statItem}>
             <ThemedText style={styles.statLabel}>Owing</ThemedText>
             <ThemedText style={[styles.statValue, styles.owingText]}>
-              GH₵{summary.owingAmount}
+              GH₵{summary.owingAmount.toFixed(2)}
             </ThemedText>
           </View>
           <View style={styles.statItem}>
@@ -456,24 +515,34 @@ const TrackPayments = () => {
     const allocation = getDuesAllocationForYear(selectedYear);
     if (!allocation) return null;
 
-    const totalMembers = members.length;
-    const executiveMembers = members.filter((m) => m.isExecutive).length;
+    // Use nonAdminMembers for calculations
+    const totalMembers = nonAdminMembers.length;
+    const executiveMembers = nonAdminMembers.filter(
+      (m) => m.isExecutive
+    ).length;
     const regularMembers = totalMembers - executiveMembers;
 
     const totalExpected =
       executiveMembers * allocation.executiveAmount * 12 +
       regularMembers * allocation.regularAmount * 12;
 
+    // Filter transactions for non-admin members only
+    const nonAdminMemberIds = new Set(nonAdminMembers.map((m) => m.id));
     const totalPaid = transactions
-      .filter((t) => t.type === "dues" && t.year === selectedYear)
+      .filter(
+        (t) =>
+          t.type === "dues" &&
+          t.year === selectedYear &&
+          nonAdminMemberIds.has(t.memberId)
+      )
       .reduce((sum, t) => sum + t.amount, 0);
 
     const totalOwing = Math.max(0, totalExpected - totalPaid);
     const overallRate =
       totalExpected > 0 ? (totalPaid / totalExpected) * 100 : 0;
 
-    // Calculate members owing (members who haven't paid all 12 months)
-    const membersOwing = members.filter((member) => {
+    // Calculate members owing (non-admin members who haven't paid all 12 months)
+    const membersOwing = nonAdminMembers.filter((member) => {
       const memberPayments = transactions.filter(
         (t) =>
           t.type === "dues" &&
@@ -482,6 +551,9 @@ const TrackPayments = () => {
       );
       return memberPayments.length < 12;
     }).length;
+
+    // For responsive web layout
+    const isWeb = Platform.OS === "web";
 
     return (
       <View style={styles.summarySection}>
@@ -503,71 +575,70 @@ const TrackPayments = () => {
 
         {/* Expected Amount Banner (always visible) */}
         <View style={styles.expectedAmountBanner}>
-          <MaterialIcons name="account-balance" size={20} color={theme.text} />
+          {/* <MaterialIcons name="account-balance" size={20} color={theme.text} /> */}
           <View style={styles.expectedAmountInfo}>
             <ThemedText style={styles.expectedAmountLabel}>
               Expected Dues for {selectedYear}
             </ThemedText>
             <ThemedText style={styles.expectedAmountValue}>
-              GH₵{totalExpected.toFixed(2)}
+              GH₵
+              {totalExpected.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
             </ThemedText>
             <ThemedText style={styles.amountLeftText}>
               Amount left to reach:
               <ThemedText style={styles.amountLeftValue}>
-                GH₵{totalOwing}
+                GH₵
+                {totalOwing.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
               </ThemedText>
             </ThemedText>
           </View>
         </View>
 
-        {/* Collapsible Tiles */}
+        {/* Responsive summary tiles in a single row */}
         {showSummaryTiles && (
-          <View style={styles.summaryGrid}>
-            <View style={styles.summaryCard}>
-              {/* <MaterialIcons
-                name="people"
-                size={24}
-                color={Colors.blueAccent}
-              /> */}
-              <ThemedText style={styles.summaryValue}>
+          <View style={[styles.summaryRow, isWeb && styles.summaryRowWeb]}>
+            <View style={styles.summaryTile}>
+              <ThemedText style={styles.summaryTileValue}>
                 {totalMembers}
               </ThemedText>
-              <ThemedText style={styles.summaryLabel}>Total Members</ThemedText>
-            </View>
-            <View style={styles.summaryCard}>
-              {/* <MaterialIcons
-                name="payments"
-                size={24}ss
-                color={Colors.greenAccent}
-              /> */}
-              <ThemedText style={styles.summaryValue}>
-                GH₵{totalPaid.toFixed(0)}
+              <ThemedText style={styles.summaryTileLabel}>
+                Total Members
               </ThemedText>
-              <ThemedText style={styles.summaryLabel}>
+            </View>
+
+            <View style={styles.summaryTile}>
+              <ThemedText style={styles.summaryTileValue}>
+                GH₵
+                {totalPaid.toLocaleString(undefined, {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0,
+                })}
+              </ThemedText>
+              <ThemedText style={styles.summaryTileLabel}>
                 Total Collected
               </ThemedText>
             </View>
-            <View style={styles.summaryCard}>
-              {/* <MaterialIcons
-                name="person-remove"
-                size={24}
-                color={Colors.orangeAccent}
-              /> */}
-              <ThemedText style={styles.summaryValue}>
+
+            <View style={styles.summaryTile}>
+              <ThemedText style={styles.summaryTileValue}>
                 {membersOwing}
               </ThemedText>
-              <ThemedText style={styles.summaryLabel}>Members Owing</ThemedText>
+              <ThemedText style={styles.summaryTileLabel}>
+                Members Owing
+              </ThemedText>
             </View>
-            <View style={styles.summaryCard}>
-              <MaterialIcons
-                name="trending-up"
-                size={24}
-                color={Colors.tealAccent}
-              />
-              <ThemedText style={styles.summaryValue}>
+
+            <View style={styles.summaryTile}>
+              <ThemedText style={styles.summaryTileValue}>
                 {overallRate.toFixed(0)}%
               </ThemedText>
-              <ThemedText style={styles.summaryLabel}>
+              <ThemedText style={styles.summaryTileLabel}>
                 Collection Rate
               </ThemedText>
             </View>
@@ -694,6 +765,74 @@ const styles = StyleSheet.create({
   yearButtonTextSelected: {
     color: "#fff",
   },
+  yearHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  yearTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    opacity: 0.8,
+  },
+  pastYearsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: Colors.uiBackground,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  pastYearsText: {
+    fontSize: 14,
+    color: Colors.blueAccent,
+    fontWeight: "500",
+  },
+  currentYearContainer: {
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  currentYearButton: {
+    paddingHorizontal: 40,
+    paddingVertical: 12,
+    borderRadius: 25,
+    minWidth: 120,
+    alignItems: "center",
+  },
+  currentYearText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  pastYearsScrollView: {
+    marginHorizontal: -16,
+  },
+  pastYearsContainer: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    gap: 8,
+    marginTop: 8,
+  },
+  pastYearButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: Colors.uiBackground,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  pastYearText: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  pastYearTextSelected: {
+    color: Colors.blueAccent,
+    fontWeight: "600",
+  },
   summarySection: {
     marginBottom: 24,
   },
@@ -703,13 +842,27 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: "center",
   },
-  summaryGrid: {
+  summaryHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+    paddingVertical: 8,
+  },
+  summaryRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12,
+    marginBottom: 16,
   },
-  summaryCard: {
-    width: "48%",
+  summaryRowWeb: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 16,
+  },
+  summaryTile: {
+    flex: 1,
+    minWidth: 120,
     backgroundColor: Colors.uiBackground,
     padding: 16,
     borderRadius: 12,
@@ -717,12 +870,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  summaryValue: {
+  summaryTileValue: {
     fontSize: 20,
     fontWeight: "bold",
     marginVertical: 8,
   },
-  summaryLabel: {
+  summaryTileLabel: {
     fontSize: 12,
     opacity: 0.7,
     textAlign: "center",
@@ -756,9 +909,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   executiveAvatar: {
-    // backgroundColor: Colors.goldAccent + "20",
     borderWidth: 2,
-    // borderColor: Colors.goldAccent,
   },
   memberDetails: {
     flex: 1,
@@ -777,19 +928,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     opacity: 0.6,
   },
-
   noAllocationMessage: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     padding: 8,
-    // backgroundColor: Colors.orangeAccent + "20",
     borderRadius: 8,
     alignSelf: "flex-start",
   },
   noAllocationText: {
     fontSize: 11,
-    // color: Colors.yellowAccent,
     fontWeight: "200",
   },
   quickStats: {
@@ -811,7 +959,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   owingText: {
-    // color: Colors.orangeAccent,
+    color: Colors.redAccent,
   },
   progressContainer: {
     marginBottom: 8,
@@ -913,9 +1061,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   expectedAmountLabel: {
-    fontSize: 14,
+    fontSize: 20,
     opacity: 0.7,
     marginBottom: 4,
+    fontWeight: "bold",
   },
   expectedAmountValue: {
     fontSize: 20,
@@ -927,9 +1076,9 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   amountLeftValue: {
-    fontSize: 12,
-    color: Colors.redAccent,
-    fontWeight: "500",
+    fontSize: 15,
+    color: Colors.orangeAccent,
+    fontWeight: "bold",
   },
   searchContainer: {
     flexDirection: "row",
@@ -946,18 +1095,9 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
   },
-  summaryHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-    paddingVertical: 8,
-  },
-
   membersScrollView: {
     maxHeight: 500,
   },
-
   membersScrollContent: {
     gap: 12,
     paddingBottom: 8,
