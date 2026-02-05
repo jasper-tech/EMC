@@ -4,8 +4,9 @@ import {
   TouchableOpacity,
   ScrollView,
   Animated,
+  ActivityIndicator,
 } from "react-native";
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,6 +15,10 @@ import ThemedText from "../components/ThemedText";
 import FooterNav from "../components/FooterNav";
 import SidePanel from "../components/SidePanel";
 import { Colors } from "../constants/Colors";
+import { doc, getDoc } from "firebase/firestore";
+import { db, auth } from "../firebase";
+import { getAllPermissions } from "../Utils/permissionsHelper";
+import CustomAlert from "../components/CustomAlert";
 
 const About = () => {
   const insets = useSafeAreaInsets();
@@ -21,7 +26,67 @@ const About = () => {
   const slideAnim = useRef(new Animated.Value(20)).current;
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
 
-  React.useEffect(() => {
+  // Permission states
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [userPermissions, setUserPermissions] = useState({
+    addEditMembers: false,
+    collectPayments: false,
+    addDues: false,
+    addContribution: false,
+    addMisc: false,
+    addBudget: false,
+    makeWithdrawal: false,
+    addEvents: false,
+    addMinutesReports: false,
+  });
+  const [loading, setLoading] = useState(true);
+
+  // Alert states
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertType, setAlertType] = useState("info");
+  const [alertTitle, setAlertTitle] = useState("");
+  const [alertMessage, setAlertMessage] = useState("");
+
+  // Fetch user permissions on mount
+  useEffect(() => {
+    const fetchUserPermissions = async () => {
+      try {
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+          const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            const userRole = userData.role || "member";
+            setIsAdmin(userData.role === "admin" || userData.isAdmin === true);
+
+            // Load permissions for the user
+            const permissions = await getAllPermissions(userRole);
+            setUserPermissions(permissions);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching user permissions:", error);
+        // Set default permissions on error
+        setUserPermissions({
+          addEditMembers: false,
+          collectPayments: false,
+          addDues: false,
+          addContribution: false,
+          addMisc: false,
+          addBudget: false,
+          makeWithdrawal: false,
+          addEvents: false,
+          addMinutesReports: false,
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserPermissions();
+  }, []);
+
+  useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -36,20 +101,41 @@ const About = () => {
     ]).start();
   }, []);
 
-  const paymentTiles = [
+  const showAlert = (title, message, type = "info") => {
+    setAlertType(type);
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
+
+  // Check if user has permission to collect payments
+  const canCollectPayments = () => {
+    return isAdmin || userPermissions.collectPayments;
+  };
+
+  const allPaymentTiles = [
     {
       id: 1,
       title: "Collect Payments",
       route: "/collect-payments",
       color: Colors.greenAccent,
+      requiresPermission: true,
+      permissionKey: "collectPayments",
     },
     {
       id: 2,
       title: "Track Payments",
       route: "/track-payments",
       color: Colors.blueAccent,
+      requiresPermission: false,
     },
   ];
+
+  // Filter payment tiles based on permissions
+  const paymentTiles = allPaymentTiles.filter((tile) => {
+    if (!tile.requiresPermission) return true;
+    return canCollectPayments();
+  });
 
   const navigationItems = [
     {
@@ -82,13 +168,34 @@ const About = () => {
     },
   ];
 
-  const handleTilePress = (route) => {
-    router.push(route);
+  const handleTilePress = (tile) => {
+    // Check permission before navigation
+    if (tile.requiresPermission && !canCollectPayments()) {
+      showAlert(
+        "Permission Denied",
+        "You don't have permission to collect payments. Please contact an administrator.",
+        "danger"
+      );
+      return;
+    }
+    router.push(tile.route);
   };
 
   const handleItemPress = (route) => {
     router.push(route);
   };
+
+  if (loading) {
+    return (
+      <ThemedView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.blueAccent} />
+          <ThemedText style={styles.loadingText}>Loading...</ThemedText>
+        </View>
+        <FooterNav onMenuPress={() => setIsSidePanelOpen(true)} />
+      </ThemedView>
+    );
+  }
 
   return (
     <ThemedView style={styles.container}>
@@ -110,26 +217,45 @@ const About = () => {
             },
           ]}
         >
-          <View style={styles.tilesGrid}>
-            {paymentTiles.map((tile) => (
-              <TouchableOpacity
-                key={tile.id}
-                style={[styles.tile, { backgroundColor: tile.color + "15" }]}
-                onPress={() => handleTilePress(tile.route)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.tileContent}>
-                  <ThemedText style={styles.tileTitle}>{tile.title}</ThemedText>
-                  <Ionicons
-                    name="arrow-forward-circle"
-                    size={32}
-                    color={tile.color}
-                    style={styles.tileIcon}
-                  />
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {paymentTiles.length > 0 ? (
+            <View style={styles.tilesGrid}>
+              {paymentTiles.map((tile) => (
+                <TouchableOpacity
+                  key={tile.id}
+                  style={[styles.tile, { backgroundColor: tile.color + "15" }]}
+                  onPress={() => handleTilePress(tile)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.tileContent}>
+                    <ThemedText style={styles.tileTitle}>
+                      {tile.title}
+                    </ThemedText>
+                    <Ionicons
+                      name="arrow-forward-circle"
+                      size={32}
+                      color={tile.color}
+                      style={styles.tileIcon}
+                    />
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.noPermissionContainer}>
+              <Ionicons
+                name="lock-closed"
+                size={48}
+                color={Colors.gray}
+                style={{ opacity: 0.5 }}
+              />
+              <ThemedText style={styles.noPermissionText}>
+                No payment actions available
+              </ThemedText>
+              <ThemedText style={styles.noPermissionSubtext}>
+                Contact an administrator for access
+              </ThemedText>
+            </View>
+          )}
         </Animated.View>
 
         {/* Navigation List Section */}
@@ -189,6 +315,16 @@ const About = () => {
         isOpen={isSidePanelOpen}
         onClose={() => setIsSidePanelOpen(false)}
       />
+
+      {/* Alert */}
+      <CustomAlert
+        visible={alertVisible}
+        type={alertType}
+        title={alertTitle}
+        message={alertMessage}
+        autoClose={false}
+        onConfirm={() => setAlertVisible(false)}
+      />
     </ThemedView>
   );
 };
@@ -205,6 +341,16 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingBottom: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+    opacity: 0.6,
   },
   tilesContainer: {
     paddingHorizontal: 24,
@@ -237,6 +383,29 @@ const styles = StyleSheet.create({
   },
   tileIcon: {
     alignSelf: "flex-end",
+  },
+  noPermissionContainer: {
+    backgroundColor: Colors.uiBackground,
+    borderRadius: 20,
+    padding: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  noPermissionText: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginTop: 12,
+    opacity: 0.7,
+  },
+  noPermissionSubtext: {
+    fontSize: 13,
+    marginTop: 4,
+    opacity: 0.5,
   },
   listContainer: {
     paddingHorizontal: 24,

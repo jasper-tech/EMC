@@ -7,7 +7,6 @@ import {
   Modal,
   ScrollView,
   ActivityIndicator,
-  Alert,
   Animated,
   Image,
   Platform,
@@ -26,16 +25,20 @@ import {
   addDoc,
   updateDoc,
   doc,
-  getDoc,
   serverTimestamp,
   where,
-  getDocs,
+  getDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { auth } from "../firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import CustomAlert from "../components/CustomAlert";
+import {
+  checkCurrentUserPermission,
+  showPermissionDeniedAlert,
+  getAllPermissions,
+} from "../Utils/permissionsHelper";
 
 const Members = () => {
   const [members, setMembers] = useState([]);
@@ -54,8 +57,15 @@ const Members = () => {
   const [currentUserId, setCurrentUserId] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [userPermissions, setUserPermissions] = useState({
-    canAdd: false,
-    canEdit: false,
+    addEditMembers: false,
+    collectPayments: false,
+    addDues: false,
+    addContribution: false,
+    addMisc: false,
+    addBudget: false,
+    makeWithdrawal: false,
+    addEvents: false,
+    addMinutesReports: false,
   });
 
   const [alertVisible, setAlertVisible] = useState(false);
@@ -79,36 +89,9 @@ const Members = () => {
     profileImg: "",
   });
 
-  // Function to check user permissions from Firestore
-  const checkUserPermissions = async (userRole) => {
-    try {
-      const permissionsRef = doc(db, "settings", "rolePermissions");
-      const permissionsDoc = await getDoc(permissionsRef);
-
-      if (permissionsDoc.exists()) {
-        const permissions = permissionsDoc.data();
-
-        // Check if "all" is enabled (special case)
-        if (permissions.all === 1) {
-          return { canAdd: true, canEdit: true };
-        }
-
-        // Check specific role
-        if (permissions[userRole] === 1) {
-          return { canAdd: true, canEdit: true };
-        }
-      }
-
-      return { canAdd: false, canEdit: false };
-    } catch (error) {
-      console.error("Error checking permissions:", error);
-      return { canAdd: false, canEdit: false };
-    }
-  };
-
   // Fetch current user role and permissions on component mount
   useEffect(() => {
-    const fetchCurrentUserRole = async () => {
+    const fetchCurrentUserAndPermissions = async () => {
       try {
         const currentUser = auth.currentUser;
         if (currentUser) {
@@ -124,14 +107,9 @@ const Members = () => {
             setCurrentUserRole(userRole);
             setIsAdmin(userRole?.toLowerCase() === "admin");
 
-            // Check permissions for non-admin users
-            if (userRole !== "admin") {
-              const permissions = await checkUserPermissions(userRole);
-              setUserPermissions(permissions);
-            } else {
-              // Admins have full access
-              setUserPermissions({ canAdd: true, canEdit: true });
-            }
+            // Load permissions for the user
+            const permissions = await getAllPermissions(userRole);
+            setUserPermissions(permissions);
           } else {
             // If user document doesn't exist, check if they're in members
             const membersRef = collection(db, "members");
@@ -150,28 +128,51 @@ const Members = () => {
               }
 
               setCurrentUserRole(userRole);
+              setIsAdmin(false);
 
-              // Check permissions
-              const permissions = await checkUserPermissions(userRole);
+              // Load permissions for the user
+              const permissions = await getAllPermissions(userRole);
               setUserPermissions(permissions);
             } else {
               setCurrentUserRole("guest");
-              setUserPermissions({ canAdd: false, canEdit: false });
+              setIsAdmin(false);
+              // Default permissions for guest
+              setUserPermissions({
+                addEditMembers: false,
+                collectPayments: false,
+                addDues: false,
+                addContribution: false,
+                addMisc: false,
+                addBudget: false,
+                makeWithdrawal: false,
+                addEvents: false,
+                addMinutesReports: false,
+              });
             }
-            setIsAdmin(false);
           }
         }
       } catch (error) {
-        console.error("Error fetching user role:", error);
+        console.error("Error fetching user role and permissions:", error);
         setCurrentUserRole("guest");
-        setUserPermissions({ canAdd: false, canEdit: false });
         setIsAdmin(false);
+        setUserPermissions({
+          addEditMembers: false,
+          collectPayments: false,
+          addDues: false,
+          addContribution: false,
+          addMisc: false,
+          addBudget: false,
+          makeWithdrawal: false,
+          addEvents: false,
+          addMinutesReports: false,
+        });
       }
     };
 
-    fetchCurrentUserRole();
+    fetchCurrentUserAndPermissions();
   }, []);
 
+  // Load members
   useEffect(() => {
     const membersRef = collection(db, "members");
     const q = query(membersRef, orderBy("dateJoined", "desc"));
@@ -184,10 +185,12 @@ const Members = () => {
           ...doc.data(),
         }));
 
+        // Filter out admin members
         const nonAdminMembers = membersList.filter(
           (member) => member.role?.toLowerCase() !== "admin"
         );
 
+        // Sort: executives first, then by date joined
         const sortedMembers = nonAdminMembers.sort((a, b) => {
           if (a.isExecutive && !b.isExecutive) return -1;
           if (!a.isExecutive && b.isExecutive) return 1;
@@ -198,6 +201,7 @@ const Members = () => {
         setFilteredMembers(sortedMembers);
         setLoading(false);
 
+        // Animation
         Animated.parallel([
           Animated.timing(fadeAnim, {
             toValue: 1,
@@ -220,6 +224,7 @@ const Members = () => {
     return () => unsubscribe();
   }, []);
 
+  // Filter members based on search query
   useEffect(() => {
     if (searchQuery.trim() === "") {
       setFilteredMembers(members);
@@ -235,7 +240,7 @@ const Members = () => {
     }
   }, [searchQuery, members]);
 
-  // Custom alert function for all platforms
+  // Custom alert function
   const showAlert = (title, message, type = "info") => {
     setAlertType(type);
     setAlertTitle(title);
@@ -263,22 +268,14 @@ const Members = () => {
     const date = new Date(dateString);
     const today = new Date();
 
-    // Check if date is valid
     if (!(date instanceof Date) || isNaN(date)) {
       return false;
     }
 
-    // For birth date: must be in the past
-    if (type === "birth") {
+    if (type === "birth" || type === "joined") {
       return date <= today;
     }
 
-    // For date joined: must be in the past
-    if (type === "joined") {
-      return date <= today;
-    }
-
-    // For any date: must be valid date
     return true;
   };
 
@@ -340,20 +337,21 @@ const Members = () => {
     setFormData({ ...formData, profileImg: "" });
   };
 
-  // Check if user can add members (admin or has permission)
-  const handleAddButtonPress = () => {
-    if (!isAdmin && !userPermissions.canAdd) {
-      showAlert(
-        "Access Denied",
-        "You don't have permission to add new members. Please contact an administrator.",
-        "danger"
-      );
+  // Check if user can add/edit members using permission helper
+  const handleAddButtonPress = async () => {
+    const { hasPermission } = await checkCurrentUserPermission(
+      "addEditMembers"
+    );
+
+    if (!hasPermission) {
+      showPermissionDeniedAlert("add new members", showAlert);
       return;
     }
     setShowAddModal(true);
   };
 
   const handleAddMember = async () => {
+    // Validate form data
     if (!formData.fullname.trim()) {
       showAlert("Error", "Please enter member's full name", "danger");
       return;
@@ -424,14 +422,13 @@ const Members = () => {
     }
   };
 
-  const openEditModal = (member) => {
-    // Check if user has permission to edit
-    if (!isAdmin && !userPermissions.canEdit) {
-      showAlert(
-        "Access Denied",
-        "You don't have permission to edit member details. Please contact an administrator.",
-        "danger"
-      );
+  const openEditModal = async (member) => {
+    const { hasPermission } = await checkCurrentUserPermission(
+      "addEditMembers"
+    );
+
+    if (!hasPermission) {
+      showPermissionDeniedAlert("edit member details", showAlert);
       return;
     }
 
@@ -448,6 +445,7 @@ const Members = () => {
   };
 
   const handleEditMember = async () => {
+    // Validate form data
     if (!formData.fullname.trim()) {
       showAlert("Error", "Please enter member's full name", "danger");
       return;
@@ -479,11 +477,6 @@ const Members = () => {
     try {
       setSubmitting(true);
 
-      // Check permissions again (in case they changed)
-      if (!isAdmin && !userPermissions.canEdit) {
-        throw new Error("Unauthorized: Edit permission required");
-      }
-
       const updateData = {
         fullname: String(formData.fullname || ""),
         address: String(formData.address || ""),
@@ -501,29 +494,50 @@ const Members = () => {
 
       // If executive, also update user record
       if (selectedMember.isExecutive && selectedMember.uid) {
-        const userRef = doc(db, "users", selectedMember.uid);
-        await updateDoc(userRef, {
-          fullName: formData.fullname,
-          phone: formData.phone,
-          address: formData.address,
-          birthDate: formData.birthDate,
-          profileImg: formData.profileImg,
-          updatedAt: serverTimestamp(),
-        });
+        try {
+          const userRef = doc(db, "users", selectedMember.uid);
+          // Check if user document exists first
+          const userDocSnap = await getDoc(userRef);
 
-        // Update AsyncStorage for current user
-        const currentUser = auth.currentUser;
-        if (currentUser && currentUser.uid === selectedMember.uid) {
-          await AsyncStorage.setItem(
-            "currentUserData",
-            JSON.stringify({
+          if (userDocSnap.exists()) {
+            await updateDoc(userRef, {
               fullName: formData.fullname,
               phone: formData.phone,
               address: formData.address,
               birthDate: formData.birthDate,
               profileImg: formData.profileImg,
-            })
-          );
+              updatedAt: serverTimestamp(),
+            });
+
+            // Update AsyncStorage ONLY for current user
+            const currentUser = auth.currentUser;
+            if (currentUser && currentUser.uid === selectedMember.uid) {
+              try {
+                await AsyncStorage.setItem(
+                  "currentUserData",
+                  JSON.stringify({
+                    fullName: formData.fullname,
+                    phone: formData.phone,
+                    address: formData.address,
+                    birthDate: formData.birthDate,
+                    profileImg: formData.profileImg,
+                  })
+                );
+              } catch (storageError) {
+                console.warn("AsyncStorage update failed:", storageError);
+                // Don't fail the entire update if AsyncStorage fails
+              }
+            }
+          } else {
+            console.warn(
+              "User document does not exist for UID:",
+              selectedMember.uid
+            );
+          }
+        } catch (userUpdateError) {
+          console.warn("Failed to update user document:", userUpdateError);
+          // Don't fail the entire update if user update fails
+          // Member update already succeeded
         }
       }
 
@@ -549,9 +563,6 @@ const Members = () => {
         errorMessage += "Network error. Please check your internet connection.";
       } else if (error.code === "invalid-argument") {
         errorMessage += "Invalid data provided. Please check all fields.";
-      } else if (error.message === "Unauthorized: Edit permission required") {
-        errorMessage =
-          "Access denied. You don't have permission to edit members.";
       } else {
         errorMessage +=
           "Please try again. If the problem persists, contact support.";
@@ -588,12 +599,10 @@ const Members = () => {
     return age ? `${age} years` : "";
   };
 
-  const canUserEditMember = (member) => {
-    if (isAdmin) return true;
-
-    if (!userPermissions.canEdit) return false;
-
-    return true;
+  // Check if user can edit a member
+  const canUserEditMember = () => {
+    // Use the permissions from state (loaded in useEffect)
+    return isAdmin || userPermissions.addEditMembers;
   };
 
   const renderMemberCard = ({ item, index }) => {
@@ -601,7 +610,7 @@ const Members = () => {
     const isExecutive = item.isExecutive;
     const ageDisplay = getAgeDisplay(item.birthDate);
     const isOwnProfile = item.uid === currentUserId;
-    const canEdit = canUserEditMember(item);
+    const canEdit = canUserEditMember();
 
     return (
       <Animated.View
@@ -663,7 +672,6 @@ const Members = () => {
                 )}
               </View>
               <ThemedText style={styles.memberPhone}>{item.phone}</ThemedText>
-              {/* Display age if available */}
               {ageDisplay && (
                 <ThemedText style={styles.memberAge}>{ageDisplay}</ThemedText>
               )}
@@ -691,7 +699,6 @@ const Members = () => {
                 </View>
               )}
 
-              {/* Birth Date */}
               {item.birthDate && (
                 <View style={styles.detailRow}>
                   <Ionicons
@@ -741,7 +748,6 @@ const Members = () => {
                 </View>
               </View>
 
-              {/* Display role for executives */}
               {isExecutive && item.role && (
                 <View style={styles.detailRow}>
                   <Ionicons
@@ -758,7 +764,6 @@ const Members = () => {
                 </View>
               )}
 
-              {/* Show edit button only if user has permission */}
               {canEdit && (
                 <TouchableOpacity
                   style={[
@@ -838,7 +843,6 @@ const Members = () => {
             </View>
 
             <ScrollView style={styles.formContainer}>
-              {/* Profile Image Section */}
               <View style={styles.imageSection}>
                 <ThemedText style={styles.inputLabel}>Profile Image</ThemedText>
                 {formData.profileImg ? (
@@ -898,7 +902,6 @@ const Members = () => {
                     }
                     placeholder="Enter full name"
                     placeholderTextColor="#999"
-                    // color={Platform.OS === "web" ? undefined : theme.text}
                   />
                 </View>
               </View>
@@ -910,7 +913,6 @@ const Members = () => {
                     styles.inputWrapper,
                     styles.textAreaWrapper,
                     { backgroundColor: theme.card },
-                    { color: theme.text },
                   ]}
                 >
                   <Ionicons
@@ -934,7 +936,6 @@ const Members = () => {
                     placeholderTextColor="#999"
                     multiline
                     numberOfLines={3}
-                    // color={Platform.OS === "web" ? undefined : theme.text}
                   />
                 </View>
               </View>
@@ -963,12 +964,10 @@ const Members = () => {
                     placeholder="Enter phone number"
                     placeholderTextColor="#999"
                     keyboardType="phone-pad"
-                    // color={Platform.OS === "web" ? undefined : theme.text}
                   />
                 </View>
               </View>
 
-              {/* Birth Date Field */}
               <View style={styles.inputGroup}>
                 <ThemedText style={styles.inputLabel}>Birth Date</ThemedText>
                 <View
@@ -993,7 +992,6 @@ const Members = () => {
                     placeholder="YYYY-MM-DD"
                     placeholderTextColor="#999"
                     keyboardType="numbers-and-punctuation"
-                    // color={Platform.OS === "web" ? undefined : theme.text}
                   />
                 </View>
                 <ThemedText style={styles.dateHint}>
@@ -1031,7 +1029,6 @@ const Members = () => {
                     placeholder="YYYY-MM-DD"
                     placeholderTextColor="#999"
                     keyboardType="numbers-and-punctuation"
-                    // color={Platform.OS === "web" ? undefined : theme.text}
                   />
                 </View>
                 <ThemedText style={styles.dateHint}>
@@ -1090,7 +1087,6 @@ const Members = () => {
           placeholderTextColor={theme.text + "80"}
           value={searchQuery}
           onChangeText={setSearchQuery}
-          // color={Platform.OS === "web" ? undefined : theme.text}
         />
         {searchQuery !== "" && (
           <TouchableOpacity onPress={() => setSearchQuery("")}>
@@ -1099,15 +1095,13 @@ const Members = () => {
         )}
       </View>
 
-      {/* Total Members Count and User Info */}
       <View style={styles.memberCountContainer}>
         <ThemedText style={styles.memberCountText}>
           Total Members: {filteredMembers.length}
         </ThemedText>
-        {/* Show current user role and permissions */}
         {currentUserRole && (
           <View style={styles.userInfoContainer}>
-            {(userPermissions.canAdd || userPermissions.canEdit) && (
+            {userPermissions.addEditMembers && (
               <ThemedText style={styles.permissionStatus}>
                 • Add/Edit Access
               </ThemedText>
@@ -1138,8 +1132,8 @@ const Members = () => {
         />
       )}
 
-      {/* FAB Button - Show for users with add permission */}
-      {(isAdmin || userPermissions.canAdd) && (
+      {/* Show FAB only if user has permission to add members */}
+      {(isAdmin || userPermissions.addEditMembers) && (
         <TouchableOpacity
           style={[styles.fab, { backgroundColor: Colors.blueAccent }]}
           onPress={handleAddButtonPress}
@@ -1153,7 +1147,6 @@ const Members = () => {
       {renderModal(true)}
       {renderImageModal()}
 
-      {/* Custom Alert Component */}
       <CustomAlert
         visible={alertVisible}
         type={alertType}
@@ -1221,12 +1214,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  userRoleText: {
-    fontSize: 12,
-    fontWeight: "500",
-    opacity: 0.5,
-    fontStyle: "italic",
-  },
   permissionStatus: {
     fontSize: 12,
     fontWeight: "600",
@@ -1263,19 +1250,6 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     borderRadius: 22,
-  },
-  adminBadge: {
-    position: "absolute",
-    top: -2,
-    right: -2,
-    backgroundColor: Colors.greenAccent,
-    borderRadius: 8,
-    width: 16,
-    height: 16,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#fff",
   },
   memberInfo: {
     flex: 1,
@@ -1369,23 +1343,6 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     fontWeight: "600",
-  },
-  infoMessage: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    padding: 12,
-    backgroundColor: Colors.blueAccent + "10",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.blueAccent + "30",
-  },
-  infoMessageText: {
-    fontSize: 13,
-    color: Colors.blueAccent,
-    opacity: 0.8,
-    textAlign: "center",
   },
   emptyContainer: {
     flex: 1,
@@ -1517,7 +1474,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontWeight: "600",
   },
-  // Image related styles
   imageSection: {
     alignItems: "center",
     marginBottom: 16,

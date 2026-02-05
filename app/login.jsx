@@ -223,13 +223,13 @@ const Login = () => {
       // Show success alert
       showCustomAlert(
         "Login Successful",
-        "Welcome back! Redirecting to dashboard...",
+        "Redirecting to dashboard...",
         "success"
       );
 
       // Navigate after short delay
       setTimeout(() => {
-        console.log("Login successful, navigating to dashboard");
+        // console.log("Login successful, navigating to dashboard");
         router.replace("/dashboard");
       }, 1500);
     } catch (error) {

@@ -26,6 +26,7 @@ import { router } from "expo-router";
 import { CustomAlert } from "../components/CustomAlert";
 import AddMoneyModal from "../components/AddMoneyModal";
 import ConfirmationModal from "../components/ConfirmationModal";
+import { getAllPermissions } from "../Utils/permissionsHelper";
 
 const Finances = () => {
   const { scheme } = useContext(ThemeContext);
@@ -43,6 +44,19 @@ const Finances = () => {
   const [totalMoneyFlow, setTotalMoneyFlow] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
   const [existingBudgetYears, setExistingBudgetYears] = useState([]);
+
+  // Permission states
+  const [userPermissions, setUserPermissions] = useState({
+    addEditMembers: false,
+    collectPayments: false,
+    addDues: false,
+    addContribution: false,
+    addMisc: false,
+    addBudget: false,
+    makeWithdrawal: false,
+    addEvents: false,
+    addMinutesReports: false,
+  });
 
   // State for modals - ensure only one modal is visible at a time
   const [showAddModal, setShowAddModal] = useState(false);
@@ -96,11 +110,28 @@ const Finances = () => {
           const userDoc = await getDoc(doc(db, "users", user.uid));
           if (userDoc.exists()) {
             const userData = userDoc.data();
+            const userRole = userData.role || "member";
             setUserFullName(userData.fullName || "");
             setIsAdmin(userData.role === "admin" || userData.isAdmin === true);
+
+            // Load permissions for the user
+            const permissions = await getAllPermissions(userRole);
+            setUserPermissions(permissions);
           }
         } catch (error) {
           console.error("Error fetching user data:", error);
+          // Set default permissions on error
+          setUserPermissions({
+            addEditMembers: false,
+            collectPayments: false,
+            addDues: false,
+            addContribution: false,
+            addMisc: false,
+            addBudget: false,
+            makeWithdrawal: false,
+            addEvents: false,
+            addMinutesReports: false,
+          });
         }
       }
     };
@@ -230,6 +261,24 @@ const Finances = () => {
     return cleaned;
   };
 
+  // Check if user has permission for a specific type
+  const hasPermissionForType = (type) => {
+    if (isAdmin) return true;
+
+    switch (type) {
+      case "dues":
+        return userPermissions.addDues;
+      case "contribution":
+        return userPermissions.addContribution;
+      case "other":
+        return userPermissions.addMisc;
+      case "budget":
+        return userPermissions.addBudget;
+      default:
+        return false;
+    }
+  };
+
   // Alert helper - close all modals before showing alert
   const showAlert = (config) => {
     // Close all modals before showing alert
@@ -254,6 +303,18 @@ const Finances = () => {
 
   // Add money modal functions
   const openAddModal = (type) => {
+    // Check permission before opening modal
+    if (!hasPermissionForType(type)) {
+      showAlert({
+        type: "danger",
+        title: "Permission Denied",
+        message: `You don't have permission to add ${getTypeLabel(
+          type
+        ).toLowerCase()}. Please contact an administrator.`,
+      });
+      return;
+    }
+
     if (type === "budget") {
       const currentYear = new Date().getFullYear().toString();
       if (existingBudgetYears.includes(currentYear)) {
@@ -537,6 +598,20 @@ const Finances = () => {
     }
   };
 
+  // Handle withdrawal button press
+  const handleWithdrawalPress = () => {
+    if (!isAdmin && !userPermissions.makeWithdrawal) {
+      showAlert({
+        type: "danger",
+        title: "Permission Denied",
+        message:
+          "You don't have permission to make withdrawals. Please contact an administrator.",
+      });
+      return;
+    }
+    router.push("/withdrawal");
+  };
+
   if (loading) {
     return (
       <ThemedView style={styles.container}>
@@ -616,7 +691,7 @@ const Finances = () => {
       />
 
       {/* Admin Clear Button */}
-      {isAdmin && (
+      {/* {isAdmin && (
         <View style={styles.adminControls}>
           <TouchableOpacity
             style={styles.clearButton}
@@ -631,7 +706,7 @@ const Finances = () => {
             ⚠️ Admin: This will delete ALL finances and transactions
           </ThemedText>
         </View>
-      )}
+      )} */}
 
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Tracking Notice */}
@@ -734,53 +809,79 @@ const Finances = () => {
               icon: "account-balance-wallet",
               color: Colors.purpleAccent,
             },
-          ].map((item) => (
-            <TouchableOpacity
-              key={item.type}
-              style={[styles.typeCard, { backgroundColor: theme.uiBackground }]}
-              onPress={() => openAddModal(item.type)}
-              activeOpacity={0.7}
-            >
-              <View
+          ].map((item) => {
+            const hasPermission = hasPermissionForType(item.type);
+
+            return (
+              <TouchableOpacity
+                key={item.type}
                 style={[
-                  styles.typeIconContainer,
-                  { backgroundColor: item.color + "20" },
+                  styles.typeCard,
+                  { backgroundColor: theme.uiBackground },
+                  !hasPermission && styles.disabledCard,
                 ]}
+                onPress={() => openAddModal(item.type)}
+                activeOpacity={hasPermission ? 0.7 : 1}
+                disabled={!hasPermission}
               >
-                <MaterialIcons name={item.icon} size={28} color={item.color} />
-              </View>
-              <ThemedText style={styles.typeLabel}>{item.label}</ThemedText>
-              <ThemedText style={styles.typeAmount}>
-                GH₵
-                {item.type === "dues"
-                  ? duesAmount
-                  : item.type === "contribution"
-                  ? contributionsAmount
-                  : item.type === "other"
-                  ? othersAmount
-                  : budgetAmount}
-              </ThemedText>
-              <View style={styles.addIconContainer}>
-                <MaterialIcons name="add-circle" size={20} color={item.color} />
-              </View>
-            </TouchableOpacity>
-          ))}
+                <View
+                  style={[
+                    styles.typeIconContainer,
+                    { backgroundColor: item.color + "20" },
+                  ]}
+                >
+                  <MaterialIcons
+                    name={item.icon}
+                    size={28}
+                    color={hasPermission ? item.color : Colors.gray}
+                  />
+                </View>
+                <ThemedText style={styles.typeLabel}>{item.label}</ThemedText>
+                <ThemedText style={styles.typeAmount}>
+                  GH₵
+                  {item.type === "dues"
+                    ? duesAmount
+                    : item.type === "contribution"
+                    ? contributionsAmount
+                    : item.type === "other"
+                    ? othersAmount
+                    : budgetAmount}
+                </ThemedText>
+                {hasPermission && (
+                  <View style={styles.addIconContainer}>
+                    <MaterialIcons
+                      name="add-circle"
+                      size={20}
+                      color={item.color}
+                    />
+                  </View>
+                )}
+                {!hasPermission && (
+                  <View style={styles.lockedIconContainer}>
+                    <MaterialIcons name="lock" size={16} color={Colors.gray} />
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        {/* Withdrawal Button */}
-        <TouchableOpacity
-          style={[
-            styles.withdrawalButton,
-            { backgroundColor: Colors.blueAccent },
-          ]}
-          onPress={() => router.push("/withdrawal")}
-          activeOpacity={0.7}
-        >
-          <MaterialIcons name="arrow-forward" size={24} color="#fff" />
-          <ThemedText style={styles.withdrawalButtonText}>
-            Make Withdrawal
-          </ThemedText>
-        </TouchableOpacity>
+        {/* Withdrawal Button - Only show if user has permission */}
+        {(isAdmin || userPermissions.makeWithdrawal) && (
+          <TouchableOpacity
+            style={[
+              styles.withdrawalButton,
+              { backgroundColor: Colors.blueAccent },
+            ]}
+            onPress={handleWithdrawalPress}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons name="arrow-forward" size={24} color="#fff" />
+            <ThemedText style={styles.withdrawalButtonText}>
+              Make Withdrawal
+            </ThemedText>
+          </TouchableOpacity>
+        )}
       </ScrollView>
     </ThemedView>
   );
@@ -897,6 +998,9 @@ const styles = StyleSheet.create({
     elevation: 3,
     position: "relative",
   },
+  disabledCard: {
+    opacity: 0.5,
+  },
   typeIconContainer: {
     width: 56,
     height: 56,
@@ -919,6 +1023,14 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 12,
     right: 12,
+  },
+  lockedIconContainer: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    backgroundColor: Colors.gray + "30",
+    borderRadius: 12,
+    padding: 4,
   },
   withdrawalButton: {
     flexDirection: "row",

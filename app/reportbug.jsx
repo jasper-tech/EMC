@@ -112,7 +112,7 @@ const ReportBug = () => {
               <View style={styles.tipItem}>
                 <ThemedText style={styles.tipBullet}>•</ThemedText>
                 <ThemedText style={styles.tipText}>
-                  Add screenshots if possible
+                  Be clear as to what you expected vs. what happened
                 </ThemedText>
               </View>
             </View>

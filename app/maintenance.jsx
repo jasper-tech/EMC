@@ -29,6 +29,7 @@ const Maintenance = () => {
   const [permissions, setPermissions] = useState({});
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [expandedRole, setExpandedRole] = useState(null);
 
   // Alert states
   const [alertVisible, setAlertVisible] = useState(false);
@@ -58,20 +59,39 @@ const Maintenance = () => {
     { label: "ALL ROLES", value: "all" }, // Special option for all roles
   ];
 
+  const permissionCategories = [
+    { key: "addEditMembers", label: "Add/Edit Members", icon: "people" },
+    { key: "collectPayments", label: "Collect Payments", icon: "cash" },
+    { key: "addDues", label: "Add Dues", icon: "receipt" },
+    { key: "addContribution", label: "Add Contribution", icon: "add-circle" },
+    { key: "addMisc", label: "Misc/Others", icon: "list" },
+    { key: "addBudget", label: "Add Budget - Deposit", icon: "wallet" },
+    { key: "makeWithdrawal", label: "Make Withdrawal", icon: "arrow-up" },
+    { key: "addEvents", label: "Add Events", icon: "calendar" },
+    {
+      key: "addMinutesReports",
+      label: "Add Minutes & Reports",
+      icon: "document-text",
+    },
+  ];
+
+  // Default permissions template for each role
+  const getDefaultPermissions = () => {
+    const defaultPermissions = {};
+    roleOptions.forEach((role) => {
+      defaultPermissions[role.value] = {};
+      permissionCategories.forEach((perm) => {
+        defaultPermissions[role.value][perm.key] = 0; // 0 = disabled, 1 = enabled
+      });
+    });
+    return defaultPermissions;
+  };
+
   const showAlert = (title, message, type = "info") => {
     setAlertType(type);
     setAlertTitle(title);
     setAlertMessage(message);
     setAlertVisible(true);
-  };
-
-  // Initialize default permissions
-  const initializeDefaultPermissions = () => {
-    const defaultPermissions = {};
-    roleOptions.forEach((role) => {
-      defaultPermissions[role.value] = 0; // 0 = disabled, 1 = enabled
-    });
-    return defaultPermissions;
   };
 
   // Check if current user is admin
@@ -137,17 +157,51 @@ const Maintenance = () => {
 
         if (permissionsDoc.exists()) {
           const data = permissionsDoc.data();
-          // Ensure all roles are present in the loaded data
-          const loadedPermissions = { ...data };
-          roleOptions.forEach((role) => {
-            if (loadedPermissions[role.value] === undefined) {
-              loadedPermissions[role.value] = 0;
-            }
-          });
-          setPermissions(loadedPermissions);
+
+          // Check if data is old format (simple numbers) or new format (objects)
+          const isOldFormat = Object.values(data).some(
+            (val) => typeof val === "number"
+          );
+
+          if (isOldFormat) {
+            // Migrate old format to new format
+            const migratedData = getDefaultPermissions();
+
+            // Convert old permissions to new structure
+            Object.keys(data).forEach((roleKey) => {
+              if (roleOptions.find((r) => r.value === roleKey)) {
+                permissionCategories.forEach((perm) => {
+                  if (perm.key === "addEditMembers") {
+                    // Map old single permission to addEditMembers
+                    migratedData[roleKey][perm.key] = data[roleKey];
+                  } else {
+                    migratedData[roleKey][perm.key] = 0; // Default to disabled for other permissions
+                  }
+                });
+              }
+            });
+
+            setPermissions(migratedData);
+            // Save migrated data back to Firestore
+            await setDoc(permissionsRef, migratedData, { merge: true });
+          } else {
+            // Already new format, ensure all roles and permissions exist
+            const loadedPermissions = { ...data };
+            roleOptions.forEach((role) => {
+              if (!loadedPermissions[role.value]) {
+                loadedPermissions[role.value] = {};
+              }
+              permissionCategories.forEach((perm) => {
+                if (loadedPermissions[role.value][perm.key] === undefined) {
+                  loadedPermissions[role.value][perm.key] = 0;
+                }
+              });
+            });
+            setPermissions(loadedPermissions);
+          }
         } else {
           // Create default permissions document
-          const defaultPermissions = initializeDefaultPermissions();
+          const defaultPermissions = getDefaultPermissions();
           try {
             await setDoc(permissionsRef, {
               ...defaultPermissions,
@@ -179,7 +233,7 @@ const Maintenance = () => {
           );
         } else {
           // Use local defaults if we can't access the database
-          const defaultPermissions = initializeDefaultPermissions();
+          const defaultPermissions = getDefaultPermissions();
           setPermissions(defaultPermissions);
           setIsInitialized(true);
           showAlert(
@@ -194,30 +248,67 @@ const Maintenance = () => {
     loadOrCreatePermissions();
   }, [isAdmin]);
 
-  const toggleRole = (roleValue) => {
-    const currentValue = permissions[roleValue] || 0;
+  const togglePermission = (roleValue, permissionKey) => {
+    const currentValue = permissions[roleValue]?.[permissionKey] || 0;
     const newValue = currentValue === 1 ? 0 : 1;
 
     setPermissions((prev) => ({
       ...prev,
-      [roleValue]: newValue,
+      [roleValue]: {
+        ...prev[roleValue],
+        [permissionKey]: newValue,
+      },
+    }));
+    setHasUnsavedChanges(true);
+  };
+
+  const enableAllPermissionsForRole = (roleValue) => {
+    const updatedPermissions = { ...permissions[roleValue] };
+    Object.keys(updatedPermissions).forEach((key) => {
+      updatedPermissions[key] = 1;
+    });
+
+    setPermissions((prev) => ({
+      ...prev,
+      [roleValue]: updatedPermissions,
+    }));
+    setHasUnsavedChanges(true);
+  };
+
+  const disableAllPermissionsForRole = (roleValue) => {
+    const updatedPermissions = { ...permissions[roleValue] };
+    Object.keys(updatedPermissions).forEach((key) => {
+      updatedPermissions[key] = 0;
+    });
+
+    setPermissions((prev) => ({
+      ...prev,
+      [roleValue]: updatedPermissions,
     }));
     setHasUnsavedChanges(true);
   };
 
   const enableAllRoles = () => {
-    const updatedPermissions = {};
+    const updatedPermissions = { ...permissions };
     roleOptions.forEach((role) => {
-      updatedPermissions[role.value] = 1;
+      if (updatedPermissions[role.value]) {
+        Object.keys(updatedPermissions[role.value]).forEach((key) => {
+          updatedPermissions[role.value][key] = 1;
+        });
+      }
     });
     setPermissions(updatedPermissions);
     setHasUnsavedChanges(true);
   };
 
   const disableAllRoles = () => {
-    const updatedPermissions = {};
+    const updatedPermissions = { ...permissions };
     roleOptions.forEach((role) => {
-      updatedPermissions[role.value] = 0;
+      if (updatedPermissions[role.value]) {
+        Object.keys(updatedPermissions[role.value]).forEach((key) => {
+          updatedPermissions[role.value][key] = 0;
+        });
+      }
     });
     setPermissions(updatedPermissions);
     setHasUnsavedChanges(true);
@@ -243,15 +334,11 @@ const Maintenance = () => {
           lastUpdated: new Date().toISOString(),
           updatedBy: auth.currentUser.uid,
         },
-        { merge: true } // Changed from merge: false to merge: true
+        { merge: true }
       );
 
       setHasUnsavedChanges(false);
-      showAlert(
-        "Success",
-        "Permissions saved successfully! Changes will take effect immediately.",
-        "success"
-      );
+      showAlert("Success", "Permissions saved successfully! ", "success");
     } catch (error) {
       console.error("Error saving permissions:", error);
       let errorMessage = "Failed to save permissions. ";
@@ -271,6 +358,9 @@ const Maintenance = () => {
   };
 
   const resetToDefault = () => {
+    const message =
+      "Are you sure you want to reset all permissions to disabled for all roles?";
+
     if (Platform.OS === "web") {
       setShowResetConfirm(true);
     } else {
@@ -290,6 +380,12 @@ const Maintenance = () => {
   const handleResetConfirm = () => {
     disableAllRoles();
     setShowResetConfirm(false);
+  };
+
+  const getEnabledPermissionsCount = (roleValue) => {
+    if (!permissions[roleValue]) return 0;
+    return Object.values(permissions[roleValue]).filter((val) => val === 1)
+      .length;
   };
 
   if (loading) {
@@ -343,8 +439,11 @@ const Maintenance = () => {
         <View style={styles.header}>
           <View style={styles.headerTop}>
             <View style={styles.headerTextContainer}>
+              {/* <ThemedText style={styles.headerTitle}>
+                Role Permissions
+              </ThemedText> */}
               <ThemedText style={styles.headerSubtitle}>
-                Toggle ON to allow access to Add/Edit buttons
+                Configure specific permissions
               </ThemedText>
               {!isInitialized && (
                 <ThemedText style={styles.initializingText}>
@@ -362,7 +461,9 @@ const Maintenance = () => {
               activeOpacity={0.7}
             >
               <Ionicons name="checkmark-circle" size={18} color="#fff" />
-              <ThemedText style={styles.quickButtonText}>Enable All</ThemedText>
+              <ThemedText style={styles.quickButtonText}>
+                Enable All Roles
+              </ThemedText>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -372,7 +473,7 @@ const Maintenance = () => {
             >
               <Ionicons name="close-circle" size={18} color="#fff" />
               <ThemedText style={styles.quickButtonText}>
-                Disable All
+                Disable All Roles
               </ThemedText>
             </TouchableOpacity>
 
@@ -382,7 +483,7 @@ const Maintenance = () => {
               activeOpacity={0.7}
             >
               <Ionicons name="refresh" size={18} color="#fff" />
-              <ThemedText style={styles.quickButtonText}>Reset</ThemedText>
+              <ThemedText style={styles.quickButtonText}>Reset All</ThemedText>
             </TouchableOpacity>
           </View>
 
@@ -423,103 +524,119 @@ const Maintenance = () => {
               size={20}
               color={Colors.blueAccent}
             />
-            <ThemedText style={styles.legendTitle}>Status Legend</ThemedText>
+            <ThemedText style={styles.legendTitle}>
+              Permissions Legend
+            </ThemedText>
           </View>
           <View style={styles.legendGrid}>
             <View style={styles.legendItem}>
               <View style={[styles.statusDot, styles.enabledDot]} />
               <ThemedText style={styles.legendItemText}>
-                ON - Can access Add/Edit buttons
+                ON - Permission granted
               </ThemedText>
             </View>
             <View style={styles.legendItem}>
               <View style={[styles.statusDot, styles.disabledDot]} />
               <ThemedText style={styles.legendItemText}>
-                OFF - Cannot access Add/Edit buttons
+                OFF - Permission denied
               </ThemedText>
             </View>
           </View>
         </View> */}
 
         {/* Roles List */}
-        {roleOptions.map((role, index) => {
-          const isEnabled = permissions[role.value] === 1;
+        {roleOptions.map((role) => {
+          const rolePerms = permissions[role.value] || {};
+          const isExpanded = expandedRole === role.value;
+          const enabledCount = getEnabledPermissionsCount(role.value);
+          const totalCount = permissionCategories.length;
 
           return (
             <View
               key={role.value}
               style={[styles.roleCard, { backgroundColor: theme.card }]}
             >
-              <View style={styles.roleContent}>
-                <View style={styles.roleInfo}>
-                  <ThemedText style={styles.roleName}>{role.label}</ThemedText>
-                  <ThemedText style={styles.roleStatus}>
-                    {!isInitialized
-                      ? "Loading..."
-                      : isEnabled
-                      ? "Access Granted"
-                      : "Access Denied"}
-                  </ThemedText>
-                </View>
-
-                <Switch
-                  value={isEnabled}
-                  onValueChange={() => toggleRole(role.value)}
-                  disabled={!isInitialized}
-                  trackColor={{
-                    false: Colors.border,
-                    true: Colors.greenAccent,
-                  }}
-                  thumbColor={isEnabled ? "#fff" : "#f4f3f4"}
-                  ios_backgroundColor={Colors.border}
-                />
-              </View>
-
-              {/* Visual indicator */}
-              <View
-                style={[
-                  styles.statusIndicator,
-                  !isInitialized
-                    ? { backgroundColor: Colors.border }
-                    : isEnabled
-                    ? { backgroundColor: Colors.greenAccent + "20" }
-                    : { backgroundColor: Colors.redAccent + "20" },
-                ]}
+              <TouchableOpacity
+                style={styles.roleHeader}
+                onPress={() => setExpandedRole(isExpanded ? null : role.value)}
+                activeOpacity={0.7}
               >
-                <Ionicons
-                  name={
-                    !isInitialized
-                      ? "time-outline"
-                      : isEnabled
-                      ? "checkmark-circle"
-                      : "close-circle"
-                  }
-                  size={16}
-                  color={
-                    !isInitialized
-                      ? Colors.border
-                      : isEnabled
-                      ? Colors.greenAccent
-                      : Colors.redAccent
-                  }
-                />
-                <ThemedText
-                  style={[
-                    styles.statusText,
-                    !isInitialized
-                      ? { color: Colors.border }
-                      : isEnabled
-                      ? { color: Colors.greenAccent }
-                      : { color: Colors.redAccent },
-                  ]}
-                >
-                  {!isInitialized
-                    ? "LOADING"
-                    : isEnabled
-                    ? "ENABLED"
-                    : "DISABLED"}
-                </ThemedText>
-              </View>
+                <View style={styles.roleHeaderContent}>
+                  <View style={styles.roleInfo}>
+                    <ThemedText style={styles.roleName}>
+                      {role.label}
+                    </ThemedText>
+                    <ThemedText style={styles.roleStatus}>
+                      {enabledCount}/{totalCount} permissions enabled
+                    </ThemedText>
+                  </View>
+                  <Ionicons
+                    name={isExpanded ? "chevron-up" : "chevron-down"}
+                    size={20}
+                    color={theme.text}
+                  />
+                </View>
+              </TouchableOpacity>
+
+              {isExpanded && (
+                <View style={styles.permissionsContainer}>
+                  {/* Role-specific quick actions */}
+                  <View style={styles.permissionQuickActions}>
+                    <TouchableOpacity
+                      style={styles.permissionQuickButton}
+                      onPress={() => enableAllPermissionsForRole(role.value)}
+                    >
+                      <ThemedText style={styles.permissionQuickButtonText}>
+                        Enable All
+                      </ThemedText>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.permissionQuickButton}
+                      onPress={() => disableAllPermissionsForRole(role.value)}
+                    >
+                      <ThemedText style={styles.permissionQuickButtonText}>
+                        Disable All
+                      </ThemedText>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Permission toggles */}
+                  {permissionCategories.map((permission) => (
+                    <View key={permission.key} style={styles.permissionRow}>
+                      <View style={styles.permissionInfo}>
+                        <Ionicons
+                          name={permission.icon}
+                          size={20}
+                          color={
+                            rolePerms[permission.key] === 1
+                              ? Colors.greenAccent
+                              : Colors.gray
+                          }
+                          style={{ marginRight: 10 }}
+                        />
+                        <ThemedText style={styles.permissionLabel}>
+                          {permission.label}
+                        </ThemedText>
+                      </View>
+                      <Switch
+                        value={rolePerms[permission.key] === 1}
+                        onValueChange={() =>
+                          togglePermission(role.value, permission.key)
+                        }
+                        disabled={!isInitialized}
+                        trackColor={{
+                          false: Colors.border,
+                          true: Colors.greenAccent,
+                        }}
+                        thumbColor={
+                          rolePerms[permission.key] === 1 ? "#fff" : "#f4f3f4"
+                        }
+                        ios_backgroundColor={Colors.border}
+                      />
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
           );
         })}
@@ -557,7 +674,7 @@ const Maintenance = () => {
         onConfirm={handleResetConfirm}
         type="danger"
         title="Reset Permissions"
-        message="Are you sure you want to reset all roles to disabled?"
+        message="Are you sure you want to reset all permissions to disabled for all roles?"
         confirmText="Reset"
         cancelText="Cancel"
       />
@@ -742,11 +859,13 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  roleContent: {
+  roleHeader: {
+    // Remove the marginBottom condition
+  },
+  roleHeaderContent: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 8,
   },
   roleInfo: {
     flex: 1,
@@ -760,18 +879,45 @@ const styles = StyleSheet.create({
     fontSize: 12,
     opacity: 0.6,
   },
-  statusIndicator: {
+  permissionsContainer: {
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border + "20",
+  },
+  permissionQuickActions: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
+    gap: 8,
+    marginBottom: 12,
+  },
+  permissionQuickButton: {
+    flex: 1,
     paddingVertical: 6,
     paddingHorizontal: 12,
-    borderRadius: 8,
-    alignSelf: "flex-start",
+    borderRadius: 6,
+    backgroundColor: Colors.blueAccent + "20",
+    alignItems: "center",
   },
-  statusText: {
-    fontSize: 11,
-    fontWeight: "700",
+  permissionQuickButtonText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: Colors.blueAccent,
+  },
+  permissionRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border + "10",
+  },
+  permissionInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  permissionLabel: {
+    fontSize: 14,
+    flex: 1,
   },
   warningCard: {
     flexDirection: "row",

@@ -1,13 +1,11 @@
-// app/settings.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
   View,
   TouchableOpacity,
-  ScrollView,
   Platform,
   Dimensions,
-  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { router } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -15,18 +13,47 @@ import ThemedView from "../components/ThemedView";
 import ThemedText from "../components/ThemedText";
 import FooterNav from "../components/FooterNav";
 import { Colors } from "../constants/Colors";
+import { doc, getDoc } from "firebase/firestore";
+import { db, auth } from "../firebase";
 
 const { width } = Dimensions.get("window");
 const isWeb = Platform.OS === "web";
 
 const Settings = () => {
-  const tabs = [
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      try {
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+          const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            setIsAdmin(userData.role === "admin" || userData.isAdmin === true);
+          }
+        }
+      } catch (error) {
+        console.error("Error checking admin status:", error);
+        setIsAdmin(false);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAdminStatus();
+  }, []);
+
+  const allTabs = [
     {
       id: "report",
       title: "Report a Bug",
       icon: "bug-report",
       description: "Report any issues or problems you encounter",
       screen: "/reportbug",
+      // color: Colors.orangeAccent,
+      adminOnly: false,
     },
     {
       id: "issues",
@@ -34,6 +61,8 @@ const Settings = () => {
       icon: "list-alt",
       description: "View bugs reported by users",
       screen: "/viewissues",
+      color: Colors.blueAccent,
+      adminOnly: true, // Only admins can see this
     },
     {
       id: "about",
@@ -41,8 +70,13 @@ const Settings = () => {
       icon: "info",
       description: "App information and copyright",
       screen: "/disclaimer",
+      // color: Colors.purpleAccent,
+      adminOnly: false,
     },
   ];
+
+  // Filter tabs based on admin status
+  const tabs = allTabs.filter((tab) => !tab.adminOnly || isAdmin);
 
   const handleTabPress = (tab) => {
     if (tab.screen) {
@@ -50,18 +84,44 @@ const Settings = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <ThemedView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.blueAccent} />
+          <ThemedText style={styles.loadingText}>Loading...</ThemedText>
+        </View>
+        <FooterNav />
+      </ThemedView>
+    );
+  }
+
   return (
     <ThemedView style={styles.container}>
       <View style={styles.content}>
         {/* Header */}
-        <View style={styles.header}></View>
+        <View style={styles.header}>
+          {isAdmin && (
+            <View style={styles.adminBadge}>
+              <MaterialIcons
+                name="admin-panel-settings"
+                size={16}
+                color="#fff"
+              />
+              <ThemedText style={styles.adminBadgeText}>Admin Mode</ThemedText>
+            </View>
+          )}
+        </View>
 
         {/* Vertical Tabs Container */}
         <View style={styles.tabsContainer}>
           {tabs.map((tab) => (
             <TouchableOpacity
               key={tab.id}
-              style={[styles.tabCard]}
+              style={[
+                styles.tabCard,
+                // { borderLeftColor: tab.color || Colors.blueAccent },
+              ]}
               onPress={() => handleTabPress(tab)}
               activeOpacity={0.8}
             >
@@ -70,13 +130,16 @@ const Settings = () => {
                   <View
                     style={[
                       styles.iconContainer,
-                      { backgroundColor: tab.color + "20" },
+                      {
+                        // backgroundColor:
+                        //   (tab.color || Colors.blueAccent) + "20",
+                      },
                     ]}
                   >
                     <MaterialIcons
                       name={tab.icon}
                       size={24}
-                      color={tab.color}
+                      color={tab.color || Colors.blueAccent}
                     />
                   </View>
                   <View style={styles.tabTextContainer}>
@@ -145,9 +208,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: isWeb ? "8%" : 20,
     paddingTop: 24,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+    opacity: 0.6,
+  },
   header: {
     marginBottom: 32,
     alignItems: "center",
+  },
+  adminBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.blueAccent,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 6,
+  },
+  adminBadgeText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
   },
   title: {
     fontSize: isWeb ? 32 : 28,
