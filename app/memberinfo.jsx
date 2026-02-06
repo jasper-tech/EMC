@@ -20,6 +20,7 @@ import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
 import { CustomAlert } from "../components/CustomAlert";
 import ConfirmationModal from "../components/ConfirmationModal";
 
@@ -252,6 +253,25 @@ const MemberInfo = ({ navigation }) => {
     }
   };
 
+  // Image compression helper
+  const compressImage = async (uri) => {
+    try {
+      const manipResult = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width: 800 } }], // Resize to max 800px width
+        {
+          compress: 0.3,
+          format: ImageManipulator.SaveFormat.JPEG,
+          base64: true,
+        }
+      );
+      return manipResult;
+    } catch (error) {
+      console.error("Error compressing image:", error);
+      return null;
+    }
+  };
+
   const pickImage = async () => {
     try {
       const { status } =
@@ -266,19 +286,47 @@ const MemberInfo = ({ navigation }) => {
         return;
       }
 
+      setUploadingImage(true);
+
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.7,
-        base64: true,
+        quality: 0.5,
+        base64: false, // Don't get base64 immediately
       });
 
       if (!result.canceled && result.assets[0]) {
-        setUploadingImage(true);
+        const asset = result.assets[0];
 
-        // Convert to base64
-        const base64String = `data:image/jpeg;base64,${result.assets[0].base64}`;
+        // Compress the image first
+        const compressed = await compressImage(asset.uri);
+
+        if (!compressed || !compressed.base64) {
+          throw new Error(
+            "Failed to process image. Please try a different image."
+          );
+        }
+
+        const base64String = `data:image/jpeg;base64,${compressed.base64}`;
+
+        // Check size
+        const sizeInBytes = base64String.length * 0.75;
+        const sizeInMB = sizeInBytes / (1024 * 1024);
+
+        console.log(`Compressed image size: ${sizeInMB.toFixed(2)} MB`);
+
+        if (sizeInMB > 0.9) {
+          showAlert({
+            type: "danger",
+            title: "Image Too Large",
+            message: `Even after compression, the image is ${sizeInMB.toFixed(
+              2
+            )}MB. Please select a smaller image.`,
+          });
+          setUploadingImage(false);
+          return;
+        }
 
         // Update form data
         setFormData((prev) => ({
@@ -286,17 +334,32 @@ const MemberInfo = ({ navigation }) => {
           profileImg: base64String,
         }));
 
-        // Immediately save the image
+        // Save the image
         await saveProfileImage(base64String);
+      } else {
+        setUploadingImage(false);
       }
     } catch (error) {
       console.error("Error picking image:", error);
+
+      let errorMessage = "Failed to pick image. ";
+
+      if (error.message.includes("process")) {
+        errorMessage +=
+          "The image could not be processed. Try a different image.";
+      } else if (error.message.includes("memory")) {
+        errorMessage +=
+          "The image is too large. Please select a smaller image.";
+      } else {
+        errorMessage += "Please try again.";
+      }
+
       showAlert({
         type: "failed",
         title: "Error",
-        message: "Failed to pick image",
+        message: errorMessage,
       });
-    } finally {
+
       setUploadingImage(false);
     }
   };
@@ -304,7 +367,14 @@ const MemberInfo = ({ navigation }) => {
   const saveProfileImage = async (base64Image) => {
     try {
       const currentUser = auth.currentUser;
-      if (!currentUser) return;
+      if (!currentUser) {
+        throw new Error("User not logged in");
+      }
+
+      // Validate base64 string
+      if (!base64Image || !base64Image.startsWith("data:image")) {
+        throw new Error("Invalid image data");
+      }
 
       // Update Firestore
       const userRef = doc(db, "users", currentUser.uid);
@@ -333,11 +403,39 @@ const MemberInfo = ({ navigation }) => {
       });
     } catch (error) {
       console.error("Error saving profile image:", error);
+
+      let errorMessage = "Failed to save profile image. ";
+
+      if (error.code === "permission-denied") {
+        errorMessage += "You don't have permission to update your profile.";
+      } else if (error.code === "unavailable") {
+        errorMessage += "Network error. Please check your connection.";
+      } else if (
+        error.message.includes("too large") ||
+        error.code === "invalid-argument"
+      ) {
+        errorMessage +=
+          "The image is too large for storage. Please select a smaller image.";
+      } else if (error.message.includes("Invalid image")) {
+        errorMessage +=
+          "The image data is invalid. Please try a different image.";
+      } else {
+        errorMessage += "Please try again.";
+      }
+
       showAlert({
         type: "failed",
         title: "Error",
-        message: "Failed to save profile image",
+        message: errorMessage,
       });
+
+      // Revert the form data if save failed
+      setFormData((prev) => ({
+        ...prev,
+        profileImg: userData?.profileImg || "",
+      }));
+    } finally {
+      setUploadingImage(false);
     }
   };
 
