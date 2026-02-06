@@ -33,6 +33,7 @@ import { db } from "../firebase";
 import { auth } from "../firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
 import CustomAlert from "../components/CustomAlert";
 import {
   checkCurrentUserPermission,
@@ -50,6 +51,7 @@ const Members = () => {
   const [expandedMemberId, setExpandedMemberId] = useState(null);
   const [selectedMember, setSelectedMember] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
 
@@ -301,6 +303,25 @@ const Members = () => {
     }
   };
 
+  // Image compression helper
+  const compressImage = async (uri) => {
+    try {
+      const manipResult = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width: 800 } }], // Resize to max 800px width
+        {
+          compress: 0.3,
+          format: ImageManipulator.SaveFormat.JPEG,
+          base64: true,
+        }
+      );
+      return manipResult;
+    } catch (error) {
+      console.error("Error compressing image:", error);
+      return null;
+    }
+  };
+
   const pickImage = async () => {
     try {
       const { status } =
@@ -315,21 +336,71 @@ const Members = () => {
         return;
       }
 
+      setUploadingImage(true);
+
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.5,
-        base64: true,
+        base64: false, // Don't get base64 immediately
       });
 
-      if (!result.canceled && result.assets && result.assets[0].base64) {
-        const base64String = `data:image/jpeg;base64,${result.assets[0].base64}`;
+      if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+
+        // Compress the image first
+        const compressed = await compressImage(asset.uri);
+
+        if (!compressed || !compressed.base64) {
+          throw new Error(
+            "Failed to process image. Please try a different image."
+          );
+        }
+
+        const base64String = `data:image/jpeg;base64,${compressed.base64}`;
+
+        // Check size
+        const sizeInBytes = base64String.length * 0.75;
+        const sizeInMB = sizeInBytes / (1024 * 1024);
+
+        console.log(`Compressed image size: ${sizeInMB.toFixed(2)} MB`);
+
+        if (sizeInMB > 0.9) {
+          showAlert(
+            "Image Too Large",
+            `Even after compression, the image is ${sizeInMB.toFixed(
+              2
+            )}MB. Please select a smaller image.`,
+            "danger"
+          );
+          setUploadingImage(false);
+          return;
+        }
+
+        // Update form data
         setFormData({ ...formData, profileImg: base64String });
+        setUploadingImage(false);
+      } else {
+        setUploadingImage(false);
       }
     } catch (error) {
       console.error("Error picking image:", error);
-      showAlert("Error", "Failed to pick image", "failed");
+
+      let errorMessage = "Failed to pick image. ";
+
+      if (error.message.includes("process")) {
+        errorMessage +=
+          "The image could not be processed. Try a different image.";
+      } else if (error.message.includes("memory")) {
+        errorMessage +=
+          "The image is too large. Please select a smaller image.";
+      } else {
+        errorMessage += "Please try again.";
+      }
+
+      showAlert("Error", errorMessage, "failed");
+      setUploadingImage(false);
     }
   };
 
@@ -865,16 +936,26 @@ const Members = () => {
                       { borderColor: Colors.blueAccent },
                     ]}
                     onPress={pickImage}
+                    disabled={uploadingImage}
                   >
-                    <Ionicons
-                      name="image-outline"
-                      size={32}
-                      color={theme.text}
-                      style={{ opacity: 0.5 }}
-                    />
-                    <ThemedText style={styles.uploadButtonText}>
-                      Tap to add profile image
-                    </ThemedText>
+                    {uploadingImage ? (
+                      <ActivityIndicator
+                        size="small"
+                        color={Colors.blueAccent}
+                      />
+                    ) : (
+                      <>
+                        <Ionicons
+                          name="image-outline"
+                          size={32}
+                          color={theme.text}
+                          style={{ opacity: 0.5 }}
+                        />
+                        <ThemedText style={styles.uploadButtonText}>
+                          Tap to add profile image
+                        </ThemedText>
+                      </>
+                    )}
                   </TouchableOpacity>
                 )}
               </View>
