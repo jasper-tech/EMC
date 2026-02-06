@@ -438,7 +438,7 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
                 </View>
 
                 {/* Edit Button */}
-                <TouchableOpacity
+                {/* <TouchableOpacity
                   style={[
                     styles.editButton,
                     { backgroundColor: Colors.blueAccent },
@@ -452,7 +452,7 @@ const SidePanel = ({ isOpen, onClose, onAvatarUpdate }) => {
                   ) : (
                     <Ionicons name="pencil" size={14} color="#fff" />
                   )}
-                </TouchableOpacity>
+                </TouchableOpacity> */}
               </View>
 
               <View style={styles.userInfo}>
