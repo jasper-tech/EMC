@@ -1,12 +1,11 @@
 // app/reportbug.jsx
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import {
   StyleSheet,
   View,
   TouchableOpacity,
   ScrollView,
   TextInput,
-  Alert,
   ActivityIndicator,
   Platform,
   Dimensions,
@@ -16,7 +15,9 @@ import { MaterialIcons } from "@expo/vector-icons";
 import ThemedView from "../components/ThemedView";
 import ThemedText from "../components/ThemedText";
 import FooterNav from "../components/FooterNav";
+import CustomAlert from "../components/CustomAlert";
 import { Colors } from "../constants/Colors";
+import { ThemeContext } from "../context/ThemeContext";
 import { collection, addDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
@@ -26,17 +27,27 @@ const isWeb = Platform.OS === "web";
 
 const ReportBug = () => {
   const { user } = useAuth();
+  const { scheme } = useContext(ThemeContext);
+  const theme = Colors[scheme] ?? Colors.light;
+
   const [bugDescription, setBugDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // Alert states
+  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
+  const [showErrorAlert, setShowErrorAlert] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
   const handleSubmitBug = async () => {
     if (!bugDescription.trim()) {
-      Alert.alert("Error", "Please describe the bug");
+      setErrorMessage("Please describe the bug");
+      setShowErrorAlert(true);
       return;
     }
 
     if (!user) {
-      Alert.alert("Error", "You must be logged in to report a bug");
+      setErrorMessage("You must be logged in to report a bug");
+      setShowErrorAlert(true);
       return;
     }
 
@@ -52,10 +63,11 @@ const ReportBug = () => {
       });
 
       setBugDescription("");
-      Alert.alert("Success", "Bug report submitted successfully!");
+      setShowSuccessAlert(true);
     } catch (error) {
       console.error("Error submitting bug report:", error);
-      Alert.alert("Error", "Failed to submit bug report");
+      setErrorMessage("Failed to submit bug report");
+      setShowErrorAlert(true);
     } finally {
       setSubmitting(false);
     }
@@ -80,12 +92,26 @@ const ReportBug = () => {
             </ThemedText>
 
             <TextInput
-              style={styles.textInput}
+              style={[
+                styles.textInput,
+                {
+                  backgroundColor:
+                    theme.inputBackground || "rgba(255, 255, 255, 0.08)",
+                  borderColor: theme.inputBorder || "rgba(255, 255, 255, 0.1)",
+                  color: theme.text,
+                },
+              ]}
               multiline
               numberOfLines={8}
               value={bugDescription}
               onChangeText={setBugDescription}
               textAlignVertical="top"
+              placeholder="Describe the bug you encountered..."
+              placeholderTextColor={
+                scheme === "dark"
+                  ? "rgba(255, 255, 255, 0.4)"
+                  : "rgba(0, 0, 0, 0.4)"
+              }
             />
 
             <View style={styles.tipsContainer}>
@@ -153,6 +179,26 @@ const ReportBug = () => {
       </ScrollView>
 
       <FooterNav />
+
+      {/* Success Alert */}
+      <CustomAlert
+        visible={showSuccessAlert}
+        type="success"
+        title="Success!"
+        message="Bug report submitted successfully!"
+        autoClose={true}
+        onConfirm={() => setShowSuccessAlert(false)}
+      />
+
+      {/* Error Alert */}
+      <CustomAlert
+        visible={showErrorAlert}
+        type="failed"
+        title="Error"
+        message={errorMessage}
+        confirmText="OK"
+        onConfirm={() => setShowErrorAlert(false)}
+      />
     </ThemedView>
   );
 };
@@ -169,25 +215,28 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: isWeb ? "8%" : 20,
-    paddingTop: 24,
+    paddingHorizontal: isWeb ? Math.max(width * 0.08, 40) : 16,
+    paddingTop: isWeb ? 32 : 20,
     paddingBottom: 40,
+    maxWidth: isWeb ? 1000 : "100%",
+    alignSelf: "center",
+    width: "100%",
   },
   backButton: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: isWeb ? 28 : 20,
     gap: 8,
   },
   backButtonText: {
-    fontSize: 16,
+    fontSize: isWeb ? 18 : 16,
     fontWeight: "600",
   },
   header: {
-    marginBottom: 32,
+    marginBottom: isWeb ? 36 : 28,
   },
   title: {
-    fontSize: isWeb ? 32 : 28,
+    fontSize: isWeb ? 32 : 24,
     fontWeight: "bold",
     marginBottom: 8,
   },
@@ -197,65 +246,63 @@ const styles = StyleSheet.create({
   },
   reportContainer: {
     backgroundColor: "rgba(255, 255, 255, 0.05)",
-    borderRadius: 16,
-    padding: 24,
+    borderRadius: isWeb ? 20 : 16,
+    padding: isWeb ? 28 : 20,
   },
   sectionTitle: {
-    fontSize: isWeb ? 22 : 20,
+    fontSize: isWeb ? 24 : 20,
     fontWeight: "bold",
-    marginBottom: 8,
+    marginBottom: isWeb ? 10 : 8,
   },
   sectionDescription: {
     fontSize: isWeb ? 16 : 14,
     opacity: 0.8,
-    marginBottom: 20,
-    lineHeight: 20,
+    marginBottom: isWeb ? 24 : 20,
+    lineHeight: isWeb ? 24 : 20,
   },
   textInput: {
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: isWeb ? 14 : 12,
+    padding: isWeb ? 18 : 16,
     fontSize: isWeb ? 16 : 14,
-    color: Colors.text,
-    marginBottom: 20,
-    minHeight: 180,
+    marginBottom: isWeb ? 24 : 20,
+    minHeight: isWeb ? 200 : 180,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.1)",
+    lineHeight: isWeb ? 24 : 20,
   },
   tipsContainer: {
     backgroundColor: "rgba(255, 193, 7, 0.1)",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
+    borderRadius: isWeb ? 14 : 12,
+    padding: isWeb ? 18 : 16,
+    marginBottom: isWeb ? 24 : 20,
   },
   tipsText: {
-    fontSize: isWeb ? 14 : 13,
+    fontSize: isWeb ? 15 : 13,
     fontWeight: "600",
     marginTop: 8,
-    marginBottom: 8,
+    marginBottom: isWeb ? 10 : 8,
     color: Colors.blueAccent,
   },
   tipItem: {
     flexDirection: "row",
     alignItems: "flex-start",
-    marginBottom: 4,
+    marginBottom: isWeb ? 6 : 4,
   },
   tipBullet: {
-    fontSize: 14,
+    fontSize: isWeb ? 16 : 14,
     marginRight: 8,
     color: Colors.blueAccent,
   },
   tipText: {
-    fontSize: isWeb ? 14 : 12,
+    fontSize: isWeb ? 15 : 12,
     flex: 1,
     opacity: 0.9,
   },
   submitButton: {
     backgroundColor: Colors.redAccent,
-    borderRadius: 12,
-    paddingVertical: 16,
+    borderRadius: isWeb ? 14 : 12,
+    paddingVertical: isWeb ? 18 : 16,
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: isWeb ? 18 : 16,
   },
   submitButtonDisabled: {
     backgroundColor: Colors.gray,
@@ -263,15 +310,14 @@ const styles = StyleSheet.create({
   },
   submitButtonText: {
     color: "#FFFFFF",
-    fontSize: isWeb ? 16 : 14,
+    fontSize: isWeb ? 17 : 14,
     fontWeight: "bold",
   },
   noteContainer: {
     flexDirection: "row",
     alignItems: "center",
-    // backgroundColor: "rgba(33, 150, 243, 0.1)",
-    padding: 12,
-    borderRadius: 8,
+    padding: isWeb ? 14 : 12,
+    borderRadius: isWeb ? 10 : 8,
     gap: 8,
   },
   noteText: {
@@ -281,7 +327,7 @@ const styles = StyleSheet.create({
     color: Colors.orangeAccent,
   },
   bottomSpacer: {
-    height: 100,
+    height: isWeb ? 120 : 100,
   },
 });
 

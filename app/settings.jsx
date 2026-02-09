@@ -6,6 +6,7 @@ import {
   Platform,
   Dimensions,
   ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import { router } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -98,101 +99,113 @@ const Settings = () => {
 
   return (
     <ThemedView style={styles.container}>
-      <View style={styles.content}>
-        {/* Header */}
-        <View style={styles.header}>
-          {isAdmin && (
-            <View style={styles.adminBadge}>
-              <MaterialIcons
-                name="admin-panel-settings"
-                size={16}
-                color="#fff"
-              />
-              <ThemedText style={styles.adminBadgeText}>Admin Mode</ThemedText>
-            </View>
-          )}
-        </View>
-
-        {/* Vertical Tabs Container */}
-        <View style={styles.tabsContainer}>
-          {tabs.map((tab) => (
-            <TouchableOpacity
-              key={tab.id}
-              style={[
-                styles.tabCard,
-                // { borderLeftColor: tab.color || Colors.blueAccent },
-              ]}
-              onPress={() => handleTabPress(tab)}
-              activeOpacity={0.8}
-            >
-              <View style={styles.tabContent}>
-                <View style={styles.tabLeft}>
-                  <View
-                    style={[
-                      styles.iconContainer,
-                      {
-                        // backgroundColor:
-                        //   (tab.color || Colors.blueAccent) + "20",
-                      },
-                    ]}
-                  >
-                    <MaterialIcons
-                      name={tab.icon}
-                      size={24}
-                      color={tab.color || Colors.blueAccent}
-                    />
-                  </View>
-                  <View style={styles.tabTextContainer}>
-                    <ThemedText style={styles.tabTitle}>{tab.title}</ThemedText>
-                    <ThemedText style={styles.tabDescription}>
-                      {tab.description}
-                    </ThemedText>
-                  </View>
-                </View>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.content}>
+          {/* Header */}
+          <View style={styles.header}>
+            {isAdmin && (
+              <View style={styles.adminBadge}>
                 <MaterialIcons
-                  name="chevron-right"
-                  size={24}
-                  color={Colors.text}
-                  style={styles.tabArrow}
+                  name="admin-panel-settings"
+                  size={16}
+                  color="#fff"
                 />
+                <ThemedText style={styles.adminBadgeText}>
+                  Admin Mode
+                </ThemedText>
               </View>
-            </TouchableOpacity>
-          ))}
-        </View>
+            )}
+          </View>
 
-        {/* Copyright Section */}
-        <View style={styles.copyrightWrapper}>
-          <View style={styles.copyrightContainer}>
-            <View style={styles.copyrightHeader}>
-              <MaterialIcons name="copyright" size={16} color={Colors.text} />
-              <ThemedText style={styles.copyrightText}>
-                {new Date().getFullYear()} Jasper-Tech
-              </ThemedText>
-            </View>
+          {/* Vertical Tabs Container */}
+          <View style={styles.tabsContainer}>
+            {tabs.map((tab) => (
+              <TouchableOpacity
+                key={tab.id}
+                style={[
+                  styles.tabCard,
+                  // { borderLeftColor: tab.color || Colors.blueAccent },
+                ]}
+                onPress={() => handleTabPress(tab)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.tabContent}>
+                  <View style={styles.tabLeft}>
+                    <View
+                      style={[
+                        styles.iconContainer,
+                        {
+                          // backgroundColor:
+                          //   (tab.color || Colors.blueAccent) + "20",
+                        },
+                      ]}
+                    >
+                      <MaterialIcons
+                        name={tab.icon}
+                        size={24}
+                        color={tab.color || Colors.blueAccent}
+                      />
+                    </View>
+                    <View style={styles.tabTextContainer}>
+                      <ThemedText style={styles.tabTitle}>
+                        {tab.title}
+                      </ThemedText>
+                      <ThemedText style={styles.tabDescription}>
+                        {tab.description}
+                      </ThemedText>
+                    </View>
+                  </View>
+                  <MaterialIcons
+                    name="chevron-right"
+                    size={24}
+                    color={Colors.text}
+                    style={styles.tabArrow}
+                  />
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
 
-            <View style={styles.versionContainer}>
-              <MaterialIcons
-                name="code"
-                size={12}
-                color={Colors.gray}
-                style={styles.versionIcon}
-              />
-              <ThemedText style={styles.versionText}>Version 1.0.0</ThemedText>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.developerInfo}>
-              <MaterialIcons
-                name="developer-mode"
-                size={14}
-                color={Colors.blueAccent}
-              />
-              <ThemedText style={styles.developerText}>
-                Developed by Sandy Afeawo
-              </ThemedText>
+          {/* Copyright Section */}
+          <View style={styles.copyrightWrapper}>
+            <View style={styles.copyrightContainer}>
+              <View style={styles.copyrightHeader}>
+                <MaterialIcons name="copyright" size={16} color={Colors.text} />
+                <ThemedText style={styles.copyrightText}>
+                  {new Date().getFullYear()} Jasper-Tech
+                </ThemedText>
+              </View>
+
+              <View style={styles.versionContainer}>
+                <MaterialIcons
+                  name="code"
+                  size={12}
+                  color={Colors.gray}
+                  style={styles.versionIcon}
+                />
+                <ThemedText style={styles.versionText}>
+                  Version 1.0.0
+                </ThemedText>
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.developerInfo}>
+                <MaterialIcons
+                  name="developer-mode"
+                  size={14}
+                  color={Colors.blueAccent}
+                />
+                <ThemedText style={styles.developerText}>
+                  Developed by Sandy Afeawo
+                </ThemedText>
+              </View>
             </View>
           </View>
         </View>
-      </View>
+      </ScrollView>
 
       <FooterNav />
     </ThemedView>
@@ -203,10 +216,20 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
   content: {
     flex: 1,
-    paddingHorizontal: isWeb ? "8%" : 20,
-    paddingTop: 24,
+    paddingHorizontal: isWeb ? Math.max(width * 0.08, 40) : 16,
+    paddingTop: isWeb ? 32 : 20,
+    paddingBottom: isWeb ? 40 : 120,
+    maxWidth: isWeb ? 1000 : "100%",
+    alignSelf: "center",
+    width: "100%",
   },
   loadingContainer: {
     flex: 1,
@@ -219,21 +242,21 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   header: {
-    marginBottom: 32,
+    marginBottom: isWeb ? 36 : 28,
     alignItems: "center",
   },
   adminBadge: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: Colors.blueAccent,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: isWeb ? 16 : 12,
+    paddingVertical: isWeb ? 8 : 6,
+    borderRadius: isWeb ? 10 : 8,
     gap: 6,
   },
   adminBadgeText: {
     color: "#fff",
-    fontSize: 12,
+    fontSize: isWeb ? 14 : 12,
     fontWeight: "600",
   },
   title: {
@@ -248,14 +271,13 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   tabsContainer: {
-    flex: 1,
-    marginBottom: 24,
+    marginBottom: isWeb ? 32 : 24,
   },
   tabCard: {
     backgroundColor: "rgba(255, 255, 255, 0.05)",
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
+    borderRadius: isWeb ? 16 : 12,
+    padding: isWeb ? 24 : 18,
+    marginBottom: isWeb ? 18 : 14,
     borderLeftWidth: 4,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.1)",
@@ -276,12 +298,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: isWeb ? 52 : 48,
+    height: isWeb ? 52 : 48,
+    borderRadius: isWeb ? 26 : 24,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 16,
+    marginRight: isWeb ? 18 : 14,
   },
   tabTextContainer: {
     flex: 1,
@@ -300,13 +322,13 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   copyrightWrapper: {
-    marginTop: "auto",
+    marginTop: isWeb ? 24 : 16,
     paddingBottom: 20,
   },
   copyrightContainer: {
-    padding: 20,
+    padding: isWeb ? 24 : 20,
     backgroundColor: "rgba(255, 255, 255, 0.05)",
-    borderRadius: 16,
+    borderRadius: isWeb ? 20 : 16,
     alignItems: "center",
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.1)",
@@ -314,7 +336,7 @@ const styles = StyleSheet.create({
   copyrightHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: isWeb ? 14 : 12,
     gap: 6,
   },
   copyrightText: {
@@ -332,11 +354,11 @@ const styles = StyleSheet.create({
   versionContainer: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: isWeb ? 14 : 12,
+    paddingVertical: isWeb ? 8 : 6,
     backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderRadius: 8,
-    marginBottom: 12,
+    borderRadius: isWeb ? 10 : 8,
+    marginBottom: isWeb ? 14 : 12,
     gap: 6,
   },
   versionIcon: {
@@ -350,13 +372,13 @@ const styles = StyleSheet.create({
     height: 1,
     width: "80%",
     backgroundColor: "rgba(255, 255, 255, 0.1)",
-    marginVertical: 8,
+    marginVertical: isWeb ? 10 : 8,
   },
   developerInfo: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    marginTop: 4,
+    marginTop: isWeb ? 6 : 4,
   },
   developerText: {
     fontSize: isWeb ? 12 : 10,

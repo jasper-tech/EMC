@@ -5,7 +5,6 @@ import {
   View,
   TouchableOpacity,
   ScrollView,
-  Alert,
   ActivityIndicator,
   Platform,
   Dimensions,
@@ -15,6 +14,8 @@ import { MaterialIcons } from "@expo/vector-icons";
 import ThemedView from "../components/ThemedView";
 import ThemedText from "../components/ThemedText";
 import FooterNav from "../components/FooterNav";
+import CustomAlert from "../components/CustomAlert";
+import ConfirmationModal from "../components/ConfirmationModal";
 import { Colors } from "../constants/Colors";
 import {
   collection,
@@ -33,6 +34,13 @@ const ViewIssues = () => {
   const [issues, setIssues] = useState([]);
   const [loadingIssues, setLoadingIssues] = useState(false);
   const [resolvingIssue, setResolvingIssue] = useState(null);
+
+  // Alert states
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [selectedIssueId, setSelectedIssueId] = useState(null);
+  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
+  const [showErrorAlert, setShowErrorAlert] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     fetchIssues();
@@ -61,29 +69,23 @@ const ViewIssues = () => {
       return () => unsubscribe();
     } catch (error) {
       console.error("Error fetching issues:", error);
-      Alert.alert("Error", "Failed to fetch issues");
+      setErrorMessage("Failed to fetch issues");
+      setShowErrorAlert(true);
       setLoadingIssues(false);
     }
   };
 
   const handleMarkAsResolved = (issueId) => {
-    Alert.alert("Confirm Resolution", "Are you sure this bug has been fixed?", [
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
-      {
-        text: "Mark as Resolved",
-        style: "destructive",
-        onPress: () => markIssueAsResolved(issueId),
-      },
-    ]);
+    setSelectedIssueId(issueId);
+    setShowConfirmModal(true);
   };
 
-  const markIssueAsResolved = async (issueId) => {
+  const markIssueAsResolved = async () => {
     try {
-      setResolvingIssue(issueId);
-      const issueRef = doc(db, "bugReports", issueId);
+      setResolvingIssue(selectedIssueId);
+      setShowConfirmModal(false);
+
+      const issueRef = doc(db, "bugReports", selectedIssueId);
 
       await updateDoc(issueRef, {
         resolved: true,
@@ -91,10 +93,12 @@ const ViewIssues = () => {
         resolvedAt: new Date(),
       });
 
-      Alert.alert("Success", "Bug marked as resolved!");
+      setShowSuccessAlert(true);
+      setSelectedIssueId(null);
     } catch (error) {
       console.error("Error marking issue as resolved:", error);
-      Alert.alert("Error", "Failed to mark issue as resolved");
+      setErrorMessage("Failed to mark issue as resolved");
+      setShowErrorAlert(true);
     } finally {
       setResolvingIssue(null);
     }
@@ -152,7 +156,7 @@ const ViewIssues = () => {
         <View style={styles.content}>
           <View style={styles.header}>
             <ThemedText style={styles.subtitle}>
-              Bugs reported by users (Admin View)
+              Bugs reported by users
             </ThemedText>
           </View>
 
@@ -308,7 +312,6 @@ const ViewIssues = () => {
                       {issue.description}
                     </ThemedText>
 
-                    {/* Update this section */}
                     <View style={styles.resolvedFooter}>
                       <View style={styles.userInfoContainer}>
                         <View style={styles.userInfo}>
@@ -346,6 +349,42 @@ const ViewIssues = () => {
       </ScrollView>
 
       <FooterNav />
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        visible={showConfirmModal}
+        onClose={() => {
+          setShowConfirmModal(false);
+          setSelectedIssueId(null);
+        }}
+        onConfirm={markIssueAsResolved}
+        type="success"
+        title="Confirm Resolution"
+        message="Are you sure this bug has been fixed?"
+        confirmText="Mark as Resolved"
+        cancelText="Cancel"
+        isLoading={false}
+      />
+
+      {/* Success Alert */}
+      <CustomAlert
+        visible={showSuccessAlert}
+        type="success"
+        title="Success!"
+        message="Bug marked as resolved successfully"
+        autoClose={true}
+        onConfirm={() => setShowSuccessAlert(false)}
+      />
+
+      {/* Error Alert */}
+      <CustomAlert
+        visible={showErrorAlert}
+        type="failed"
+        title="Error"
+        message={errorMessage}
+        confirmText="OK"
+        onConfirm={() => setShowErrorAlert(false)}
+      />
     </ThemedView>
   );
 };
@@ -362,25 +401,28 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: isWeb ? "8%" : 20,
-    paddingTop: 24,
+    paddingHorizontal: isWeb ? Math.max(width * 0.08, 40) : 16,
+    paddingTop: isWeb ? 32 : 20,
     paddingBottom: 40,
+    maxWidth: isWeb ? 1200 : "100%",
+    alignSelf: "center",
+    width: "100%",
   },
   backButton: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: isWeb ? 28 : 20,
     gap: 8,
   },
   backButtonText: {
-    fontSize: 16,
+    fontSize: isWeb ? 18 : 16,
     fontWeight: "600",
   },
   header: {
-    marginBottom: 24,
+    marginBottom: isWeb ? 28 : 20,
   },
   title: {
-    fontSize: isWeb ? 32 : 28,
+    fontSize: isWeb ? 32 : 24,
     fontWeight: "bold",
     marginBottom: 8,
   },
@@ -391,47 +433,48 @@ const styles = StyleSheet.create({
   statsContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 24,
-    gap: 12,
+    marginBottom: isWeb ? 28 : 20,
+    gap: isWeb ? 16 : 10,
   },
   statCard: {
     flex: 1,
     backgroundColor: "rgba(255, 255, 255, 0.05)",
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: isWeb ? 16 : 12,
+    padding: isWeb ? 20 : 14,
     alignItems: "center",
   },
   statNumber: {
-    fontSize: 24,
+    fontSize: isWeb ? 28 : 22,
     fontWeight: "bold",
-    marginBottom: 4,
+    marginBottom: 6,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: isWeb ? 13 : 11,
     opacity: 0.7,
   },
   loadingContainer: {
     alignItems: "center",
     justifyContent: "center",
-    padding: 40,
+    padding: isWeb ? 60 : 40,
   },
   loadingText: {
     marginTop: 12,
     opacity: 0.7,
+    fontSize: isWeb ? 15 : 14,
   },
   emptyContainer: {
     alignItems: "center",
     justifyContent: "center",
-    padding: 40,
+    padding: isWeb ? 60 : 40,
   },
   emptyTitle: {
-    fontSize: 20,
+    fontSize: isWeb ? 22 : 18,
     fontWeight: "bold",
     marginTop: 16,
     marginBottom: 8,
   },
   emptyText: {
-    fontSize: 14,
+    fontSize: isWeb ? 15 : 14,
     opacity: 0.7,
     textAlign: "center",
   },
@@ -439,27 +482,27 @@ const styles = StyleSheet.create({
     maxHeight: isWeb ? 600 : 500,
   },
   sectionHeader: {
-    marginBottom: 16,
-    marginTop: 8,
+    marginBottom: isWeb ? 20 : 14,
+    marginTop: isWeb ? 12 : 8,
   },
   sectionTitle: {
-    fontSize: isWeb ? 18 : 16,
+    fontSize: isWeb ? 20 : 16,
     fontWeight: "bold",
     opacity: 0.9,
   },
   issueCard: {
     backgroundColor: "rgba(255, 255, 255, 0.05)",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: isWeb ? 16 : 12,
+    padding: isWeb ? 20 : 14,
+    marginBottom: isWeb ? 16 : 12,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.1)",
   },
   resolvedCard: {
     backgroundColor: "rgba(76, 175, 80, 0.05)",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: isWeb ? 16 : 12,
+    padding: isWeb ? 20 : 14,
+    marginBottom: isWeb ? 16 : 12,
     borderWidth: 1,
     borderColor: Colors.greenAccent + "30",
   },
@@ -467,7 +510,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: isWeb ? 14 : 10,
+    flexWrap: "wrap",
+    gap: 8,
   },
   statusContainer: {
     flexDirection: "row",
@@ -475,28 +520,29 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: isWeb ? 10 : 8,
+    height: isWeb ? 10 : 8,
+    borderRadius: isWeb ? 5 : 4,
   },
   statusText: {
-    fontSize: 12,
+    fontSize: isWeb ? 13 : 11,
     fontWeight: "bold",
     textTransform: "uppercase",
   },
   issueDate: {
-    fontSize: 12,
+    fontSize: isWeb ? 13 : 11,
     opacity: 0.7,
   },
   issueDescription: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 12,
+    fontSize: isWeb ? 15 : 14,
+    lineHeight: isWeb ? 22 : 20,
+    marginBottom: isWeb ? 14 : 10,
   },
   issueFooter: {
-    flexDirection: "row",
+    flexDirection: isWeb ? "row" : "column",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: isWeb ? "center" : "flex-start",
+    gap: isWeb ? 0 : 12,
   },
   userInfo: {
     flexDirection: "row",
@@ -504,48 +550,49 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   issueUser: {
-    fontSize: 12,
+    fontSize: isWeb ? 13 : 12,
     opacity: 0.7,
   },
   resolveButton: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: Colors.greenAccent,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: isWeb ? 16 : 12,
+    paddingVertical: isWeb ? 10 : 8,
+    borderRadius: isWeb ? 10 : 8,
     gap: 6,
+    alignSelf: isWeb ? "auto" : "flex-end",
   },
   resolveButtonDisabled: {
     opacity: 0.6,
   },
   resolveButtonText: {
     color: "#FFFFFF",
-    fontSize: 12,
+    fontSize: isWeb ? 13 : 12,
     fontWeight: "bold",
   },
   resolvedInfo: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: Colors.greenAccent + "20",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
+    paddingHorizontal: isWeb ? 10 : 8,
+    paddingVertical: isWeb ? 6 : 4,
+    borderRadius: 6,
     gap: 4,
   },
   resolvedAtText: {
-    fontSize: 10,
+    fontSize: isWeb ? 11 : 10,
     fontWeight: "bold",
     color: Colors.greenAccent,
   },
   bottomSpacer: {
-    height: 100,
+    height: isWeb ? 120 : 100,
   },
   resolvedFooter: {
-    marginTop: 8,
+    marginTop: isWeb ? 10 : 8,
   },
   userInfoContainer: {
-    gap: 8,
+    gap: isWeb ? 10 : 8,
   },
 });
 
