@@ -50,7 +50,7 @@ const FooterNav = ({ onMenuPress }) => {
       route: "/dashboard",
     },
     {
-      name: "About",
+      name: "Manage",
       icon: "information-circle-outline",
       iconFilled: "information-circle",
       route: "/about",

@@ -99,7 +99,7 @@ const LayoutContent = () => {
             <Stack.Screen
               name="about"
               options={{
-                headerTitle: "About",
+                headerTitle: "Management",
                 gestureEnabled: false,
               }}
             />
@@ -107,6 +107,13 @@ const LayoutContent = () => {
               name="reports"
               options={{
                 headerTitle: "Reports",
+                gestureEnabled: false,
+              }}
+            />
+            <Stack.Screen
+              name="jotter"
+              options={{
+                headerTitle: "Jotter",
                 gestureEnabled: false,
               }}
             />
@@ -293,7 +300,7 @@ const LayoutContent = () => {
                 gestureEnabled: false,
               }}
             />
-             <Stack.Screen
+            <Stack.Screen
               name="maintenance"
               options={{
                 headerTitle: "Maintenance",

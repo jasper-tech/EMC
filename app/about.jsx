@@ -143,28 +143,35 @@ const About = () => {
       title: "Members",
       description: "View and manage union members",
       route: "/members",
-      badge: "Manage",
+      icon: "people",
     },
     {
       id: 2,
       title: "Finances",
       description: "View Money Available",
       route: "/finances",
-      badge: "Track",
+      icon: "wallet",
     },
     {
       id: 3,
       title: "Students Union",
       description: "Union info and code of conduct",
       route: "/studentunion",
-      badge: "Info",
+      icon: "information-circle",
     },
     {
       id: 4,
       title: "Events & Birthdays",
       description: "Upcoming events and birthdays",
       route: "/events",
-      badge: "Latest",
+      icon: "calendar",
+    },
+    {
+      id: 5,
+      title: "Jotter",
+      description: "Write Minutes and Reports",
+      route: "/jotter",
+      icon: "document-text",
     },
   ];
 
@@ -284,11 +291,12 @@ const About = () => {
                     <ThemedText style={styles.itemTitle}>
                       {item.title}
                     </ThemedText>
-                    <View style={styles.badge}>
-                      <ThemedText style={styles.badgeText}>
-                        {item.badge}
-                      </ThemedText>
-                    </View>
+                    <Ionicons
+                      name={item.icon}
+                      size={20}
+                      color={Colors.text}
+                      style={styles.iconBadge}
+                    />
                   </View>
                   <ThemedText style={styles.itemDescription}>
                     {item.description}
@@ -453,18 +461,9 @@ const styles = StyleSheet.create({
     opacity: 0.6,
     lineHeight: 18,
   },
-  badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    marginLeft: 12,
-    backgroundColor: Colors.border + "40",
-  },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: "bold",
-    letterSpacing: 0.5,
+  iconBadge: {
     opacity: 0.7,
+    marginLeft: 12,
   },
   chevron: {
     opacity: 0.5,
