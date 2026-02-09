@@ -1,4 +1,3 @@
-// app/components/DocumentViewer.jsx
 import React, { useState, useContext } from "react";
 import {
   StyleSheet,
@@ -11,7 +10,6 @@ import {
   Modal,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import ThemedView from "./ThemedView";
 import ThemedText from "./ThemedText";
 import ConfirmationModal from "./ConfirmationModal";
 import { Colors } from "../constants/Colors";

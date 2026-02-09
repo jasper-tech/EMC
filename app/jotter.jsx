@@ -220,7 +220,7 @@ const Jotter = () => {
         <ScrollView style={styles.scrollView}>
           <View style={styles.content}>
             <View style={styles.noPermissionContainer}>
-              <MaterialIcons
+              {/* <MaterialIcons
                 name="lock"
                 size={64}
                 color={Colors.redAccent}
@@ -228,7 +228,7 @@ const Jotter = () => {
               />
               <ThemedText style={styles.noPermissionTitle}>
                 Access Denied
-              </ThemedText>
+              </ThemedText> */}
               <ThemedText style={styles.noPermissionText}>
                 You don't have permission to write minutes or announcements.
               </ThemedText>

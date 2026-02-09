@@ -169,7 +169,7 @@ const About = () => {
     {
       id: 5,
       title: "Jotter",
-      description: "Write Minutes and Reports",
+      description: "Write Minutes, Reports and Announcements",
       route: "/jotter",
       icon: "document-text",
     },

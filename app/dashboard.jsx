@@ -28,6 +28,7 @@ import {
 import { db } from "../firebase";
 import SidePanel from "../components/SidePanel";
 import { MaterialIcons } from "@expo/vector-icons";
+import AnnouncementModal from "../components/AnnouncementModal";
 
 const { width, height } = Dimensions.get("window");
 const isWeb = Platform.OS === "web";
@@ -298,6 +299,8 @@ const Dashboard = () => {
   const [showBirthdayBanner, setShowBirthdayBanner] = useState(true);
   const [hoveredTab, setHoveredTab] = useState(null);
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
+  const [latestAnnouncement, setLatestAnnouncement] = useState(null);
+  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
   const [members, setMembers] = useState([]);
   const currentUserId = user?.uid;
 
@@ -326,6 +329,50 @@ const Dashboard = () => {
 
     return () => unsubscribe();
   }, [currentUserId]);
+
+  useEffect(() => {
+    const fetchLatestAnnouncement = async () => {
+      try {
+        const writingsRef = collection(db, "writings");
+        const q = query(
+          writingsRef,
+          where("type", "==", "announcement"),
+          orderBy("timestamp", "desc")
+        );
+
+        const unsubscribe = onSnapshot(
+          q,
+          (snapshot) => {
+            if (!snapshot.empty) {
+              const announcement = {
+                id: snapshot.docs[0].id,
+                ...snapshot.docs[0].data(),
+                timestamp:
+                  snapshot.docs[0].data().timestamp?.toDate() || new Date(),
+              };
+
+              setLatestAnnouncement(announcement);
+              setShowAnnouncementModal(true);
+            } else {
+              setLatestAnnouncement(null);
+              setShowAnnouncementModal(false);
+            }
+          },
+          (error) => {
+            console.error("Error fetching announcements:", error);
+          }
+        );
+
+        return () => unsubscribe();
+      } catch (error) {
+        console.error("Error setting up announcement listener:", error);
+      }
+    };
+
+    if (currentUserId && !authLoading && !pendingVerification) {
+      fetchLatestAnnouncement();
+    }
+  }, [currentUserId, authLoading, pendingVerification]);
 
   // Fetch upcoming programs
   useEffect(() => {
@@ -394,8 +441,8 @@ const Dashboard = () => {
   // Calculate next upcoming birthday
   const nextBirthday = useMemo(() => {
     const today = new Date();
-    const currentMonth = today.getMonth() + 1;
-    const currentDay = today.getDate();
+    // const currentMonth = today.getMonth() + 1;
+    // const currentDay = today.getDate();
 
     const membersWithBirthdays = members.filter(
       (member) => member.birthDate && member.birthDate.trim() !== ""
@@ -536,7 +583,9 @@ const Dashboard = () => {
   const handleCloseBirthdayBanner = () => {
     setShowBirthdayBanner(false);
   };
-
+  const handleCloseAnnouncement = () => {
+    setShowAnnouncementModal(false);
+  };
   const renderTabCard = ({ item, index }) => (
     <View
       onMouseEnter={isWeb ? () => setHoveredTab(item.id) : undefined}
@@ -633,6 +682,11 @@ const Dashboard = () => {
 
       {/* Footer with hamburger menu functionality */}
       <FooterNav onMenuPress={() => setIsSidePanelOpen(true)} />
+      <AnnouncementModal
+        announcement={latestAnnouncement}
+        visible={showAnnouncementModal}
+        onClose={handleCloseAnnouncement}
+      />
 
       {/* Side Panel */}
       <SidePanel
