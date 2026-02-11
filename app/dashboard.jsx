@@ -214,13 +214,13 @@ const UpcomingProgramBanner = ({
             )}
 
             {/* Age info for birthdays */}
-            {isBirthday && program.age && (
+            {/* {isBirthday && program.age && (
               <View style={styles.detailItem}>
                 <ThemedText style={[styles.detailText]}>
                   Turns {program.age + 1}
                 </ThemedText>
               </View>
-            )}
+            )} */}
           </View>
         </View>
 

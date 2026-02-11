@@ -332,9 +332,9 @@ const Birthday = () => {
                                     size={14}
                                     style={styles.ageIcon}
                                   /> */}
-                                  <ThemedText style={styles.ageText}>
+                                  {/* <ThemedText style={styles.ageText}>
                                     {member.age} years
-                                  </ThemedText>
+                                  </ThemedText> */}
                                 </>
                               )}
                             </View>

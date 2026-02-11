@@ -743,9 +743,9 @@ const Members = () => {
                 )}
               </View>
               <ThemedText style={styles.memberPhone}>{item.phone}</ThemedText>
-              {ageDisplay && (
+              {/* {ageDisplay && (
                 <ThemedText style={styles.memberAge}>{ageDisplay}</ThemedText>
-              )}
+              )} */}
               {item.email && (
                 <ThemedText style={styles.memberEmail}>{item.email}</ThemedText>
               )}
